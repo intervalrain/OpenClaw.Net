@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>OpenClaw</id>
+    <version>1.0.0</version>
+    <title>Weda Clean Architecture Template</title>
+    <authors>Rain Hu</authors>
+    <description>A clean architecture template with DDD, CQRS, NATS EventController, and Entity Framework Core for building enterprise-grade .NET applications.</description>
+    <projectUrl>https://github.com/advantech/openclaw</projectUrl>
+    <license type="expression">MIT</license>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>dotnet-new template clean-architecture ddd cqrs nats efcore</tags>
+    <packageTypes>
+      <packageType name="Template" />
+    </packageTypes>
+  </metadata>
+  <files>
+    <file src="**/*" exclude="**/.git/**;**/.claude/**;**/.vscode/**;**/bin/**;**/obj/**;**/*.sqlite;**/*.sqlite-shm;**/*.sqlite-wal;**/.DS_Store;*.nupkg" target="content" />
+  </files>
+</package>

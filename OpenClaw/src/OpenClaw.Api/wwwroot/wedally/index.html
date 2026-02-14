@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wedally - NATS API Testing</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="wedally.css">
+</head>
+<body>
+    <div class="wedally-app">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <a href="/" class="logo">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                    </svg>
+                    <span class="logo-text">Wedally</span>
+                </a>
+                <span class="api-title" id="apiTitle">NATS API</span>
+            </div>
+            <div class="topbar-right">
+                <div class="version-select">
+                    <label>Version:</label>
+                    <select id="versionSelect">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <a href="/api/v1/wedally/spec" target="_blank" class="btn btn-outline" title="Download Spec">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Spec
+                </a>
+            </div>
+        </header>
+
+        <!-- Info Banner -->
+        <div class="info-banner" id="infoBanner">
+            <div class="info-content">
+                <h1 id="infoTitle">Weda NATS API</h1>
+                <p id="infoDescription">NATS EventController endpoints specification</p>
+                <div class="info-meta">
+                    <span class="info-version" id="infoVersion">v1.0.0</span>
+                    <span class="info-servers" id="infoServers"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar - Tags/Controllers -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-header">
+                        <h3>Endpoints</h3>
+                        <span class="badge" id="endpointCount">0</span>
+                    </div>
+                    <div class="filter-box">
+                        <input type="text" id="filterInput" placeholder="Filter by subject or method...">
+                    </div>
+                    <nav class="tag-list" id="tagList">
+                        <!-- Tags will be rendered here -->
+                    </nav>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-header">
+                        <h3>Definitions</h3>
+                        <span class="badge" id="definitionCount">0</span>
+                    </div>
+                    <nav class="definition-list" id="definitionList">
+                        <!-- Definitions will be rendered here -->
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- Main Panel -->
+            <main class="main-panel" id="mainPanel">
+                <!-- Endpoints Section -->
+                <section class="endpoints-section" id="endpointsSection">
+                    <!-- Endpoint cards will be rendered here -->
+                </section>
+
+                <!-- Definitions Section -->
+                <section class="definitions-section" id="definitionsSection">
+                    <!-- Definitions header and content will be rendered by JS -->
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Try It Modal -->
+    <div class="modal" id="tryItModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="action-badge" id="modalAction">Request</span>
+                    <h2 id="modalMethod">GetEmployee</h2>
+                </div>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="try-section">
+                    <label>Subject</label>
+                    <div class="subject-builder" id="modalSubjectBuilder"></div>
+                </div>
+                <div class="try-section" id="modalBodySection">
+                    <label>Request Body</label>
+                    <textarea id="modalRequestBody" class="json-editor" placeholder="{}"></textarea>
+                </div>
+                <div class="try-actions">
+                    <button class="btn btn-primary" id="modalExecuteBtn">Execute</button>
+                    <button class="btn btn-outline" id="modalClearBtn">Clear</button>
+                </div>
+                <div class="try-section response-section" id="modalResponseSection" style="display: none;">
+                    <div class="response-header">
+                        <label>Response</label>
+                        <div class="response-meta">
+                            <span class="response-time" id="modalResponseTime"></span>
+                            <span class="response-status" id="modalResponseStatus"></span>
+                        </div>
+                    </div>
+                    <div class="json-viewer" id="modalResponseViewer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="wedally.js"></script>
+</body>
+</html>

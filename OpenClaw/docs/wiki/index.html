@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEDA Wiki Documentation</title>
+    <link rel="stylesheet" href="wiki.css">
+    <style>
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #1a1a2e;
+            color: #fff;
+            padding: 20px 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .lang-switch {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .lang-btn.active {
+            background: #4a69bd;
+            color: #fff;
+        }
+
+        .lang-btn:not(.active) {
+            background: #333;
+            color: #aaa;
+        }
+
+        .lang-btn:hover:not(.active) {
+            background: #444;
+        }
+
+        .nav-section {
+            padding: 20px;
+        }
+
+        .nav-section h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #888;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-list {
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 5px;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 10px 15px;
+            color: #ccc;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+
+        .nav-link:hover {
+            background: #333;
+            color: #fff;
+        }
+
+        .nav-link.active {
+            background: #4a69bd;
+            color: #fff;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            background: #fff;
+        }
+
+        .content-frame {
+            width: 100%;
+            height: 100vh;
+            border: none;
+        }
+
+        /* Loading state */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error-message {
+            text-align: center;
+            padding: 60px 40px;
+            color: #666;
+        }
+
+        .error-message h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .error-message code {
+            background: #f4f4f4;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .mode-indicator {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+        .mode-static {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .mode-dynamic {
+            background: #f39c12;
+            color: #fff;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                height: auto;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .container {
+                flex-direction: column;
+            }
+
+            .content-frame {
+                height: calc(100vh - 200px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>WEDA Wiki</h1>
+                <div class="lang-switch">
+                    <button class="lang-btn active" data-lang="en">English</button>
+                    <button class="lang-btn" data-lang="zh">中文</button>
+                </div>
+                <span class="mode-indicator" id="mode-indicator"></span>
+            </div>
+            <div class="nav-section">
+                <h3>Documentation</h3>
+                <ul class="nav-list" id="nav-list">
+                    <li class="nav-item"><span class="loading">Loading...</span></li>
+                </ul>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <iframe class="content-frame" id="content-frame" src="about:blank"></iframe>
+        </main>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let currentDocId = null;
+        let manifest = null;
+        let useStaticMode = false;
+
+        // Try to load manifest (static mode) or fallback to dynamic mode
+        async function init() {
+            try {
+                const response = await fetch('manifest.json');
+                if (response.ok) {
+                    manifest = await response.json();
+                    useStaticMode = true;
+                    setModeIndicator('Static', 'mode-static');
+                } else {
+                    throw new Error('No manifest');
+                }
+            } catch {
+                // Fallback to dynamic mode with hardcoded docs
+                manifest = {
+                    en: [
+                        { id: 'GUIDE', title: 'Learning Guide', path: 'en/GUIDE.md' },
+                        { id: '00-weda-core-overview', title: 'WEDA Core Overview', path: 'en/00-weda-core-overview.md' },
+                        { id: '01-domain-layer', title: 'Domain Layer', path: 'en/01-domain-layer.md' },
+                        { id: '02-application-layer', title: 'Application Layer', path: 'en/02-application-layer.md' },
+                        { id: '03-infrastructure-layer', title: 'Infrastructure Layer', path: 'en/03-infrastructure-layer.md' },
+                        { id: '04-api-layer', title: 'API Layer', path: 'en/04-api-layer.md' }
+                    ],
+                    zh: [
+                        { id: 'GUIDE', title: '學習指南', path: 'zh/GUIDE.md' },
+                        { id: '00-weda-core-overview', title: 'WEDA Core 概觀', path: 'zh/00-weda-core-overview.md' },
+                        { id: '01-domain-layer', title: 'Domain 層', path: 'zh/01-domain-layer.md' },
+                        { id: '02-application-layer', title: 'Application 層', path: 'zh/02-application-layer.md' },
+                        { id: '03-infrastructure-layer', title: 'Infrastructure 層', path: 'zh/03-infrastructure-layer.md' },
+                        { id: '04-api-layer', title: 'API 層', path: 'zh/04-api-layer.md' }
+                    ]
+                };
+                useStaticMode = false;
+                setModeIndicator('Dynamic', 'mode-dynamic');
+            }
+
+            renderNav();
+            loadFirstDoc();
+        }
+
+        function setModeIndicator(text, className) {
+            const indicator = document.getElementById('mode-indicator');
+            indicator.textContent = text;
+            indicator.className = 'mode-indicator ' + className;
+        }
+
+        function renderNav() {
+            const navList = document.getElementById('nav-list');
+            const docs = manifest[currentLang] || [];
+
+            navList.innerHTML = docs.map(doc => `
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-id="${doc.id}" data-path="${doc.path}">
+                        ${doc.title}
+                    </a>
+                </li>
+            `).join('');
+
+            navList.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadDocument(link.dataset.id, link.dataset.path);
+                });
+            });
+        }
+
+        function loadFirstDoc() {
+            const docs = manifest[currentLang] || [];
+            if (docs.length > 0) {
+                loadDocument(docs[0].id, docs[0].path);
+            }
+        }
+
+        function loadDocument(docId, path) {
+            currentDocId = docId;
+            updateActiveNav();
+
+            const frame = document.getElementById('content-frame');
+
+            if (useStaticMode) {
+                // Load pre-generated HTML (path already includes lang folder)
+                frame.src = path;
+            } else {
+                // Dynamic mode: show inline rendered content
+                frame.srcdoc = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <link rel="stylesheet" href="wiki.css">
+                        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+                    </head>
+                    <body>
+                        <article class="markdown-body" id="content">
+                            <div style="text-align:center;padding:40px;color:#666;">Loading...</div>
+                        </article>
+                        <script>
+                            (async () => {
+                                try {
+                                    const res = await fetch('${path}');
+                                    if (!res.ok) throw new Error('Not found');
+                                    let text = await res.text();
+                                    text = text.replace(/^---[\\s\\S]*?---\\n*/m, '');
+                                    document.getElementById('content').innerHTML = marked.parse(text);
+                                } catch (e) {
+                                    document.getElementById('content').innerHTML =
+                                        '<div style="text-align:center;padding:40px;color:#666;">' +
+                                        '<h2>Document not found</h2>' +
+                                        '<p>Run WikiGenerator to generate static files, or use a web server.</p>' +
+                                        '</div>';
+                                }
+                            })();
+                        <\/script>
+                    </body>
+                    </html>
+                `;
+            }
+        }
+
+        function updateActiveNav() {
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.toggle('active', link.dataset.id === currentDocId);
+            });
+        }
+
+        // Language switch
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentLang = btn.dataset.lang;
+
+                document.querySelectorAll('.lang-btn').forEach(b => {
+                    b.classList.toggle('active', b === btn);
+                });
+
+                renderNav();
+
+                // Try to stay on same doc
+                const docs = manifest[currentLang] || [];
+                const sameDoc = docs.find(d => d.id === currentDocId);
+                if (sameDoc) {
+                    loadDocument(sameDoc.id, sameDoc.path);
+                } else {
+                    loadFirstDoc();
+                }
+            });
+        });
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

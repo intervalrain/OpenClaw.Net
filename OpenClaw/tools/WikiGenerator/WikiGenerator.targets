@@ -1,0 +1,24 @@
+<Project>
+  <!--
+    WikiGenerator MSBuild Target
+
+    Usage: Add this to your Api.csproj:
+    <Import Project="..\..\tools\WikiGenerator\WikiGenerator.targets" />
+
+    Or run manually:
+    dotnet run --project tools/WikiGenerator - - docs/wiki docs/wiki/_generated
+  -->
+
+  <PropertyGroup>
+    <WikiGeneratorProject>$(MSBuildThisFileDirectory)WikiGenerator.csproj</WikiGeneratorProject>
+    <WikiSourceDir>$(MSBuildProjectDirectory)\..\..\docs\wiki</WikiSourceDir>
+    <WikiOutputDir>$(WikiSourceDir)\_generated</WikiOutputDir>
+  </PropertyGroup>
+
+  <Target Name="GenerateWiki" BeforeTargets="Build" Condition="Exists('$(WikiSourceDir)')">
+    <Message Importance="high" Text="Generating Wiki documentation..." />
+    <Exec Command="dotnet run --project &quot;$(WikiGeneratorProject)&quot; -- &quot;$(WikiSourceDir)&quot; &quot;$(WikiOutputDir)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+</Project>
