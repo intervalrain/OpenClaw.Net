@@ -7,6 +7,7 @@ using OpenClaw.Infrastructure.Llm.Ollama;
 using OpenClaw.Skills.FileSystem.ListDirectory;
 using OpenClaw.Skills.FileSystem.ReadFile;
 using OpenClaw.Skills.FileSystem.WriteFile;
+using OpenClaw.Skills.Shell.ExecuteCommand;
 
 var client = new OllamaApiClient("http://localhost:11434");
 var llmProvider = new OllamaLlmProvider(client, "qwen2.5:7b");
@@ -16,6 +17,7 @@ var skills = new IAgentSkill[]
     ReadFileSkill.Default,
     WriteFileSkill.Default,
     ListDirectorySkill.Default,
+    ExecuteCommandSkill.Default,
 };
 
 var options = new AgentPipelineOptions

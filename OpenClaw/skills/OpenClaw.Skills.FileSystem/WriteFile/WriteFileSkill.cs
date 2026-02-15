@@ -5,7 +5,7 @@ namespace OpenClaw.Skills.FileSystem.WriteFile;
 
 public class WriteFileSkill : AgentSkillBase<WriteFileArgs>
 {
-    public static readonly WriteFileSkill Default = new();
+    public static WriteFileSkill Default => new();
 
     public override string Name => "write_file";
     public override string Description => "Write content to a file at the specified path. Creates the file if it doesn't exist.";

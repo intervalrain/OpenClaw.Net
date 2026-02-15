@@ -5,7 +5,7 @@ namespace OpenClaw.Skills.FileSystem.ListDirectory;
 
 public class ListDirectorySkill : AgentSkillBase<ListDirectoryArgs>
 {
-    public static readonly ListDirectorySkill Default = new();
+    public static ListDirectorySkill Default => new();
 
     public override string Name => "list_directory";
     public override string Description => "List files and directories at the specified path.";

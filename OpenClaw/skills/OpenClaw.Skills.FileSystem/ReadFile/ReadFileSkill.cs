@@ -5,7 +5,7 @@ namespace OpenClaw.Skills.FileSystem.ReadFile;
 
 public class ReadFileSkill : AgentSkillBase<ReadFileArgs>
 {
-    public static readonly ReadFileSkill Default = new();
+    public static ReadFileSkill Default => new();
 
     public override string Name => "read_file";
     public override string Description => "Read the contents of a file at the specified path.";
