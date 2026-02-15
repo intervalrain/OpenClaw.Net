@@ -35,6 +35,9 @@ public class AgentPipeline(
                 return response.Content ?? "";
             }
 
+            // Add assistant message with tool calls first (required by OpenAI)
+            _messages.Add(new ChatMessage(ChatRole.Assistant, response.Content, ToolCalls: response.ToolCalls));
+
             foreach (var toolCall in response.ToolCalls!)
             {
                 var result = await ExecuteToolCallAsync(toolCall, ct);

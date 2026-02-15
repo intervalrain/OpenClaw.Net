@@ -1,17 +1,24 @@
-﻿using OllamaSharp;
-
-using OpenClaw.Application.Agents;
+﻿using OpenClaw.Application.Agents;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Skills;
-using OpenClaw.Infrastructure.Llm.Ollama;
 using OpenClaw.Skills.FileSystem.ListDirectory;
 using OpenClaw.Skills.FileSystem.ReadFile;
 using OpenClaw.Skills.FileSystem.WriteFile;
 using OpenClaw.Skills.Shell.ExecuteCommand;
 using OpenClaw.Skills.Http.HttpRequest;
+using OpenClaw.Infrastructure.Configuration;
+using OpenClaw.Contracts.Configuration;
+using OpenClaw.Infrastructure.Llm.OpenAI;
+using OpenClaw.Infrastructure.Llm.Ollama;
+using OpenClaw.Contracts.Llm;
 
-var client = new OllamaApiClient("http://localhost:11434");
-var llmProvider = new OllamaLlmProvider(client, "qwen2.5:7b");
+var config = new EnvironmentConfigStore();
+ILlmProvider llmProvider = config.Get(ConfigKeys.LlmProvider) switch 
+{
+    "openai" => new OpenAILlmProvider(config),
+    _ => new OllamaLlmProvider(config)
+};
+
 
 var skills = new IAgentSkill[]
 {

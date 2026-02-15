@@ -2,21 +2,25 @@ using System.Text;
 using System.Text.Json;
 
 using OllamaSharp;
+
 using OllamaSharp.Models.Chat;
 
+using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
 
 namespace OpenClaw.Infrastructure.Llm.Ollama;
 
-public class OllamaLlmProvider(OllamaApiClient client, string model) : ILlmProvider
+public class OllamaLlmProvider(IConfigStore config) : ILlmProvider
 {
-    public string Name => $"ollama:{model}";
+    public string Name => $"ollama:{_model}";
+    private readonly OllamaApiClient _client = new(config.Get(ConfigKeys.OllamaUrl) ?? "http://localhost:11434");
+    private readonly string _model = config.Get(ConfigKeys.OllamaModel) ?? "qwen2.5:7b";
 
     public async Task<ChatResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
     {
         var request = new ChatRequest
         {
-            Model = model,
+            Model = _model,
             Messages = messages.Select(ToOllamaMessage).ToList(),
             Tools = tools?.Select(ToOllamaTool).ToList(),
         };
@@ -24,7 +28,7 @@ public class OllamaLlmProvider(OllamaApiClient client, string model) : ILlmProvi
         var sb = new StringBuilder();
         List<Message.ToolCall>? toolCalls = null;
 
-        await foreach (var chunk in client.ChatAsync(request, ct))
+        await foreach (var chunk in _client.ChatAsync(request, ct))
         {
             if (chunk?.Message.Content is { } content)
             {

@@ -2,7 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenClaw.Application\OpenClaw.Application.csproj" />
+    <ProjectReference Include="..\OpenClaw.Infrastructure\OpenClaw.Infrastructure.csproj" />
     <ProjectReference Include="..\OpenClaw.Infrastructure.Llm.Ollama\OpenClaw.Infrastructure.Llm.Ollama.csproj" />
+    <ProjectReference Include="..\OpenClaw.Infrastructure.Llm.OpenAI\OpenClaw.Infrastructure.Llm.OpenAI.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.FileSystem\OpenClaw.Skills.FileSystem.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Shell\OpenClaw.Skills.Shell.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Http\OpenClaw.Skills.Http.csproj" />
