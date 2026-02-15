@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 using OllamaSharp;
@@ -20,13 +21,23 @@ public class OllamaLlmProvider(OllamaApiClient client, string model) : ILlmProvi
             Tools = tools?.Select(ToOllamaTool).ToList(),
         };
 
-        ChatResponseStream? response = null;
+        var sb = new StringBuilder();
+        List<Message.ToolCall>? toolCalls = null;
+
         await foreach (var chunk in client.ChatAsync(request, ct))
         {
-            response = chunk;
+            if (chunk?.Message.Content is { } content)
+            {
+                sb.Append(content);
+            }
+
+            if (chunk?.Message.ToolCalls is { } tc && tc.Any())
+            {
+                toolCalls = chunk.Message.ToolCalls.ToList();   
+            }
         }
 
-        return ToChatResponse(response);
+        return ToChatResponse(sb.ToString(), toolCalls);
     }
 
     public IAsyncEnumerable<ChatResponseChunk> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
@@ -53,20 +64,39 @@ public class OllamaLlmProvider(OllamaApiClient client, string model) : ILlmProvi
         {
             Name = tool.Name,
             Description = tool.Description,
-            Parameters = tool.Parameters as Parameters,
+            Parameters = ConvertToParameters(tool.Parameters),
         },
     };
 
-    private static ChatResponse ToChatResponse(ChatResponseStream? response)
+    private static Parameters? ConvertToParameters(object? parameters)
     {
-        var content = response?.Message?.Content;
-        var toolCalls = response?.Message?.ToolCalls?
+        if (parameters is not ToolParameters toolParams) return null;
+
+        return new Parameters
+        {
+            Type = toolParams.Type,
+            Required = toolParams.Required,
+            Properties = toolParams.Properties?.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new Property
+                {
+                    Type = kvp.Value.Type,
+                    Description = kvp.Value.Description
+                })
+        };
+    }
+
+    private static ChatResponse ToChatResponse(string content, List<Message.ToolCall>? toolCalls)
+    {
+        var mappedToolCalls = toolCalls?
             .Select(tc => new ToolCall(
                 Guid.NewGuid().ToString(),
                 tc.Function?.Name ?? "",
                 JsonSerializer.Serialize(tc.Function?.Arguments)))
             .ToList();
-        
-        return new ChatResponse(content, toolCalls);
+
+        return new ChatResponse(
+            string.IsNullOrEmpty(content) ? null : content,
+            mappedToolCalls);
     }
 }

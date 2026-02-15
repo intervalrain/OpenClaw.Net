@@ -22,7 +22,7 @@ public class AgentPipeline(
         _messages.Add(new ChatMessage(ChatRole.User, userInput));
 
         var toolDefinitions = _skillMap.Values
-            .Select(s => new ToolDefinition(s.Name, s.Description))
+            .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
             .ToList();
 
         for (int i = 0; i < options.MaxIterations; i++)
