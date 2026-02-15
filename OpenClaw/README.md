@@ -67,26 +67,69 @@ WedaTemplate/
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Docker & Docker Compose (optional)
+- Docker & Docker Compose
 - NATS Server (optional, for messaging features)
 
-### Run with .NET CLI
+### Run with Docker Compose (Recommended)
+
+Start all services (API + PostgreSQL):
+
+```bash
+docker compose up -d
+```
+
+View logs:
+
+```bash
+docker compose logs -f
+```
+
+Stop services:
+
+```bash
+docker compose down
+```
+
+### Local Development with Docker PostgreSQL
+
+Start only PostgreSQL container:
+
+```bash
+docker compose up -d postgres
+```
+
+Run API locally:
 
 ```bash
 dotnet run --project src/OpenClaw.Api
 ```
 
-### Run with Docker Compose
+### Run without Docker
 
-```bash
-docker compose up
+If you have a local PostgreSQL instance, update the connection string in `appsettings.Development.json`:
+
+```json
+{
+  "Database": {
+    "Provider": "PostgreSql",
+    "ConnectionString": "Host=localhost;Port=5432;Database=openclaw_dev;Username=postgres;Password=postgres"
+  }
+}
 ```
 
-The API will be available at `http://localhost:5001`
+Then run:
 
-### Access Swagger UI
+```bash
+dotnet run --project src/OpenClaw.Api
+```
 
-Navigate to `http://localhost:5001/swagger` to explore the API documentation.
+### Access Points
+
+| Service | URL |
+|---------|-----|
+| API | http://localhost:5001 |
+| Swagger UI | http://localhost:5001/swagger |
+| PostgreSQL | localhost:5433 (Docker) |
 
 ## Domain Models
 

@@ -1,23 +1,42 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
-COPY ["src/WedaCleanArch.Api/WedaCleanArch.Api.csproj", "WedaCleanArch.Api/"]
-COPY ["src/WedaCleanArch.Application/WedaCleanArch.Application.csproj", "WedaCleanArch.Application/"]
-COPY ["src/WedaCleanArch.Domain/WedaCleanArch.Domain.csproj", "WedaCleanArch.Domain/"]
-COPY ["src/WedaCleanArch.Contracts/WedaCleanArch.Contracts.csproj", "WedaCleanArch.Contracts/"]
-COPY ["src/WedaCleanArch.Infrastructure/WedaCleanArch.Infrastructure.csproj", "WedaCleanArch.Infrastructure/"]
+
+# Copy solution and project files
 COPY ["Directory.Packages.props", "./"]
 COPY ["Directory.Build.props", "./"]
-RUN dotnet restore "WedaCleanArch.Api/WedaCleanArch.Api.csproj"
-COPY . ../
-WORKDIR /src/WedaCleanArch.Api
-RUN dotnet build "WedaCleanArch.Api.csproj" -c Release -o /app/build
+COPY ["src/OpenClaw.Api/OpenClaw.Api.csproj", "OpenClaw.Api/"]
+COPY ["src/OpenClaw.Application/OpenClaw.Application.csproj", "OpenClaw.Application/"]
+COPY ["src/OpenClaw.Domain/OpenClaw.Domain.csproj", "OpenClaw.Domain/"]
+COPY ["src/OpenClaw.Contracts/OpenClaw.Contracts.csproj", "OpenClaw.Contracts/"]
+COPY ["src/OpenClaw.Infrastructure/OpenClaw.Infrastructure.csproj", "OpenClaw.Infrastructure/"]
+COPY ["src/OpenClaw.Infrastructure.Llm.Ollama/OpenClaw.Infrastructure.Llm.Ollama.csproj", "OpenClaw.Infrastructure.Llm.Ollama/"]
+COPY ["src/Weda.Core/Weda.Core.csproj", "Weda.Core/"]
+COPY ["src/Weda.Protocol/Weda.Protocol.csproj", "Weda.Protocol/"]
 
+# Copy WikiGenerator project for build-time wiki generation
+COPY ["tools/WikiGenerator/WikiGenerator.csproj", "tools/WikiGenerator/"]
+
+# Restore dependencies
+RUN dotnet restore "OpenClaw.Api/OpenClaw.Api.csproj"
+RUN dotnet restore "tools/WikiGenerator/WikiGenerator.csproj"
+
+# Copy source code and docs
+COPY src/ ./
+COPY tools/ /src/../tools/
+COPY docs/ /src/../docs/
+
+# Build
+WORKDIR /src/OpenClaw.Api
+RUN dotnet build "OpenClaw.Api.csproj" -c Release -o /app/build
+
+# Publish
 FROM build AS publish
-RUN dotnet publish --no-restore -c Release -o /app/publish
+RUN dotnet publish "OpenClaw.Api.csproj" --no-restore -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+# Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
 ENV ASPNETCORE_HTTP_PORTS=5001
 EXPOSE 5001
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "WedaCleanArch.Api.dll"]
+ENTRYPOINT ["dotnet", "OpenClaw.Api.dll"]

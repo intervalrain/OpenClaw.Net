@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   api:
-    container_name: clean-architecture-api
+    container_name: openclaw-api
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,6 +8,37 @@ services:
       - "5001:5001"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - Database__Provider=PostgreSql
+      - Database__ConnectionString=Host=postgres;Database=openclaw_dev;Username=postgres;Password=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: on-failure
+    networks:
+      - openclaw-network
+
+  postgres:
+    container_name: openclaw-postgres
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=openclaw_dev
+    ports:
+      - "5433:5432"
     volumes:
-      - ./src/WedaCleanArch.Api/WedaCleanArch.sqlite:/app/WedaCleanArch.sqlite
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - openclaw-network
+
+networks:
+  openclaw-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

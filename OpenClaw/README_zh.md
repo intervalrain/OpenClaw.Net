@@ -68,26 +68,69 @@ WedaTemplate/
 ### 先決條件
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Docker & Docker Compose（選用）
+- Docker & Docker Compose
 - NATS Server（選用，用於訊息傳遞功能）
 
-### 使用 .NET CLI 執行
+### 使用 Docker Compose 執行（推薦）
+
+啟動所有服務（API + PostgreSQL）：
+
+```bash
+docker compose up -d
+```
+
+查看 logs：
+
+```bash
+docker compose logs -f
+```
+
+停止服務：
+
+```bash
+docker compose down
+```
+
+### 本機開發搭配 Docker PostgreSQL
+
+僅啟動 PostgreSQL 容器：
+
+```bash
+docker compose up -d postgres
+```
+
+本機執行 API：
 
 ```bash
 dotnet run --project src/OpenClaw.Api
 ```
 
-### 使用 Docker Compose 執行
+### 不使用 Docker 執行
 
-```bash
-docker compose up
+如果你有本機 PostgreSQL，請更新 `appsettings.Development.json` 中的連線字串：
+
+```json
+{
+  "Database": {
+    "Provider": "PostgreSql",
+    "ConnectionString": "Host=localhost;Port=5432;Database=openclaw_dev;Username=postgres;Password=postgres"
+  }
+}
 ```
 
-API 將在 `http://localhost:5001` 上提供服務
+然後執行：
 
-### 存取 Swagger UI
+```bash
+dotnet run --project src/OpenClaw.Api
+```
 
-瀏覽 `http://localhost:5001/swagger` 來查看 API 文件。
+### 存取端點
+
+| 服務 | URL |
+|------|-----|
+| API | http://localhost:5001 |
+| Swagger UI | http://localhost:5001/swagger |
+| PostgreSQL | localhost:5433 (Docker) |
 
 ## 領域模型
 
