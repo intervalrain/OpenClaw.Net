@@ -1,0 +1,25 @@
+# Aspire Dashboard - Standalone Mode
+# A lightweight, single-container OTEL dashboard from Microsoft
+#
+# Usage:
+#   docker compose -f docker/observability/docker-compose.aspire.yml up -d
+#
+# Dashboard URL: http://localhost:18888
+# OTLP Endpoint: http://localhost:4317 (gRPC) / http://localhost:4318 (HTTP)
+
+services:
+  aspire-dashboard:
+    container_name: openclaw-aspire-dashboard
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    ports:
+      - "18888:18888"  # Dashboard UI
+      - "4317:18889"   # OTLP gRPC
+      - "4318:18890"   # OTLP HTTP
+    environment:
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
+    networks:
+      - openclaw-observability
+
+networks:
+  openclaw-observability:
+    driver: bridge

@@ -1,0 +1,27 @@
+# Jaeger - Distributed Tracing Platform
+# Full-featured tracing backend with native OTLP support
+#
+# Usage:
+#   docker compose -f docker/observability/docker-compose.jaeger.yml up -d
+#
+# Dashboard URL: http://localhost:16686
+# OTLP Endpoint: http://localhost:4317 (gRPC) / http://localhost:4318 (HTTP)
+
+services:
+  jaeger:
+    container_name: openclaw-jaeger
+    image: jaegertracing/all-in-one:1.54
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "14268:14268"  # Jaeger HTTP Thrift
+      - "6831:6831/udp" # Jaeger Compact Thrift
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - openclaw-observability
+
+networks:
+  openclaw-observability:
+    driver: bridge

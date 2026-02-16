@@ -4,33 +4,42 @@ WORKDIR /src
 # Copy solution and project files
 COPY ["Directory.Packages.props", "./"]
 COPY ["Directory.Build.props", "./"]
-COPY ["src/OpenClaw.Api/OpenClaw.Api.csproj", "OpenClaw.Api/"]
-COPY ["src/OpenClaw.Application/OpenClaw.Application.csproj", "OpenClaw.Application/"]
-COPY ["src/OpenClaw.Domain/OpenClaw.Domain.csproj", "OpenClaw.Domain/"]
-COPY ["src/OpenClaw.Contracts/OpenClaw.Contracts.csproj", "OpenClaw.Contracts/"]
-COPY ["src/OpenClaw.Infrastructure/OpenClaw.Infrastructure.csproj", "OpenClaw.Infrastructure/"]
-COPY ["src/OpenClaw.Infrastructure.Llm.Ollama/OpenClaw.Infrastructure.Llm.Ollama.csproj", "OpenClaw.Infrastructure.Llm.Ollama/"]
-COPY ["src/Weda.Core/Weda.Core.csproj", "Weda.Core/"]
-COPY ["src/Weda.Protocol/Weda.Protocol.csproj", "Weda.Protocol/"]
+COPY ["src/OpenClaw.Api/OpenClaw.Api.csproj", "src/OpenClaw.Api/"]
+COPY ["src/OpenClaw.Application/OpenClaw.Application.csproj", "src/OpenClaw.Application/"]
+COPY ["src/OpenClaw.Domain/OpenClaw.Domain.csproj", "src/OpenClaw.Domain/"]
+COPY ["src/OpenClaw.Contracts/OpenClaw.Contracts.csproj", "src/OpenClaw.Contracts/"]
+COPY ["src/OpenClaw.Infrastructure/OpenClaw.Infrastructure.csproj", "src/OpenClaw.Infrastructure/"]
+COPY ["src/OpenClaw.Infrastructure.Llm.Ollama/OpenClaw.Infrastructure.Llm.Ollama.csproj", "src/OpenClaw.Infrastructure.Llm.Ollama/"]
+COPY ["src/OpenClaw.Infrastructure.Llm.OpenAI/OpenClaw.Infrastructure.Llm.OpenAI.csproj", "src/OpenClaw.Infrastructure.Llm.OpenAI/"]
+COPY ["src/OpenClaw.Hosting/OpenClaw.Hosting.csproj", "src/OpenClaw.Hosting/"]
+COPY ["src/Weda.Core/Weda.Core.csproj", "src/Weda.Core/"]
+COPY ["src/Weda.Protocol/Weda.Protocol.csproj", "src/Weda.Protocol/"]
+
+# Copy skills project files
+COPY ["skills/OpenClaw.Skills.FileSystem/OpenClaw.Skills.FileSystem.csproj", "skills/OpenClaw.Skills.FileSystem/"]
+COPY ["skills/OpenClaw.Skills.Http/OpenClaw.Skills.Http.csproj", "skills/OpenClaw.Skills.Http/"]
+COPY ["skills/OpenClaw.Skills.Shell/OpenClaw.Skills.Shell.csproj", "skills/OpenClaw.Skills.Shell/"]
 
 # Copy WikiGenerator project for build-time wiki generation
 COPY ["tools/WikiGenerator/WikiGenerator.csproj", "tools/WikiGenerator/"]
 
 # Restore dependencies
-RUN dotnet restore "OpenClaw.Api/OpenClaw.Api.csproj"
+RUN dotnet restore "src/OpenClaw.Api/OpenClaw.Api.csproj"
 RUN dotnet restore "tools/WikiGenerator/WikiGenerator.csproj"
 
-# Copy source code and docs
-COPY src/ ./
-COPY tools/ /src/../tools/
-COPY docs/ /src/../docs/
+# Copy source code, skills and docs
+COPY src/ ./src/
+COPY skills/ ./skills/
+COPY tools/ ./tools/
+COPY docs/ ./docs/
 
 # Build
-WORKDIR /src/OpenClaw.Api
+WORKDIR /src/src/OpenClaw.Api
 RUN dotnet build "OpenClaw.Api.csproj" -c Release -o /app/build
 
 # Publish
 FROM build AS publish
+WORKDIR /src/src/OpenClaw.Api
 RUN dotnet publish "OpenClaw.Api.csproj" --no-restore -c Release -o /app/publish
 
 # Runtime

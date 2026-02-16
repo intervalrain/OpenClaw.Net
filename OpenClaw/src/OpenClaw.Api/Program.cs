@@ -14,6 +14,7 @@ using OpenClaw.Domain.Users.Entities;
 using OpenClaw.Infrastructure;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Hosting;
+using OpenClaw.Hosting.Observability;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,7 @@ var builder = WebApplication.CreateBuilder(args);
 
     builder.Services
         .AddOpenClaw(builder.Configuration)
+        .AddOpenClawTelemetry(builder.Configuration)
         .AddApplication()
         .AddInfrastructure(builder.Configuration)
         .AddWedaCore<IAssemblyMarker, IContractsMarker, IApplicationMarker>(
