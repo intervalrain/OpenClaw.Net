@@ -255,11 +255,103 @@ public interface IAgentSkill
 
 ---
 
-## 11. 開放問題
+## 11. User Stories（未來功能）
+
+### US-01：多 Channel 對話整合
+**作為** 使用者，**我希望** 透過 Telegram 或 Line 與 OpenClaw 進行對話，**以便** 不需開啟電腦也能操作 Agent。
+
+**Acceptance Criteria:**
+- 支援 Telegram Bot Channel
+- 支援 Line Messaging API Channel
+- 訊息雙向同步，支援文字與圖片
+
+---
+
+### US-02：遠端桌面/瀏覽器操作可視化
+**作為** Host 管理員，**我希望** 當程式運行在 Server 容器內時，可透過 SSH 看到 Server 的桌面動作或瀏覽器操作，**以便** 監控 Agent 的實際執行狀況。
+
+**Acceptance Criteria:**
+- 容器內運行 headless browser（Playwright/Puppeteer）
+- 透過 VNC/noVNC 或 X11 forwarding 提供遠端可視化
+- SSH tunnel 支援安全連線
+
+---
+
+### US-03：對話式 Cron Job 管理
+**作為** 使用者，**我希望** 透過對話方式新增 Cron Jobs，**以便** 不需手動編輯設定檔即可排程任務。
+
+**Acceptance Criteria:**
+- 自然語言描述排程（如「每天早上 9 點執行 X」）
+- 支援 list/add/remove/update cron jobs
+- 持久化儲存 cron 設定
+
+---
+
+### US-04：Web 管理介面
+**作為** 管理員，**我希望** 有一個網頁介面來管理 Config、Cron Jobs、API Keys、Models、Skills 等，同時支援網頁版對話，**以便** 集中管理所有設定與功能。
+
+**Acceptance Criteria:**
+- Web Dashboard：Config 管理
+- Cron Jobs CRUD 介面
+- API Key / LLM Model 設定
+- Skills 啟用/停用管理
+- 內建 Web Chat 介面
+
+---
+
+### US-05：24/7 自主開發模式
+**作為** 開發者，**我希望** Agent 可以自主、不停歇的 24/7 進行程式開發，**以便** 持續推進專案進度。
+
+**Acceptance Criteria:**
+- Agent 具備 Task Queue 與優先序管理
+- 自動 commit、push、建立 PR
+- 錯誤自動恢復與重試機制
+- 進度報告與通知（Telegram/Line/Email）
+
+---
+
+### US-06：瀏覽器自動化購物
+**作為** 使用者，**我希望** Agent 可透過瀏覽器操作進行購物流程（瀏覽、加入購物車、填寫資料），支付動作仍由我執行，**以便** 節省重複操作時間。
+
+**Acceptance Criteria:**
+- Browser Skill 支援 Playwright/Puppeteer
+- 從 ConfigStore 讀取使用者資料（姓名、地址、電話等）
+- 自動填入表單欄位
+- 停在支付頁面等待使用者確認
+- 支援截圖回傳確認畫面
+
+---
+
+### US-07：Azure DevOps 整合與自動化
+**作為** 開發者，**我希望** Agent 可透過 HTTP Request 讀取 Azure DevOps (ADO)，自動分析 User Story、更新 Tasks 狀態，**以便** 減少手動維護 ADO 的時間。
+
+**Acceptance Criteria:**
+- 從 ConfigStore 讀取 ADO PAT Token 與組織/專案設定
+- 透過 ADO REST API 讀取 Work Items（User Stories、Tasks）
+- 根據 ADO Task 對應的 project-path，掃描本地 Git commits
+- 比對 codebase 變更與 Task 描述，判斷完成度
+- 自動更新 ADO Task 狀態（New → Active → Closed）
+- 針對 User Story 進行分析，自動拆解為 Tasks/Todos
+- 新建立的 Tasks 同步推送至 ADO
+- 支援雙向同步：本地 todo 檔案 ↔ ADO Work Items
+
+**技術細節:**
+- ADO Skill：封裝 ADO REST API 操作
+- Git Skill：分析 commits、diff、branch 狀態
+- 映射表：ADO Work Item ID ↔ Local Project Path
+- 狀態推斷邏輯：根據 commit message 關鍵字或程式碼變更判斷
+
+---
+
+## 12. 開放問題
 
 * Plugin 安全邊界策略
 * Tool 自動生成 Schema 標準
 * Memory 壓縮策略
+* Browser Skill 安全性（防止敏感資料洩漏）
+* 24/7 模式下的資源管理與成本控制
+* ADO 同步衝突處理策略（本地 vs 遠端變更）
+* Git commit message 與 ADO Task 的映射規則
 
 ---
 

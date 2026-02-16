@@ -7,11 +7,11 @@ namespace OpenClaw.Skills.Http.HttpRequest;
 
 public class HttpRequestSkill(
     TimeSpan? timeout = null,
-    int maxResponseLength = 50000) : AgentSkillBase<HttpRequestArgs>
+    int maxResponseLength = 200000) : AgentSkillBase<HttpRequestArgs>
 {
     public static HttpRequestSkill Default => new(
         timeout: TimeSpan.FromSeconds(30),
-        maxResponseLength: 50000);
+        maxResponseLength: 200000);
 
     private readonly TimeSpan _timeout = timeout ?? TimeSpan.FromSeconds(30);
     private readonly int _maxResponseLength = maxResponseLength;

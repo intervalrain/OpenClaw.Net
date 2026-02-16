@@ -7,41 +7,69 @@ namespace OpenClaw.Application.Agents;
 public class AgentPipeline(
     ILlmProvider llmProvider,
     IEnumerable<IAgentSkill> skills,
-    AgentPipelineOptions options) : IAgentPipeline
+    AgentPipelineOptions options,
+    IReadOnlyList<IAgentMiddleware>? middlewares = null) : IAgentPipeline
 {
-    private readonly List<ChatMessage> _messages = [];
     private readonly Dictionary<string, IAgentSkill> _skillMap = skills.ToDictionary(s => s.Name);
+    private readonly IReadOnlyList<IAgentMiddleware> _middlewares = middlewares ?? [];
 
     public async Task<string> ExecuteAsync(string userInput, CancellationToken ct = default)
     {
-        if (_messages.Count == 0 && options.SystemPrompt is not null)
+        var context = new AgentContext
         {
-            _messages.Add(new ChatMessage(ChatRole.System, options.SystemPrompt));
+            UserInput = userInput,
+            LlmProvider = llmProvider,
+            Skills = _skillMap.Values.ToList(),
+            Options = options
+        };
+
+        if (options.SystemPrompt is not null)
+        {
+            context.Messages.Add(new ChatMessage(ChatRole.System, options.SystemPrompt));
         }
 
-        _messages.Add(new ChatMessage(ChatRole.User, userInput));
+        var pipeline = BuildPipeline();
+        return await pipeline(context, ct);
+    }
+
+    private AgentDelegate BuildPipeline()
+    {
+        AgentDelegate core = ExecuteCoreAsync;
+
+        for (int i = _middlewares.Count - 1; i >= 0; i--)
+        {
+            var middleware = _middlewares[i];   
+            var next = core;
+            core = (ctx, ct) => middleware.InvokeAsync(ctx, next, ct);
+        }
+
+        return core;
+    }
+
+    private async Task<string> ExecuteCoreAsync(AgentContext context, CancellationToken ct)
+    {
+        context.Messages.Add(new ChatMessage(ChatRole.User, context.UserInput));
 
         var toolDefinitions = _skillMap.Values
             .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
             .ToList();
 
-        for (int i = 0; i < options.MaxIterations; i++)
+        for (int i = 0; i < context.Options.MaxIterations; i++)
         {
-            var response = await llmProvider.ChatAsync(_messages, toolDefinitions, ct);
-            
+            var response = await context.LlmProvider.ChatAsync(context.Messages, toolDefinitions, ct);
+
             if (!response.HasToolCalls)
             {
-                _messages.Add(new ChatMessage(ChatRole.Assistant, response.Content ?? ""));
-                return response.Content ?? "";
+                context.Messages.Add(new ChatMessage(ChatRole.Assistant, response.Content ?? ""));
+                return response.Content ?? string.Empty;
             }
-
-            // Add assistant message with tool calls first (required by OpenAI)
-            _messages.Add(new ChatMessage(ChatRole.Assistant, response.Content, ToolCalls: response.ToolCalls));
+            
+            context.Messages.Add(new ChatMessage(ChatRole.Assistant, response.Content, ToolCalls: response.ToolCalls));
 
             foreach (var toolCall in response.ToolCalls!)
             {
                 var result = await ExecuteToolCallAsync(toolCall, ct);
-                _messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
+                context.Messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
             }
         }
 
@@ -52,17 +80,11 @@ public class AgentPipeline(
     {
         if (!_skillMap.TryGetValue(toolCall.Name, out var skill))
         {
-            return $"Error: Skill '{toolCall.Name}' not found.";
+            return $"Error: skill '{toolCall.Name}' not found.";
         }
 
-        var context = new SkillContext
-        {
-            Arguments = toolCall.Arguments,
-        };
-
-        var result = await skill.ExecuteAsync(context, ct);
-
-        return result.IsSuccess ? result.Output ?? "" : $"Error: {result.Error}";
+        var skillContext = new SkillContext { Arguments = toolCall.Arguments };
+        var result = await skill.ExecuteAsync(skillContext, ct);
+        return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";
     }
-
 }
