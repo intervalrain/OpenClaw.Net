@@ -25,11 +25,16 @@ public class ExecuteCommandSkill(
 
     private static readonly HashSet<string> DefaultBlockedPatterns =
     [
+        // Dangerous system commands
         "sudo", "su ", "rm -rf", "rm -fr", "mkfs", "dd ",
         ":(){", "fork", "> /dev/", "chmod 777", "chmod -R",
         "curl | sh", "curl | bash", "wget | sh", "wget | bash",
         "eval ", "exec ", "&&", "||", ";", "|", "`", "$(",
-        "> ", ">> ", "< ", "<< "
+        "> ", ">> ", "< ", "<< ",
+        // Sensitive file access patterns
+        ".env", "credentials", "secrets", ".npmrc", ".pypirc",
+        "id_rsa", "id_ed25519", "private_key", "apikey", "api_key",
+        ".netrc", ".git-credentials", ".docker/config"
     ];
 
     private readonly HashSet<string> _allowedCommands = allowedCommands ?? DefaultAllowedCommands;

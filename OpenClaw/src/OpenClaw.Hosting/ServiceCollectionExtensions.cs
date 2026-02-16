@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<LoggingMiddleware>();
         services.AddSingleton<ErrorHandlingMiddleware>();
         services.AddSingleton<TimeoutMiddleware>();
+        services.AddSingleton<SecretRedactionMiddleware>();
 
         // ConfigStore
         services.AddSingleton<IConfigStore, EnvironmentConfigStore>();
@@ -63,6 +64,7 @@ public static class ServiceCollectionExtensions
 
             var pipeline = new AgentPipelineBuilder(sp)
                 .Use<ErrorHandlingMiddleware>()
+                .Use<SecretRedactionMiddleware>()  // Redact secrets before logging
                 .Use<LoggingMiddleware>()
                 .Use<TimeoutMiddleware>()
                 .Build(llmProvider, skills, options);
