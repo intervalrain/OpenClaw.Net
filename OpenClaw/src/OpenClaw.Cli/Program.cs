@@ -1,45 +1,22 @@
-﻿using OpenClaw.Application.Agents;
-using OpenClaw.Contracts.Agents;
-using OpenClaw.Contracts.Skills;
-using OpenClaw.Skills.FileSystem.ListDirectory;
-using OpenClaw.Skills.FileSystem.ReadFile;
-using OpenClaw.Skills.FileSystem.WriteFile;
-using OpenClaw.Skills.Shell.ExecuteCommand;
-using OpenClaw.Skills.Http.HttpRequest;
-using OpenClaw.Infrastructure.Configuration;
-using OpenClaw.Contracts.Configuration;
-using OpenClaw.Infrastructure.Llm.OpenAI;
-using OpenClaw.Infrastructure.Llm.Ollama;
-using OpenClaw.Contracts.Llm;
-
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using OpenClaw.Application.Agents.Middlewares;
 using Microsoft.Extensions.Options;
 
+using OpenClaw.Application.Agents;
+using OpenClaw.Application.Agents.Middlewares;
+using OpenClaw.Contracts.Agents;
+using OpenClaw.Contracts.Configuration;
+using OpenClaw.Contracts.Llm;
+using OpenClaw.Contracts.Skills;
+using OpenClaw.Hosting;
+
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: false)
+    .Build();
+
 var services = new ServiceCollection();
-
-// logging
-services.AddLogging(builder => builder.AddConsole());
-
-// middlewares
-services.AddSingleton<LoggingMiddleware>();
-services.AddSingleton<ErrorHandlingMiddleware>();
-services.AddSingleton<TimeoutMiddleware>();
-
-// config store
-services.AddSingleton<IConfigStore, EnvironmentConfigStore>();
-
-// llm
-services.AddKeyedSingleton<ILlmProvider, OpenAILlmProvider>("openai");
-services.AddKeyedSingleton<ILlmProvider, OllamaLlmProvider>("ollama");
-
-// skills
-services.AddSingleton<IAgentSkill>(ReadFileSkill.Default);
-services.AddSingleton<IAgentSkill>(WriteFileSkill.Default);
-services.AddSingleton<IAgentSkill>(ListDirectorySkill.Default);
-services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
-services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
+services.AddOpenClaw(configuration);
 
 // agent pipeline
 services.Configure<AgentPipelineOptions>(opts =>
@@ -47,7 +24,9 @@ services.Configure<AgentPipelineOptions>(opts =>
     opts.MaxIterations = 5;
     opts.SystemPrompt = "You are a helpful assistant. Use tools when needed";
 });
+
 var sp = services.BuildServiceProvider();
+
 var config = sp.GetRequiredService<IConfigStore>();
 var llmProvider = sp.GetRequiredKeyedService<ILlmProvider>(config.Get(ConfigKeys.LlmProvider) ?? "ollama");
 var skills = sp.GetServices<IAgentSkill>();
