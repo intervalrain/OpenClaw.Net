@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 
@@ -37,16 +38,57 @@ public class OllamaLlmProvider(IConfigStore config) : ILlmProvider
 
             if (chunk?.Message.ToolCalls is { } tc && tc.Any())
             {
-                toolCalls = chunk.Message.ToolCalls.ToList();   
+                toolCalls = chunk.Message.ToolCalls.ToList();
             }
         }
 
         return ToChatResponse(sb.ToString(), toolCalls);
     }
 
-    public IAsyncEnumerable<ChatResponseChunk> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
+    public async IAsyncEnumerable<ChatResponseChunk> ChatStreamAsync(
+        IReadOnlyList<ChatMessage> messages,
+        IReadOnlyList<ToolDefinition>? tools = null,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
-        throw new NotImplementedException();
+        var request = new ChatRequest
+        {
+            Model = _model,
+            Messages = messages.Select(ToOllamaMessage).ToList(),
+            Tools = tools?.Select(ToOllamaTool).ToList(),
+        };
+
+        List<Message.ToolCall>? toolCalls = null;
+
+        await foreach (var chunk in _client.ChatAsync(request, ct))
+        {
+            if (chunk?.Message.Content is { } content && !string.IsNullOrEmpty(content))
+            {
+                yield return new ChatResponseChunk(ContentDelta: content);
+            }
+
+            if (chunk?.Message.ToolCalls is { } tc && tc.Any())
+            {
+                toolCalls = chunk.Message.ToolCalls.ToList();
+            }
+
+            if (chunk?.Done == true)
+            {
+                // Emit tool calls at the end
+                if (toolCalls is { Count: > 0 })
+                {
+                    foreach (var toolCall in toolCalls)
+                    {
+                        yield return new ChatResponseChunk(
+                            ToolCall: new ToolCall(
+                                Guid.NewGuid().ToString(),
+                                toolCall.Function?.Name ?? "",
+                                JsonSerializer.Serialize(toolCall.Function?.Arguments)));
+                    }
+                }
+
+                yield return new ChatResponseChunk(IsComplete: true);
+            }
+        }
     }
 
     private static Message ToOllamaMessage(ChatMessage msg) => new()

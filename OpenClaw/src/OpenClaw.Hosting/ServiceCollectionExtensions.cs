@@ -1,7 +1,11 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+using OpenClaw.Application.Agents;
 
 using OpenClaw.Application.Agents.Middlewares;
+using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
@@ -48,6 +52,23 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgentSkill>(ListDirectorySkill.Default);
         services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
         services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
+
+        // pipeline
+        services.AddSingleton<IAgentPipeline>(sp =>
+        {
+            var configStore = sp.GetRequiredService<IConfigStore>();
+            var llmProvider = sp.GetRequiredKeyedService<ILlmProvider>(configStore.Get(ConfigKeys.LlmProvider));
+            var skills = sp.GetServices<IAgentSkill>();
+            var options = sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value;
+
+            var pipeline = new AgentPipelineBuilder(sp)
+                .Use<ErrorHandlingMiddleware>()
+                .Use<LoggingMiddleware>()
+                .Use<TimeoutMiddleware>()
+                .Build(llmProvider, skills, options);
+
+            return pipeline;
+        });
 
         return services;
     }

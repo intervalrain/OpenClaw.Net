@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw.NET</title>
+    <link rel="stylesheet" href="/openclaw/app.css">
+    <!-- Marked.js for Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- KaTeX for LaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <!-- highlight.js for code syntax -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-theme">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>OpenClaw.NET</h1>
+                <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
+                    <span class="icon-sun">☀️</span>
+                    <span class="icon-moon">🌙</span>
+                </button>
+            </div>
+            <ul>
+                <li><a href="#chat" class="nav-link active">Chat</a></li>
+                <li><a href="#dashboard" class="nav-link">Dashboard</a></li>
+            </ul>
+        </nav>
+        <main class="content">
+            <div id="chat-page" class="page active">
+                <div class="chat-container">
+                    <div id="messages" class="messages"></div>
+                    <div class="input-area">
+                        <textarea id="user-input" placeholder="Type a message..."></textarea>
+                        <button id="send-btn">Send</button>
+                    </div>
+                </div>
+            </div>
+            <div id="dashboard-page" class="page">
+                <h2>Dashboard</h2>
+                <p>Coming soon...</p>
+            </div>
+        </main>
+    </div>
+    <script src="/openclaw/app.js"></script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Text;
 using OpenAI;
 using OpenAI.Chat;
 
@@ -40,12 +42,84 @@ public class OpenAILlmProvider(IConfigStore config) : ILlmProvider
         return ToChatResponse(response.Value);
     }
 
-    public IAsyncEnumerable<ChatResponseChunk> ChatStreamAsync(
+    public async IAsyncEnumerable<ChatResponseChunk> ChatStreamAsync(
         IReadOnlyList<OpenClawChatMessage> messages,
         IReadOnlyList<ToolDefinition>? tools = null,
-        CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
-        throw new NotImplementedException();
+        var chatClient = _client.GetChatClient(_model);
+        var options = new ChatCompletionOptions();
+
+        if (tools is { Count: > 0 })
+        {
+            foreach (var tool in tools)
+            {
+                options.Tools.Add(ChatTool.CreateFunctionTool(
+                    tool.Name,
+                    tool.Description,
+                    BinaryData.FromObjectAsJson(tool.Parameters)));
+            }
+        }
+
+        var chatMessages = messages.Select(ToOpenAIMessage).ToList();
+
+        // Track tool calls being built across chunks
+        var toolCallBuilders = new Dictionary<int, (string Id, string Name, StringBuilder Args)>();
+
+        await foreach (var update in chatClient.CompleteChatStreamingAsync(chatMessages, options, ct))
+        {
+            // Handle content delta
+            foreach (var contentPart in update.ContentUpdate)
+            {
+                if (!string.IsNullOrEmpty(contentPart.Text))
+                {
+                    yield return new ChatResponseChunk(ContentDelta: contentPart.Text);
+                }
+            }
+
+            // Handle tool call updates
+            foreach (var toolCallUpdate in update.ToolCallUpdates)
+            {
+                if (!toolCallBuilders.TryGetValue(toolCallUpdate.Index, out var builder))
+                {
+                    // ToolCallId comes in the first chunk for each tool call
+                    var id = toolCallUpdate.ToolCallId ?? $"call_{Guid.NewGuid():N}";
+                    builder = (id, toolCallUpdate.FunctionName ?? "", new StringBuilder());
+                    toolCallBuilders[toolCallUpdate.Index] = builder;
+                }
+                else if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
+                {
+                    // Update function name if it comes in a later chunk
+                    builder = (builder.Id, toolCallUpdate.FunctionName, builder.Args);
+                    toolCallBuilders[toolCallUpdate.Index] = builder;
+                }
+
+                // Accumulate function arguments
+                var argsUpdate = toolCallUpdate.FunctionArgumentsUpdate?.ToString();
+                if (!string.IsNullOrEmpty(argsUpdate))
+                {
+                    builder.Args.Append(argsUpdate);
+                    toolCallBuilders[toolCallUpdate.Index] = builder;
+                }
+            }
+
+            // Check if stream is complete
+            if (update.FinishReason.HasValue)
+            {
+                // Emit completed tool calls
+                foreach (var kvp in toolCallBuilders.OrderBy(x => x.Key))
+                {
+                    var (id, name, args) = kvp.Value;
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        yield return new ChatResponseChunk(
+                            ToolCall: new ToolCall(id, name, args.ToString()));
+                    }
+                }
+
+                yield return new ChatResponseChunk(IsComplete: true);
+            }
+        }
     }
 
     private static OpenAIChatMessage ToOpenAIMessage(OpenClawChatMessage msg)

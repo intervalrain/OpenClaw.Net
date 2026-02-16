@@ -13,6 +13,7 @@ using OpenClaw.Contracts;
 using OpenClaw.Domain.Users.Entities;
 using OpenClaw.Infrastructure;
 using OpenClaw.Infrastructure.Common.Persistence;
+using OpenClaw.Hosting;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,7 @@ var builder = WebApplication.CreateBuilder(args);
         configuration.ReadFrom.Configuration(context.Configuration));
 
     builder.Services
+        .AddOpenClaw(builder.Configuration)
         .AddApplication()
         .AddInfrastructure(builder.Configuration)
         .AddWedaCore<IAssemblyMarker, IContractsMarker, IApplicationMarker>(
