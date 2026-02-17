@@ -39,10 +39,10 @@ var builder = WebApplication.CreateBuilder(args);
                 options.XmlCommentAssemblies = [Assembly.GetExecutingAssembly()];
                 options.OpenApiInfo = new OpenApiInfo
                 {
-                    Title = "Weda API",
+                    Title = "OpenClaw.NET API",
                     Version = "v1",
                 };
-                options.Observability.ServiceName = "WedaTemplate";
+                options.Observability.ServiceName = "OpenClaw.NET";
                 options.Observability.Tracing.UseConsoleExporter = true;
             },
             nats =>
@@ -94,7 +94,7 @@ var app = builder.Build();
     {
         options.EnsureDatabaseCreated = false; // Already done above
         options.SwaggerEndpointUrl = "/swagger/v1/swagger.json";
-        options.SwaggerEndpointName = "Weda API V1";
+        options.SwaggerEndpointName = "OpenClaw.NET API V1";
         options.RoutePrefix = "swagger";
     });
 

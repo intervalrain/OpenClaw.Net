@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'OpenClaw'
+    orgId: 1
+    folder: 'OpenClaw'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

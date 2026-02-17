@@ -1,7 +1,6 @@
 using ErrorOr;
 
 using Weda.Core.Application.Security.Models;
-
 using Weda.Core.Domain;
 using OpenClaw.Domain.Users.Enums;
 using OpenClaw.Domain.Users.Errors;

@@ -5,6 +5,7 @@ using OpenAI.Chat;
 
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
+using OpenClaw.Domain.Chat.Enums;
 
 using OpenAIChatMessage = OpenAI.Chat.ChatMessage;
 using OpenClawChatMessage = OpenClaw.Contracts.Llm.ChatMessage;

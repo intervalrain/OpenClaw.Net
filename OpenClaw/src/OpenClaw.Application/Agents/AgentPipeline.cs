@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Domain.Chat.Entities;
+using OpenClaw.Domain.Chat.Enums;
 
 namespace OpenClaw.Application.Agents;
 

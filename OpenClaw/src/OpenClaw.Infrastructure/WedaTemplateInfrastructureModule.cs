@@ -17,6 +17,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Weda.Core.Application.Security.Models;
+using OpenClaw.Domain.Chat.Repositories;
+using OpenClaw.Infrastructure.Chat.Persistence;
 
 
 
@@ -66,8 +68,10 @@ public static class WedaTemplateInfrastructureModule
 
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
 
-
+        // persistence
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IConversationRepository, ConversationRepository>();
+
         services.AddSingleton<IPasswordHasher, InfraPasswordHasher>();
         services.AddScoped<AppDbContextSeeder>();
 

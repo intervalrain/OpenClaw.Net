@@ -1,4 +1,4 @@
-namespace OpenClaw.Contracts.Llm;
+namespace OpenClaw.Domain.Chat.Enums;
 
 public enum ChatRole
 {

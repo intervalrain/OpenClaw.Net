@@ -37,6 +37,11 @@
     box-sizing: border-box;
 }
 
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
@@ -47,6 +52,7 @@ body {
 #app {
     display: flex;
     height: 100vh;
+    overflow: hidden;
 }
 
 /* Sidebar */
@@ -58,6 +64,8 @@ body {
     flex-direction: column;
     border-right: 1px solid var(--border-subtle);
     transition: background 0.2s, border-color 0.2s;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .sidebar-header {
@@ -66,6 +74,11 @@ body {
     justify-content: space-between;
     padding: 8px 12px;
     margin-bottom: 16px;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 8px;
 }
 
 .sidebar h1 {
@@ -104,6 +117,69 @@ body {
     display: none;
 }
 
+/* Sidebar Toggle */
+.sidebar-toggle {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.15s;
+}
+
+.sidebar-toggle:hover {
+    background: var(--bg-tertiary);
+}
+
+.sidebar-toggle .icon-expand {
+    display: none;
+}
+
+.sidebar-toggle .icon-collapse {
+    display: inline;
+}
+
+/* Sidebar collapsed state */
+.sidebar.collapsed {
+    width: 60px;
+    padding: 16px 8px;
+}
+
+.sidebar.collapsed .sidebar-header {
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sidebar.collapsed .sidebar-header h1 {
+    display: none;
+}
+
+.sidebar.collapsed .header-buttons {
+    flex-direction: column;
+}
+
+.sidebar.collapsed .sidebar-toggle .icon-expand {
+    display: inline;
+}
+
+.sidebar.collapsed .sidebar-toggle .icon-collapse {
+    display: none;
+}
+
+.sidebar.collapsed .nav-link {
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar.collapsed ul {
+    margin-top: 8px;
+}
+
 .sidebar ul {
     list-style: none;
 }
@@ -136,11 +212,15 @@ body {
     flex-direction: column;
     background: var(--bg-primary);
     transition: background 0.2s;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .page {
     display: none;
     flex: 1;
+    height: 100%;
+    overflow: hidden;
 }
 
 .page.active {
@@ -156,6 +236,8 @@ body {
     margin: 0 auto;
     width: 100%;
     padding: 0 24px;
+    height: 100%;
+    overflow: hidden;
 }
 
 .messages {

@@ -8,6 +8,7 @@ using OllamaSharp.Models.Chat;
 
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
+using OpenClaw.Domain.Chat.Entities;
 
 namespace OpenClaw.Infrastructure.Llm.Ollama;
 
@@ -95,10 +96,10 @@ public class OllamaLlmProvider(IConfigStore config) : ILlmProvider
     {
         Role = msg.Role switch
         {
-            Contracts.Llm.ChatRole.System => OllamaSharp.Models.Chat.ChatRole.System,
-            Contracts.Llm.ChatRole.User => OllamaSharp.Models.Chat.ChatRole.User,
-            Contracts.Llm.ChatRole.Assistant => OllamaSharp.Models.Chat.ChatRole.Assistant,
-            Contracts.Llm.ChatRole.Tool => OllamaSharp.Models.Chat.ChatRole.Tool,
+            Domain.Chat.Enums.ChatRole.System => OllamaSharp.Models.Chat.ChatRole.System,
+            Domain.Chat.Enums.ChatRole.User => OllamaSharp.Models.Chat.ChatRole.User,
+            Domain.Chat.Enums.ChatRole.Assistant => OllamaSharp.Models.Chat.ChatRole.Assistant,
+            Domain.Chat.Enums.ChatRole.Tool => OllamaSharp.Models.Chat.ChatRole.Tool,
             _ => OllamaSharp.Models.Chat.ChatRole.User,
         },
         Content = msg.Content,
