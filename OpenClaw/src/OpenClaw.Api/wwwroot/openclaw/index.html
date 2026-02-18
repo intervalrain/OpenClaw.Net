@@ -17,28 +17,55 @@
 <body>
     <div id="app">
         <nav class="sidebar">
+            <!-- Sidebar Header -->
             <div class="sidebar-header">
-                <h1>OpenClaw</h1>
-                <div class="header-buttons">
-                    <button id="new-chat-btn" class="icon-btn" title="New Chat">+</button>
-                    <button id="theme-toggle" class="icon-btn" title="Toggle theme">
-                        <span class="icon-sun">☀️</span>
-                        <span class="icon-moon">🌙</span>
-                    </button>
-                    <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar">
-                        <span class="icon-collapse">◀</span>
-                        <span class="icon-expand">▶</span>
-                    </button>
-                </div>
+                <button id="sidebar-toggle" class="icon-btn sidebar-toggle-btn" title="Toggle sidebar">
+                    <svg class="icon-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18M3 6h18M3 18h18"/>
+                    </svg>
+                </button>
+                <button id="new-chat-btn" class="icon-btn new-chat-btn" title="New Chat">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
             </div>
-            <ul class="nav-menu">
-                <li><a href="#chat" class="nav-link active">Chat</a></li>
-                <li><a href="#settings" class="nav-link">Settings</a></li>
-            </ul>
+
+            <!-- Conversations Section -->
             <div class="conversation-section">
                 <div class="conversation-header">Conversations</div>
                 <div class="conversation-list" id="conversation-list">
                     <!-- Conversations will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Profile Section (Bottom) -->
+            <div class="sidebar-footer">
+                <div class="profile-section">
+                    <button id="profile-btn" class="profile-btn">
+                        <div class="profile-avatar">U</div>
+                        <span class="profile-name">User</span>
+                        <svg class="profile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <!-- Profile Dropdown -->
+                    <div id="profile-dropdown" class="profile-dropdown">
+                        <button id="theme-toggle" class="dropdown-item">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"/>
+                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                            </svg>
+                            <span class="theme-text">Light Mode</span>
+                        </button>
+                        <button id="settings-link" class="dropdown-item">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                            </svg>
+                            <span>Settings</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -58,6 +85,94 @@
             </div>
         </main>
     </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Language Setting -->
+                <div class="setting-group">
+                    <label for="language-select">Response Language</label>
+                    <select id="language-select">
+                        <option value="zh-TW">繁體中文</option>
+                        <option value="en">English</option>
+                        <option value="ja">日本語</option>
+                        <option value="auto">Auto (follow user)</option>
+                    </select>
+                    <p class="setting-hint">AI will respond in the selected language</p>
+                </div>
+
+                <!-- Model Configuration -->
+                <div class="setting-group">
+                    <label>Model Providers</label>
+                    <div id="model-list" class="model-list">
+                        <!-- Models will be rendered here -->
+                    </div>
+                    <button id="add-model-btn" class="btn btn-outline add-model-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        Add Model Provider
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-cancel">Cancel</button>
+                <button class="btn btn-primary modal-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Model Modal -->
+    <div id="add-model-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Model Provider</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label for="provider-type">Provider Type</label>
+                    <select id="provider-type">
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="custom">Custom OpenAI-Compatible</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="provider-name">Display Name</label>
+                    <input type="text" id="provider-name" placeholder="e.g., My Ollama Server">
+                </div>
+                <div class="setting-group url-group">
+                    <label for="provider-url">API URL</label>
+                    <input type="text" id="provider-url" placeholder="http://localhost:11434">
+                    <p class="setting-hint provider-url-hint">Ollama default: http://localhost:11434</p>
+                </div>
+                <div class="setting-group api-key-group" style="display: none;">
+                    <label for="provider-api-key">API Key</label>
+                    <input type="password" id="provider-api-key" placeholder="sk-...">
+                </div>
+                <div class="setting-group">
+                    <label for="provider-model">Model Name</label>
+                    <input type="text" id="provider-model" placeholder="qwen2.5:7b">
+                </div>
+                <div id="validation-status" class="validation-status"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-add-model">Cancel</button>
+                <button class="btn btn-outline" id="validate-model-btn">Validate</button>
+                <button class="btn btn-primary" id="save-model-btn" disabled>Save</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/openclaw/app.js"></script>
 </body>
 </html>

@@ -19,6 +19,7 @@ public class AgentPipeline(
     public async Task<string> ExecuteAsync(
         string userInput,
         IReadOnlyList<ChatMessage>? history = null,
+        string? language = null,
         CancellationToken ct = default)
     {
         var context = new AgentContext
@@ -29,9 +30,12 @@ public class AgentPipeline(
             Options = options
         };
 
-        if (options.SystemPrompt is not null)
+
+        var systemPrompt = BuildSystemPrompt(language);
+
+        if (!string.IsNullOrEmpty(systemPrompt))
         {
-            context.Messages.Add(new ChatMessage(ChatRole.System, options.SystemPrompt));
+            context.Messages.Add(new ChatMessage(ChatRole.System, systemPrompt));
         }
 
         // Add conversation history
@@ -47,13 +51,16 @@ public class AgentPipeline(
     public async IAsyncEnumerable<AgentStreamEvent> ExecuteStreamAsync(
         string userInput,
         IReadOnlyList<ChatMessage>? history = null,
+        string? language = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
 
-        if (options.SystemPrompt is not null)
+        var systemPrompt = BuildSystemPrompt(language);
+
+        if (!string.IsNullOrEmpty(systemPrompt))
         {
-            messages.Add(new ChatMessage(ChatRole.System, options.SystemPrompt));
+            messages.Add(new ChatMessage(ChatRole.System, systemPrompt));
         }
 
         // Add conversation history
@@ -113,6 +120,36 @@ public class AgentPipeline(
 
         yield return new AgentStreamEvent(AgentStreamEventType.Error, "Max iteration reached");
     }
+
+    private string BuildSystemPrompt(string? language)
+    {
+        var parts = new List<string>();
+
+        if (options.SystemPrompt is not null)
+        {
+            parts.Add(options.SystemPrompt);
+        }
+
+        if (!string.IsNullOrEmpty(language) && language != "auto")
+        {
+            var langInstruction = language switch
+            {
+                "zh-TW" => "Always response in Traditional Chinese (繁體中文).",
+                "en" => "Always response in English.",
+                "ja" => "Always response in Japanese.",
+                "kr" => "Always response in Korean.",
+                _ => null
+            };
+
+            if (langInstruction != null)
+            {
+                parts.Add(langInstruction);
+            }
+        }
+
+        return string.Join("\n\n", parts);
+    }
+
 
     private AgentDelegate BuildPipeline()
     {

@@ -37,7 +37,7 @@ public class ChatController(
     {
         var (conversation, history, isFirstMessage) = await LoadConversationAsync(request.ConversationId, ct);
 
-        var response = await pipeline.ExecuteAsync(request.Message, history, ct);
+        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, ct);
 
         // Save messages to DB
         if (conversation != null)
@@ -76,7 +76,7 @@ public class ChatController(
         {
             string assistantResponse = "";
 
-            await foreach (var evt in pipeline.ExecuteStreamAsync(request.Message, history, ct))
+            await foreach (var evt in pipeline.ExecuteStreamAsync(request.Message, history, request.Language, ct))
             {
                 var data = JsonSerializer.Serialize(evt, JsonOptions);
                 await Response.WriteAsync($"data: {data}\n\n", ct);

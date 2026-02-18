@@ -1,7 +1,8 @@
 // DOM Elements
-let messagesEl, userInputEl, sendBtn, navLinks, pages, themeToggle;
+let messagesEl, userInputEl, sendBtn, themeToggle;
 let currentConversationId = null;
 let conversations = [];
+let modelProviders = [];
 
 // Configure marked.js
 marked.setOptions({
@@ -19,8 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     messagesEl = document.getElementById('messages');
     userInputEl = document.getElementById('user-input');
     sendBtn = document.getElementById('send-btn');
-    navLinks = document.querySelectorAll('.nav-link');
-    pages = document.querySelectorAll('.page');
     themeToggle = document.getElementById('theme-toggle');
 
     // Initialize theme
@@ -37,23 +36,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const hash = e.target.getAttribute('href') || '#chat';
-            navigate(hash);
-            history.pushState(null, '', hash);
-        });
-    });
-
-    // Initial navigation
-    navigate(location.hash || '#chat');
-
     // Sidebar toggle
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const sidebar = document.querySelector('.sidebar');
     sidebarToggle.addEventListener('click', () => {
         sidebar.classList.toggle('collapsed');
+    });
+
+    // Profile dropdown toggle
+    const profileBtn = document.getElementById('profile-btn');
+    const profileSection = document.querySelector('.profile-section');
+    profileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        profileSection.classList.toggle('open');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!profileSection.contains(e.target)) {
+            profileSection.classList.remove('open');
+        }
     });
 
     // Initialize conversations
@@ -66,6 +68,7 @@ function initTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
     updateHljsTheme(savedTheme);
+    updateThemeButtonText(savedTheme);
 }
 
 function toggleTheme() {
@@ -74,6 +77,14 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
     updateHljsTheme(newTheme);
+    updateThemeButtonText(newTheme);
+}
+
+function updateThemeButtonText(theme) {
+    const themeText = document.querySelector('.theme-text');
+    if (themeText) {
+        themeText.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+    }
 }
 
 function updateHljsTheme(theme) {
@@ -205,12 +216,14 @@ async function sendMessage() {
     let accumulatedContent = '';
 
     try {
+        const settings = getSettings();
         const res = await fetch('/api/v1/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message,
-                conversationId: currentConversationId
+                conversationId: currentConversationId,
+                language: settings.language
             })
         });
 
@@ -314,16 +327,6 @@ async function sendMessage() {
     }
 }
 
-// Navigation
-function navigate(hash) {
-    navLinks.forEach(link => {
-        link.classList.toggle('active', link.getAttribute('href') === hash);
-    });
-    pages.forEach(page => {
-        const pageId = page.id.replace('-page', '');
-        page.classList.toggle('active', `#${pageId}` === hash);
-    });
-}
 
 // Load conversations on startup
 async function loadConversations() {
@@ -397,3 +400,320 @@ async function deleteConversation(id, event) {
     }
     renderConversationList();
 }
+
+// Settings Modal
+const SETTINGS_KEY = 'openclaw_settings';
+const MODELS_KEY = 'openclaw_models';
+
+function getSettings() {
+    const saved = localStorage.getItem(SETTINGS_KEY);
+    return saved ? JSON.parse(saved) : {
+        language: 'auto',
+        activeModelId: null
+    };
+}
+
+function saveSettings(settings) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function getModelProviders() {
+    const saved = localStorage.getItem(MODELS_KEY);
+    if (saved) {
+        return JSON.parse(saved);
+    }
+    // Default Ollama provider
+    const defaultProvider = {
+        id: crypto.randomUUID(),
+        type: 'ollama',
+        name: 'Local Ollama',
+        url: 'http://localhost:11434',
+        model: 'qwen2.5:7b',
+        apiKey: null
+    };
+    saveModelProviders([defaultProvider]);
+    return [defaultProvider];
+}
+
+function saveModelProviders(providers) {
+    localStorage.setItem(MODELS_KEY, JSON.stringify(providers));
+    modelProviders = providers;
+}
+
+function renderModelList() {
+    const settings = getSettings();
+    const providers = getModelProviders();
+    const listEl = document.getElementById('model-list');
+
+    if (providers.length === 0) {
+        listEl.innerHTML = '<p class="setting-hint">No model providers configured.</p>';
+        return;
+    }
+
+    listEl.innerHTML = providers.map(p => `
+        <div class="model-item ${settings.activeModelId === p.id ? 'active' : ''}" data-id="${p.id}">
+            <input type="radio" name="active-model" class="model-item-radio"
+                   value="${p.id}" ${settings.activeModelId === p.id ? 'checked' : ''}>
+            <div class="model-item-info">
+                <div class="model-item-name">${escapeHtml(p.name)}</div>
+                <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.model)}</div>
+            </div>
+            <div class="model-item-actions">
+                <button class="model-item-btn delete" data-id="${p.id}" title="Delete">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add event listeners for radio buttons
+    listEl.querySelectorAll('.model-item-radio').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const settings = getSettings();
+            settings.activeModelId = e.target.value;
+            saveSettings(settings);
+            renderModelList();
+        });
+    });
+
+    // Add event listeners for delete buttons
+    listEl.querySelectorAll('.model-item-btn.delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.id;
+            if (confirm('Delete this model provider?')) {
+                const providers = getModelProviders().filter(p => p.id !== id);
+                saveModelProviders(providers);
+                const settings = getSettings();
+                if (settings.activeModelId === id) {
+                    settings.activeModelId = providers[0]?.id || null;
+                    saveSettings(settings);
+                }
+                renderModelList();
+            }
+        });
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function openSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    const settings = getSettings();
+
+    document.getElementById('language-select').value = settings.language;
+    renderModelList();
+
+    modal.classList.add('active');
+    document.querySelector('.profile-section').classList.remove('open');
+}
+
+function closeSettingsModal() {
+    document.getElementById('settings-modal').classList.remove('active');
+}
+
+function saveSettingsAndClose() {
+    const settings = getSettings();
+    settings.language = document.getElementById('language-select').value;
+    saveSettings(settings);
+    closeSettingsModal();
+}
+
+// Add Model Modal
+function openAddModelModal() {
+    const modal = document.getElementById('add-model-modal');
+    // Reset form
+    document.getElementById('provider-type').value = 'ollama';
+    document.getElementById('provider-name').value = '';
+    document.getElementById('provider-url').value = '';
+    document.getElementById('provider-api-key').value = '';
+    document.getElementById('provider-model').value = '';
+    document.getElementById('validation-status').className = 'validation-status';
+    document.getElementById('validation-status').textContent = '';
+    document.getElementById('save-model-btn').disabled = true;
+    updateProviderTypeUI();
+    modal.classList.add('active');
+}
+
+function closeAddModelModal() {
+    document.getElementById('add-model-modal').classList.remove('active');
+}
+
+function updateProviderTypeUI() {
+    const type = document.getElementById('provider-type').value;
+    const apiKeyGroup = document.querySelector('.api-key-group');
+    const urlGroup = document.querySelector('.url-group');
+    const urlHint = document.querySelector('.provider-url-hint');
+    const urlInput = document.getElementById('provider-url');
+
+    if (type === 'ollama') {
+        apiKeyGroup.style.display = 'none';
+        urlGroup.style.display = 'block';
+        urlHint.textContent = 'Ollama default: http://localhost:11434';
+        urlInput.placeholder = 'http://localhost:11434';
+    } else if (type === 'openai') {
+        apiKeyGroup.style.display = 'block';
+        urlGroup.style.display = 'none'; // OpenAI has fixed endpoint
+    } else if (type === 'anthropic') {
+        apiKeyGroup.style.display = 'block';
+        urlGroup.style.display = 'none'; // Anthropic has fixed endpoint
+    } else {
+        // Custom OpenAI-compatible
+        apiKeyGroup.style.display = 'block';
+        urlGroup.style.display = 'block';
+        urlHint.textContent = 'Enter your OpenAI-compatible API endpoint';
+        urlInput.placeholder = 'https://your-api-endpoint.com';
+    }
+}
+
+async function validateModel() {
+    const statusEl = document.getElementById('validation-status');
+    const saveBtn = document.getElementById('save-model-btn');
+    const type = document.getElementById('provider-type').value;
+    const url = document.getElementById('provider-url').value.trim();
+    const model = document.getElementById('provider-model').value.trim();
+    const apiKey = document.getElementById('provider-api-key').value.trim();
+
+    // Validation requirements differ by provider type
+    if (type === 'ollama' && (!url || !model)) {
+        statusEl.className = 'validation-status error';
+        statusEl.textContent = 'Please enter URL and model name';
+        return;
+    }
+    if ((type === 'openai' || type === 'anthropic') && (!apiKey || !model)) {
+        statusEl.className = 'validation-status error';
+        statusEl.textContent = 'Please enter API Key and model name';
+        return;
+    }
+    if (type === 'custom' && (!url || !model)) {
+        statusEl.className = 'validation-status error';
+        statusEl.textContent = 'Please enter URL and model name';
+        return;
+    }
+
+    statusEl.className = 'validation-status validating';
+    statusEl.innerHTML = '<div class="validation-spinner"></div><span>Validating connection...</span>';
+    saveBtn.disabled = true;
+
+    try {
+        if (type === 'ollama') {
+            // Check if Ollama model exists
+            const res = await fetch(`${url}/api/tags`);
+            if (!res.ok) throw new Error('Cannot connect to Ollama');
+            const data = await res.json();
+            const models = data.models || [];
+            const modelExists = models.some(m => m.name === model || m.name.startsWith(model + ':'));
+            if (!modelExists) {
+                statusEl.className = 'validation-status error';
+                statusEl.textContent = `Model "${model}" not found. Available: ${models.slice(0, 3).map(m => m.name).join(', ')}...`;
+                return;
+            }
+        } else if (type === 'openai') {
+            // Validate OpenAI API key by listing models
+            const res = await fetch('https://api.openai.com/v1/models', {
+                headers: { 'Authorization': `Bearer ${apiKey}` }
+            });
+            if (!res.ok) throw new Error('Invalid API Key');
+        } else if (type === 'anthropic') {
+            // Anthropic doesn't have a simple validation endpoint
+            // Just check key format
+            if (!apiKey.startsWith('sk-ant-')) {
+                throw new Error('Invalid Anthropic API Key format (should start with sk-ant-)');
+            }
+        }
+        // For custom providers, skip validation (user responsibility)
+
+        statusEl.className = 'validation-status success';
+        statusEl.textContent = 'Validation successful!';
+        saveBtn.disabled = false;
+    } catch (err) {
+        statusEl.className = 'validation-status error';
+        statusEl.textContent = `Validation failed: ${err.message}`;
+        saveBtn.disabled = true;
+    }
+}
+
+function saveModelProvider() {
+    const type = document.getElementById('provider-type').value;
+    const name = document.getElementById('provider-name').value.trim();
+
+    // Set URL based on provider type
+    let url = document.getElementById('provider-url').value.trim();
+    if (type === 'openai') {
+        url = 'https://api.openai.com';
+    } else if (type === 'anthropic') {
+        url = 'https://api.anthropic.com';
+    }
+
+    const provider = {
+        id: crypto.randomUUID(),
+        type: type,
+        name: name || getDefaultProviderName(type),
+        url: url,
+        model: document.getElementById('provider-model').value.trim(),
+        apiKey: document.getElementById('provider-api-key').value.trim() || null
+    };
+
+    const providers = getModelProviders();
+    providers.push(provider);
+    saveModelProviders(providers);
+
+    // If this is the first provider, set it as active
+    const settings = getSettings();
+    if (!settings.activeModelId) {
+        settings.activeModelId = provider.id;
+        saveSettings(settings);
+    }
+
+    closeAddModelModal();
+    renderModelList();
+}
+
+function getDefaultProviderName(type) {
+    switch (type) {
+        case 'ollama': return 'Local Ollama';
+        case 'openai': return 'OpenAI';
+        case 'anthropic': return 'Anthropic';
+        default: return 'Custom Provider';
+    }
+}
+
+// Initialize settings modal events
+document.addEventListener('DOMContentLoaded', () => {
+    const settingsLink = document.getElementById('settings-link');
+    const modal = document.getElementById('settings-modal');
+    const addModelModal = document.getElementById('add-model-modal');
+
+    if (settingsLink) {
+        settingsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            openSettingsModal();
+        });
+    }
+
+    if (modal) {
+        modal.querySelector('.modal-overlay').addEventListener('click', closeSettingsModal);
+        modal.querySelector('.modal-close').addEventListener('click', closeSettingsModal);
+        modal.querySelector('.modal-cancel').addEventListener('click', closeSettingsModal);
+        modal.querySelector('.modal-save').addEventListener('click', saveSettingsAndClose);
+        document.getElementById('add-model-btn').addEventListener('click', openAddModelModal);
+    }
+
+    if (addModelModal) {
+        addModelModal.querySelector('.modal-overlay').addEventListener('click', closeAddModelModal);
+        addModelModal.querySelector('.modal-close').addEventListener('click', closeAddModelModal);
+        document.getElementById('cancel-add-model').addEventListener('click', closeAddModelModal);
+        document.getElementById('validate-model-btn').addEventListener('click', validateModel);
+        document.getElementById('save-model-btn').addEventListener('click', saveModelProvider);
+        document.getElementById('provider-type').addEventListener('change', updateProviderTypeUI);
+    }
+
+    // Initialize model providers from localStorage
+    modelProviders = getModelProviders();
+});
