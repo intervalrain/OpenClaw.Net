@@ -18,22 +18,29 @@
     <div id="app">
         <nav class="sidebar">
             <div class="sidebar-header">
-                <h1>OpenClaw.NET</h1>
+                <h1>OpenClaw</h1>
                 <div class="header-buttons">
-                    <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
+                    <button id="new-chat-btn" class="icon-btn" title="New Chat">+</button>
+                    <button id="theme-toggle" class="icon-btn" title="Toggle theme">
                         <span class="icon-sun">☀️</span>
                         <span class="icon-moon">🌙</span>
                     </button>
-                    <button id="sidebar-toggle" class="sidebar-toggle" title="Toggle sidebar">
+                    <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar">
                         <span class="icon-collapse">◀</span>
                         <span class="icon-expand">▶</span>
                     </button>
                 </div>
             </div>
-            <ul>
+            <ul class="nav-menu">
                 <li><a href="#chat" class="nav-link active">Chat</a></li>
-                <li><a href="#dashboard" class="nav-link">Dashboard</a></li>
+                <li><a href="#settings" class="nav-link">Settings</a></li>
             </ul>
+            <div class="conversation-section">
+                <div class="conversation-header">Conversations</div>
+                <div class="conversation-list" id="conversation-list">
+                    <!-- Conversations will be loaded here -->
+                </div>
+            </div>
         </nav>
         <main class="content">
             <div id="chat-page" class="page active">

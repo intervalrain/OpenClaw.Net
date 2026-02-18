@@ -3,12 +3,10 @@ using System.Text;
 using System.Text.Json;
 
 using OllamaSharp;
-
 using OllamaSharp.Models.Chat;
 
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
-using OpenClaw.Domain.Chat.Entities;
 
 namespace OpenClaw.Infrastructure.Llm.Ollama;
 
@@ -18,7 +16,7 @@ public class OllamaLlmProvider(IConfigStore config) : ILlmProvider
     private readonly OllamaApiClient _client = new(config.Get(ConfigKeys.OllamaUrl) ?? "http://localhost:11434");
     private readonly string _model = config.Get(ConfigKeys.OllamaModel) ?? "qwen2.5:7b";
 
-    public async Task<ChatResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
+    public async Task<LlmChatResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
     {
         var request = new ChatRequest
         {
@@ -133,7 +131,7 @@ public class OllamaLlmProvider(IConfigStore config) : ILlmProvider
         };
     }
 
-    private static ChatResponse ToChatResponse(string content, List<Message.ToolCall>? toolCalls)
+    private static LlmChatResponse ToChatResponse(string content, List<Message.ToolCall>? toolCalls)
     {
         var mappedToolCalls = toolCalls?
             .Select(tc => new ToolCall(
@@ -142,7 +140,7 @@ public class OllamaLlmProvider(IConfigStore config) : ILlmProvider
                 JsonSerializer.Serialize(tc.Function?.Arguments)))
             .ToList();
 
-        return new ChatResponse(
+        return new LlmChatResponse(
             string.IsNullOrEmpty(content) ? null : content,
             mappedToolCalls);
     }

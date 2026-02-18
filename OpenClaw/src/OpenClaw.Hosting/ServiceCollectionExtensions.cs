@@ -43,9 +43,17 @@ public static class ServiceCollectionExtensions
         // ConfigStore
         services.AddSingleton<IConfigStore, EnvironmentConfigStore>();
 
-        // LLM Providers
+        // LLM Providers (keyed)
         services.AddKeyedSingleton<ILlmProvider, OpenAILlmProvider>("openai");
         services.AddKeyedSingleton<ILlmProvider, OllamaLlmProvider>("ollama");
+
+        // Default LLM Provider (resolved from config)
+        services.AddSingleton<ILlmProvider>(sp =>
+        {
+            var configStore = sp.GetRequiredService<IConfigStore>();
+            var providerKey = configStore.Get(ConfigKeys.LlmProvider) ?? "ollama";
+            return sp.GetRequiredKeyedService<ILlmProvider>(providerKey);
+        });
 
         // skills
         services.AddSingleton<IAgentSkill>(ReadFileSkill.Default);

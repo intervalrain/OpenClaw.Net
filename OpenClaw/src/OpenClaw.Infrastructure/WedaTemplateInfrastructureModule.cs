@@ -105,4 +105,5 @@ public static class WedaTemplateInfrastructureModule
 
         return services;
     }
+
 }

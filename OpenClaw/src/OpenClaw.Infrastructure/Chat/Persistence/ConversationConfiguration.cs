@@ -12,6 +12,7 @@ public class ConversationConfiguration : IEntityTypeConfiguration<Conversation>
         builder.ToTable("Conversations");
 
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.Id).ValueGeneratedNever();
 
         builder.Property(c => c.Title)
             .HasMaxLength(200);

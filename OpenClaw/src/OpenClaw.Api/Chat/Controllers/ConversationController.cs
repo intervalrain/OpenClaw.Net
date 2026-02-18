@@ -7,13 +7,14 @@ using OpenClaw.Contracts.Chat.Requests;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Repositories;
 
+using Weda.Core.Application.Interfaces;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Chat.Controllers;
 
 [AllowAnonymous]
 [ApiVersion("1.0")]
-public class ConversationController(IConversationRepository repository) : ApiController
+public class ConversationController(IConversationRepository repository, IUnitOfWork uow) : ApiController
 {
     [HttpGet]
     public async Task<IActionResult> GetListAsync(CancellationToken ct)
@@ -42,10 +43,11 @@ public class ConversationController(IConversationRepository repository) : ApiCon
     {
         var conversation = Conversation.Create(request?.Title);
         await repository.AddAsync(conversation);
+        await uow.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(GetById), new { id = conversation.Id }, new { conversation.Id, conversation.Title });
     }
 
-    [HttpPut]
+    [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateTitle(Guid id, [FromBody] UpdateTitleRequest request, CancellationToken ct)
     {
         var conversation = await repository.GetByIdAsync(id, ct);
@@ -53,6 +55,7 @@ public class ConversationController(IConversationRepository repository) : ApiCon
 
         conversation.UpdateTitle(request.Title);
         await repository.UpdateAsync(conversation, ct);
+        await uow.SaveChangesAsync(ct);
         return NoContent();
     }
 
@@ -62,6 +65,7 @@ public class ConversationController(IConversationRepository repository) : ApiCon
         var conversation = await repository.GetByIdAsync(id, ct);
         if (conversation is null) return NotFound();
         await repository.DeleteAsync(conversation, ct);
+        await uow.SaveChangesAsync(ct);
         return NoContent();
     }
 }

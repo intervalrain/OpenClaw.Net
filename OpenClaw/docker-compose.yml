@@ -14,8 +14,14 @@ services:
       - Database__ConnectionString=Host=postgres;Database=openclaw_dev;Username=postgres;Password=postgres
       - OpenTelemetry__OtlpEndpoint=http://host.docker.internal:4317
       - OLLAMA_URL=http://host.docker.internal:11434
+      - Nats__Broker__Url=nats://nats-broker:4222
+      - Nats__Bus__Url=nats://nats-bus:4222
     depends_on:
       postgres:
+        condition: service_healthy
+      nats-broker:
+        condition: service_healthy
+      nats-bus:
         condition: service_healthy
     restart: on-failure
     networks:
@@ -40,9 +46,45 @@ services:
     networks:
       - openclaw-network
 
+  nats-broker:
+    container_name: openclaw-nats-broker
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    volumes:
+      - nats-broker-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - openclaw-network
+
+  nats-bus:
+    container_name: openclaw-nats-bus
+    image: nats:2.10-alpine
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    volumes:
+      - nats-bus-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - openclaw-network
+
 networks:
   openclaw-network:
     driver: bridge
 
 volumes:
   postgres-data:
+  nats-broker-data:
+  nats-bus-data:

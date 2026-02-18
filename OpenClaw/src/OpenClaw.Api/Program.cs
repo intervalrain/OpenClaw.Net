@@ -1,5 +1,4 @@
 using System.Reflection;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Serilog;
 using Weda.Core;
@@ -10,7 +9,6 @@ using Weda.Protocol;
 using OpenClaw.Api;
 using OpenClaw.Application;
 using OpenClaw.Contracts;
-using OpenClaw.Domain.Users.Entities;
 using OpenClaw.Infrastructure;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Hosting;
@@ -43,13 +41,15 @@ var builder = WebApplication.CreateBuilder(args);
                     Version = "v1",
                 };
                 options.Observability.ServiceName = "OpenClaw.NET";
-                options.Observability.Tracing.UseConsoleExporter = true;
+                options.Observability.Tracing.UseConsoleExporter = false;
             },
             nats =>
             {
                 nats.DefaultConnection = "bus";
-                nats.AddConnection(EcoType.Protobuf ,"broker", "nats://localhost:4222");
-                nats.AddConnection(EcoType.Json, "bus", "nats://localhost:4223");
+                var brokerUrl = builder.Configuration["Nats:Broker:Url"] ?? "nats://localhost:4222";
+                var busUrl = builder.Configuration["Nats:Bus:Url"] ?? "nats://localhost:4223";
+                nats.AddConnection(EcoType.Protobuf, "broker", brokerUrl);
+                nats.AddConnection(EcoType.Json, "bus", busUrl);
 
                 nats.AddKeyValueCache();
                 nats.AddObjectStore();
@@ -71,19 +71,22 @@ var app = builder.Build();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        // Try to create database, if schema mismatch occurs, recreate
         try
         {
-            dbContext.Database.EnsureCreated();
-
-            // Verify schema by testing a simple query on each DbSet
-            _ = await dbContext.Set<User>().AnyAsync();
+            // Try EnsureCreated first (idempotent if schema exists)
+            var created = dbContext.Database.EnsureCreated();
+            if (created)
+                logger.LogInformation("Database created");
+            else
+                logger.LogInformation("Database already exists");
         }
-        catch (Exception ex) when (ex.Message.Contains("no such table") || ex.Message.Contains("doesn't exist"))
+        catch (Exception ex)
         {
-            logger.LogWarning("Database schema mismatch detected, recreating database...");
+            // Schema mismatch or corruption, recreate
+            logger.LogWarning(ex, "Database schema issue, recreating...");
             dbContext.Database.EnsureDeleted();
             dbContext.Database.EnsureCreated();
+            logger.LogInformation("Database recreated successfully");
         }
 
         var seeder = scope.ServiceProvider.GetRequiredService<AppDbContextSeeder>();

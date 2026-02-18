@@ -12,6 +12,7 @@ public class ConversationMessageConfiguration : IEntityTypeConfiguration<Convers
         builder.ToTable("ConversationMessages");
 
         builder.HasKey(m => m.Id);
+        builder.Property(m => m.Id).ValueGeneratedNever();
 
         builder.Property(m => m.ConversationId)
             .IsRequired();

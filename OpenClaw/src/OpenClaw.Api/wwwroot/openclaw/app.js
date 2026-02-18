@@ -1,5 +1,7 @@
 // DOM Elements
 let messagesEl, userInputEl, sendBtn, navLinks, pages, themeToggle;
+let currentConversationId = null;
+let conversations = [];
 
 // Configure marked.js
 marked.setOptions({
@@ -46,6 +48,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial navigation
     navigate(location.hash || '#chat');
+
+    // Sidebar toggle
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.querySelector('.sidebar');
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+    });
+
+    // Initialize conversations
+    document.getElementById('new-chat-btn').addEventListener('click', createNewConversation);
+    loadConversations();
 });
 
 // Theme functions
@@ -195,7 +208,10 @@ async function sendMessage() {
         const res = await fetch('/api/v1/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({
+                message,
+                conversationId: currentConversationId
+            })
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -307,4 +323,77 @@ function navigate(hash) {
         const pageId = page.id.replace('-page', '');
         page.classList.toggle('active', `#${pageId}` === hash);
     });
+}
+
+// Load conversations on startup
+async function loadConversations() {
+    const response = await fetch('/api/v1/conversation');
+    conversations = await response.json();
+
+    // Auto-create or select first conversation
+    if (conversations.length === 0) {
+        await createNewConversation();
+    } else {
+        selectConversation(conversations[0].id);
+    }
+
+    renderConversationList();
+}
+
+function renderConversationList() {
+    const list = document.getElementById('conversation-list');
+    list.innerHTML = conversations.map(c => `
+        <div class="conversation-item ${c.id === currentConversationId ? 'active' : ''}" 
+             data-id="${c.id}">
+            <span class="title">${c.title}</span>
+            <button class="delete-btn" onclick="deleteConversation('${c.id}', event)">🗑️</button>
+        </div>
+    `).join('');
+
+    // Add click handlers
+    list.querySelectorAll('.conversation-item').forEach(item => {
+        item.addEventListener('click', () => selectConversation(item.dataset.id));
+    })
+}
+
+async function createNewConversation() {
+    const response = await fetch('/api/v1/conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New Chat' })
+    });
+    const { id, title } = await response.json();
+    conversations.unshift({ id, title, messageCount: 0 });
+    selectConversation(id);
+    renderConversationList();
+}
+
+async function selectConversation(id) {
+    currentConversationId = id;
+    renderConversationList();
+
+    // Load messages
+    const response = await fetch(`/api/v1/conversation/${id}`);
+    const conversation = await response.json();
+
+    // Clear and render messages
+    const messagesDiv = document.getElementById('messages');
+    messagesDiv.innerHTML = '';
+    conversation.messages.forEach(msg => {
+        addMessage(msg.content, msg.role === 'User' ? 'user' : 'assistant');
+    });
+}
+
+async function deleteConversation(id, event) {
+    event.stopPropagation();
+    if (!confirm('Are you sure to delete this conversation?')) return;
+
+    await fetch(`/api/v1/conversation/${id}`, { method: 'DELETE' });
+    conversations = conversations.filter(c => c.id !== id);
+
+    if (currentConversationId === id) {
+        currentConversationId = null;
+        document.getElementById('messages').innerHTML = '';
+    }
+    renderConversationList();
 }

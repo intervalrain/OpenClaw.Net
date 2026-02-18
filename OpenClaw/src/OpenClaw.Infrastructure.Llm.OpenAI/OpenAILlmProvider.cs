@@ -18,7 +18,7 @@ public class OpenAILlmProvider(IConfigStore config) : ILlmProvider
     private readonly OpenAIClient _client = new(config.GetRequired(ConfigKeys.OpenAiApiKey));
     private readonly string _model = config.Get(ConfigKeys.OpenAiModel) ?? "gpt-4o-mini";
 
-    public async Task<ChatResponse> ChatAsync(
+    public async Task<LlmChatResponse> ChatAsync(
         IReadOnlyList<OpenClawChatMessage> messages,
         IReadOnlyList<ToolDefinition>? tools = null,
         CancellationToken ct = default)
@@ -149,13 +149,13 @@ public class OpenAILlmProvider(IConfigStore config) : ILlmProvider
         }
     }
 
-    private static ChatResponse ToChatResponse(ChatCompletion completion)
+    private static LlmChatResponse ToChatResponse(ChatCompletion completion)
     {
         var toolCalls = completion.ToolCalls?
             .Select(tc => new ToolCall(tc.Id, tc.FunctionName, tc.FunctionArguments.ToString()))
             .ToList();
 
-        return new ChatResponse(
+        return new LlmChatResponse(
             completion.Content?.FirstOrDefault()?.Text,
             toolCalls);
     }

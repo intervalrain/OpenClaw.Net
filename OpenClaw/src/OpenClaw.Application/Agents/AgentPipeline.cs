@@ -16,7 +16,10 @@ public class AgentPipeline(
     private readonly Dictionary<string, IAgentSkill> _skillMap = skills.ToDictionary(s => s.Name);
     private readonly IReadOnlyList<IAgentMiddleware> _middlewares = middlewares ?? [];
 
-    public async Task<string> ExecuteAsync(string userInput, CancellationToken ct = default)
+    public async Task<string> ExecuteAsync(
+        string userInput,
+        IReadOnlyList<ChatMessage>? history = null,
+        CancellationToken ct = default)
     {
         var context = new AgentContext
         {
@@ -31,12 +34,19 @@ public class AgentPipeline(
             context.Messages.Add(new ChatMessage(ChatRole.System, options.SystemPrompt));
         }
 
+        // Add conversation history
+        if (history is { Count: > 0 })
+        {
+            context.Messages.AddRange(history);
+        }
+
         var pipeline = BuildPipeline();
         return await pipeline(context, ct);
     }
 
     public async IAsyncEnumerable<AgentStreamEvent> ExecuteStreamAsync(
         string userInput,
+        IReadOnlyList<ChatMessage>? history = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
@@ -44,6 +54,12 @@ public class AgentPipeline(
         if (options.SystemPrompt is not null)
         {
             messages.Add(new ChatMessage(ChatRole.System, options.SystemPrompt));
+        }
+
+        // Add conversation history
+        if (history is { Count: > 0 })
+        {
+            messages.AddRange(history);
         }
 
         messages.Add(new ChatMessage(ChatRole.User, userInput));

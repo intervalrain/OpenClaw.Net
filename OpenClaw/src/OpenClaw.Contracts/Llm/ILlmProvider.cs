@@ -4,7 +4,7 @@ public interface ILlmProvider
 {
     string Name { get; }
 
-    Task<ChatResponse> ChatAsync(
+    Task<LlmChatResponse> ChatAsync(
         IReadOnlyList<ChatMessage> messages,
         IReadOnlyList<ToolDefinition>? tools = null,
         CancellationToken ct = default);

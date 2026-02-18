@@ -10,18 +10,23 @@ public class NatsKvDistributedCache(
 {
     private INatsKVStore? _store;
     private readonly SemaphoreSlim _initLock = new(1, 1);
-    
+
     public byte[]? Get(string key) => GetAsync(key).GetAwaiter().GetResult();
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken token = default)
     {
         var store = await GetOrCreateStoreAsync(token);
+        var sanitizedKey = SanitizeKey(key);
         try
         {
-            var entry = await store.GetEntryAsync<byte[]>(key, cancellationToken: token);
+            var entry = await store.GetEntryAsync<byte[]>(sanitizedKey, cancellationToken: token);
             return entry.Value;
         }
         catch (NatsKVKeyNotFoundException)
+        {
+            return null;
+        }
+        catch (NatsKVKeyDeletedException)
         {
             return null;
         }
@@ -36,13 +41,18 @@ public class NatsKvDistributedCache(
     public async Task RemoveAsync(string key, CancellationToken token = default)
     {
         var store = await GetOrCreateStoreAsync(token);
+        var sanitizedKey = SanitizeKey(key);
         try
         {
-            await store.DeleteAsync(key, cancellationToken: token);
+            await store.DeleteAsync(sanitizedKey, cancellationToken: token);
         }
         catch (NatsKVKeyNotFoundException)
         {
             // ignore
+        }
+        catch (NatsKVKeyDeletedException)
+        {
+            // ignore - already deleted
         }
     }
 
@@ -51,8 +61,22 @@ public class NatsKvDistributedCache(
     public async Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
     {
         var store = await GetOrCreateStoreAsync(token);
-        await store.PutAsync(key, value, cancellationToken: token);
+        var sanitizedKey = SanitizeKey(key);
+        await store.PutAsync(sanitizedKey, value, cancellationToken: token);
     }
+
+    /// <summary>
+    /// NATS KV keys only allow [A-Za-z0-9_], sanitize invalid characters
+    /// </summary>
+    private static string SanitizeKey(string key) =>
+        string.Create(key.Length, key, (span, k) =>
+        {
+            for (var i = 0; i < k.Length; i++)
+            {
+                var c = k[i];
+                span[i] = char.IsLetterOrDigit(c) || c == '_' ? c : '_';
+            }
+        });
 
     private async Task<INatsKVStore> GetOrCreateStoreAsync(CancellationToken token)
     {
