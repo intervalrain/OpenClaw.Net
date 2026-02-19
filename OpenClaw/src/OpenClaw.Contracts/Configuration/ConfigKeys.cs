@@ -7,4 +7,5 @@ public class ConfigKeys
     public const string OpenAiApiKey = "OPENAI_API_KEY";
     public const string OllamaUrl = "OLLAMA_URL";
     public const string OllamaModel = "OLLAMA_MODEL";
+    public const string EncryptionKey = "OPENCLAW_ENCRYPTION_KEY";
 }

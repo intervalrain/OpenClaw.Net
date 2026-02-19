@@ -1,3 +1,3 @@
-namespace OpenClaw.Contracts.Chat.Response;
+namespace OpenClaw.Contracts.Chat.Responses;
 
 public record ChatResponse(string Response);

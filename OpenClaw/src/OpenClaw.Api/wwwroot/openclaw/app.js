@@ -417,46 +417,39 @@ function saveSettings(settings) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-function getModelProviders() {
-    const saved = localStorage.getItem(MODELS_KEY);
-    if (saved) {
-        return JSON.parse(saved);
+async function loadModelProviders() {
+    try {
+        const res = await fetch('/api/v1/model-provider');
+        if (res.ok) {
+            modelProviders = await res.json();
+        }
+    } catch (e) {
+        console.error('Failed to load model providers:', e);
+        modelProviders = [];
     }
-    // Default Ollama provider
-    const defaultProvider = {
-        id: crypto.randomUUID(),
-        type: 'ollama',
-        name: 'Local Ollama',
-        url: 'http://localhost:11434',
-        model: 'qwen2.5:7b',
-        apiKey: null
-    };
-    saveModelProviders([defaultProvider]);
-    return [defaultProvider];
+    return modelProviders;
 }
 
-function saveModelProviders(providers) {
-    localStorage.setItem(MODELS_KEY, JSON.stringify(providers));
-    modelProviders = providers;
+function getActiveModelProviderId() {
+    const active = modelProviders.find(p => p.isActive);
+    return active?.id || null;
 }
 
 function renderModelList() {
-    const settings = getSettings();
-    const providers = getModelProviders();
     const listEl = document.getElementById('model-list');
 
-    if (providers.length === 0) {
+    if (modelProviders.length === 0) {
         listEl.innerHTML = '<p class="setting-hint">No model providers configured.</p>';
         return;
     }
 
-    listEl.innerHTML = providers.map(p => `
-        <div class="model-item ${settings.activeModelId === p.id ? 'active' : ''}" data-id="${p.id}">
+    listEl.innerHTML = modelProviders.map(p => `
+        <div class="model-item ${p.isActive ? 'active' : ''}" data-id="${p.id}">
             <input type="radio" name="active-model" class="model-item-radio"
-                   value="${p.id}" ${settings.activeModelId === p.id ? 'checked' : ''}>
+                   value="${p.id}" ${p.isActive ? 'checked' : ''}>
             <div class="model-item-info">
                 <div class="model-item-name">${escapeHtml(p.name)}</div>
-                <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.model)}</div>
+                <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
             </div>
             <div class="model-item-actions">
                 <button class="model-item-btn delete" data-id="${p.id}" title="Delete">
@@ -470,31 +463,42 @@ function renderModelList() {
 
     // Add event listeners for radio buttons
     listEl.querySelectorAll('.model-item-radio').forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            const settings = getSettings();
-            settings.activeModelId = e.target.value;
-            saveSettings(settings);
+        radio.addEventListener('change', async (e) => {
+            const id = e.target.value;
+            await activateModelProvider(id);
             renderModelList();
         });
     });
 
     // Add event listeners for delete buttons
     listEl.querySelectorAll('.model-item-btn.delete').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const id = btn.dataset.id;
             if (confirm('Delete this model provider?')) {
-                const providers = getModelProviders().filter(p => p.id !== id);
-                saveModelProviders(providers);
-                const settings = getSettings();
-                if (settings.activeModelId === id) {
-                    settings.activeModelId = providers[0]?.id || null;
-                    saveSettings(settings);
-                }
+                await deleteModelProvider(id);
                 renderModelList();
             }
         });
     });
+}
+
+async function activateModelProvider(id) {
+    try {
+        await fetch(`/api/v1/model-provider/${id}/activate`, { method: 'POST' });
+        await loadModelProviders();
+    } catch (e) {
+        console.error('Failed to activate provider:', e);
+    }
+}
+
+async function deleteModelProvider(id) {
+    try {
+        await fetch(`/api/v1/model-provider/${id}`, { method: 'DELETE' });
+        await loadModelProviders();
+    } catch (e) {
+        console.error('Failed to delete provider:', e);
+    }
 }
 
 function escapeHtml(text) {
@@ -503,11 +507,14 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-function openSettingsModal() {
+async function openSettingsModal() {
     const modal = document.getElementById('settings-modal');
     const settings = getSettings();
 
     document.getElementById('language-select').value = settings.language;
+
+    // Load providers from backend
+    await loadModelProviders();
     renderModelList();
 
     modal.classList.add('active');
@@ -639,7 +646,7 @@ async function validateModel() {
     }
 }
 
-function saveModelProvider() {
+async function saveModelProvider() {
     const type = document.getElementById('provider-type').value;
     const name = document.getElementById('provider-name').value.trim();
 
@@ -651,28 +658,33 @@ function saveModelProvider() {
         url = 'https://api.anthropic.com';
     }
 
+    const isFirstProvider = modelProviders.length === 0;
+
     const provider = {
-        id: crypto.randomUUID(),
         type: type,
         name: name || getDefaultProviderName(type),
         url: url,
-        model: document.getElementById('provider-model').value.trim(),
-        apiKey: document.getElementById('provider-api-key').value.trim() || null
+        modelName: document.getElementById('provider-model').value.trim(),
+        apiKey: document.getElementById('provider-api-key').value.trim() || null,
+        isActive: isFirstProvider
     };
 
-    const providers = getModelProviders();
-    providers.push(provider);
-    saveModelProviders(providers);
+    try {
+        const res = await fetch('/api/v1/model-provider', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(provider)
+        });
 
-    // If this is the first provider, set it as active
-    const settings = getSettings();
-    if (!settings.activeModelId) {
-        settings.activeModelId = provider.id;
-        saveSettings(settings);
+        if (!res.ok) throw new Error('Failed to create provider');
+
+        await loadModelProviders();
+        closeAddModelModal();
+        renderModelList();
+    } catch (e) {
+        console.error('Failed to save provider:', e);
+        alert('Failed to save model provider');
     }
-
-    closeAddModelModal();
-    renderModelList();
 }
 
 function getDefaultProviderName(type) {
@@ -714,6 +726,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('provider-type').addEventListener('change', updateProviderTypeUI);
     }
 
-    // Initialize model providers from localStorage
-    modelProviders = getModelProviders();
+    // Initialize model providers from backend
+    loadModelProviders();
 });

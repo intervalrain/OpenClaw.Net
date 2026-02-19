@@ -2,6 +2,7 @@ using Asp.Versioning;
 using FluentValidation;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 using Weda.Core.Application.Behaviors;
 using Weda.Core.Infrastructure.Middleware;
 using Weda.Core.Infrastructure.Messaging.Nats.Configuration;
+using Weda.Core.Presentation.Routing;
 using Weda.Core.Presentation.Swagger;
 using Weda.Core.Presentation.Filters;
 using Weda.Core.Infrastructure.Observability;
@@ -124,11 +126,19 @@ public static class WedaCoreModule
         this IServiceCollection services,
         WedaCoreOptions options)
     {
-        services.AddControllers()
-            .AddJsonOptions(options =>
+        services.AddRouting(routeOptions =>
+        {
+            routeOptions.ConstraintMap["slugify"] = typeof(SlugifyParameterTransformer);
+        });
+
+        services.AddControllers(mvcOptions =>
             {
-                options.JsonSerializerOptions.PropertyNamingPolicy = WedaJsonDefaults.Options.PropertyNamingPolicy;
-                options.JsonSerializerOptions.PropertyNameCaseInsensitive = WedaJsonDefaults.Options.PropertyNameCaseInsensitive;
+                mvcOptions.Conventions.Add(new RouteTokenTransformerConvention(new SlugifyParameterTransformer()));
+            })
+            .AddJsonOptions(jsonOptions =>
+            {
+                jsonOptions.JsonSerializerOptions.PropertyNamingPolicy = WedaJsonDefaults.Options.PropertyNamingPolicy;
+                jsonOptions.JsonSerializerOptions.PropertyNameCaseInsensitive = WedaJsonDefaults.Options.PropertyNameCaseInsensitive;
             });
         services.AddEndpointsApiExplorer();
 

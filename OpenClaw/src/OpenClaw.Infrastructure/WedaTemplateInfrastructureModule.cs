@@ -1,5 +1,15 @@
 using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security;
+using Weda.Core.Application.Security.Models;
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+using OpenClaw.Contracts.Security;
+using OpenClaw.Domain.Chat.Repositories;
+using OpenClaw.Domain.Configuration.Repositories;
 using OpenClaw.Domain.Users.Repositories;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Infrastructure.Persistence;
@@ -8,20 +18,10 @@ using OpenClaw.Infrastructure.Security.PolicyEnforcer;
 using OpenClaw.Infrastructure.Security.TokenValidation;
 using OpenClaw.Infrastructure.Services;
 using OpenClaw.Infrastructure.Users.Persistence;
-
-using InfraCurrentUserProvider = OpenClaw.Infrastructure.Security.CurrentUserProvider.CurrentUserProvider;
-using InfraPasswordHasher = OpenClaw.Infrastructure.Security.PasswordHasher.BCryptPasswordHasher;
-
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Weda.Core.Application.Security.Models;
-using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Infrastructure.Chat.Persistence;
-
-
-
+using OpenClaw.Infrastructure.Configuration.Persistence;
+using OpenClaw.Infrastructure.Security.CurrentUserProvider;
+using OpenClaw.Infrastructure.Security.PasswordHasher;
 
 namespace OpenClaw.Infrastructure;
 
@@ -71,8 +71,11 @@ public static class WedaTemplateInfrastructureModule
         // persistence
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IModelProviderRepository, ModelProviderRepository>();
 
-        services.AddSingleton<IPasswordHasher, InfraPasswordHasher>();
+        // security
+        services.AddSingleton<IEncryptionService, AesEncryptionService>();
+        services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<AppDbContextSeeder>();
 
         return services;
@@ -81,7 +84,7 @@ public static class WedaTemplateInfrastructureModule
     private static IServiceCollection AddAuthorizationPolicies(this IServiceCollection services)
     {
         services.AddScoped<IAuthorizationService, AuthorizationService>();
-        services.AddScoped<ICurrentUserProvider, InfraCurrentUserProvider>();
+        services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
         services.AddSingleton<IPolicyEnforcer, PolicyEnforcer>();
 
         services.AddAuthorizationBuilder()

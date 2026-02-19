@@ -34,7 +34,7 @@ public static class ConfigLoader
         return values;
     }
 
-    private static string? FindEnvFile()
+    public static string? FindEnvFile()
     {
         var dir = Directory.GetCurrentDirectory();
         while (dir is not null)
@@ -46,4 +46,17 @@ public static class ConfigLoader
         return null;
     }
 
+    public static void AppendToEnvFile(string key, string value)
+    {
+        var envPath = FindEnvFile();
+        if (envPath is null) return;
+
+        var content = File.ReadAllText(envPath);
+
+        // Skip if key already exists
+        if (content.Contains($"{key}=")) return;
+
+        var newLine = content.EndsWith('\n') ? "" : "\n";
+        File.AppendAllText(envPath, $"{newLine}{key}={value}\n");
+    }
 }

@@ -12,11 +12,24 @@ using OpenClawChatMessage = OpenClaw.Contracts.Llm.ChatMessage;
 
 namespace OpenClaw.Infrastructure.Llm.OpenAI;
 
-public class OpenAILlmProvider(IConfigStore config) : ILlmProvider
+public class OpenAILlmProvider : ILlmProvider
 {
     public string Name => "OpenAI";
-    private readonly OpenAIClient _client = new(config.GetRequired(ConfigKeys.OpenAiApiKey));
-    private readonly string _model = config.Get(ConfigKeys.OpenAiModel) ?? "gpt-4o-mini";
+    private readonly OpenAIClient _client;
+    private readonly string _model;
+
+    public OpenAILlmProvider(string apiKey, string model)
+    {
+        _client = new OpenAIClient(apiKey);
+        _model = model;
+    }
+
+    public OpenAILlmProvider(IConfigStore config)
+        : this(
+            config.GetRequired(ConfigKeys.OpenAiApiKey), 
+            config.Get(ConfigKeys.OpenAiModel) ?? "gpt-4o-mini")
+    {
+    }
 
     public async Task<LlmChatResponse> ChatAsync(
         IReadOnlyList<OpenClawChatMessage> messages,

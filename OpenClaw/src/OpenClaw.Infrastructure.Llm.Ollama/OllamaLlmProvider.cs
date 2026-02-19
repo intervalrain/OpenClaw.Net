@@ -10,11 +10,24 @@ using OpenClaw.Contracts.Llm;
 
 namespace OpenClaw.Infrastructure.Llm.Ollama;
 
-public class OllamaLlmProvider(IConfigStore config) : ILlmProvider
+public class OllamaLlmProvider : ILlmProvider
 {
     public string Name => $"ollama:{_model}";
-    private readonly OllamaApiClient _client = new(config.Get(ConfigKeys.OllamaUrl) ?? "http://localhost:11434");
-    private readonly string _model = config.Get(ConfigKeys.OllamaModel) ?? "qwen2.5:7b";
+    private readonly OllamaApiClient _client;
+    private readonly string _model;
+
+    public OllamaLlmProvider(string url, string model)
+    {
+        _client = new OllamaApiClient(url);
+        _model = model;
+    }
+
+    public OllamaLlmProvider(IConfigStore config)
+        : this(
+            config.Get(ConfigKeys.OllamaUrl) ?? "http://localhost:11434",
+            config.Get(ConfigKeys.OllamaModel) ?? "qwen2.5:7b")
+    {   
+    }
 
     public async Task<LlmChatResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, IReadOnlyList<ToolDefinition>? tools = null, CancellationToken ct = default)
     {

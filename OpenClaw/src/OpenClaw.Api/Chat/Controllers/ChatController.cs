@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Chat.Requests;
-using OpenClaw.Contracts.Chat.Response;
+using OpenClaw.Contracts.Chat.Responses;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
@@ -23,7 +23,7 @@ namespace OpenClaw.Api.Chat.Controllers;
 public class ChatController(
     IAgentPipeline pipeline,
     IConversationRepository repository,
-    ILlmProvider llmProvider,
+    ILlmProviderFactory llmProviderFactory,
     IUnitOfWork uow) : ApiController
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -134,7 +134,9 @@ public class ChatController(
     private const int MaxTokenEstimate = 4000; // ~4k tokens for context
     private const int RecentMessagesToKeep = 6; // Keep last 3 exchanges (6 messages)
 
-    private async Task<List<ChatMessage>> CompactHistoryIfNeededAsync(List<ChatMessage> history, CancellationToken ct)
+    private async Task<List<ChatMessage>> CompactHistoryIfNeededAsync(
+        List<ChatMessage> history,
+        CancellationToken ct)
     {
         if (history.Count <= RecentMessagesToKeep)
             return history;
@@ -163,7 +165,9 @@ public class ChatController(
         return compacted;
     }
 
-    private async Task<string> SummarizeConversationAsync(List<ChatMessage> messages, CancellationToken ct)
+    private async Task<string> SummarizeConversationAsync(
+        List<ChatMessage> messages,
+        CancellationToken ct)
     {
         const string systemPrompt = """
             Summarize the following conversation concisely.
@@ -183,6 +187,7 @@ public class ChatController(
 
         try
         {
+            var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
             var response = await llmProvider.ChatAsync(summaryMessages, ct: ct);
             return response.Content ?? "Previous conversation context.";
         }
@@ -193,7 +198,10 @@ public class ChatController(
         }
     }
 
-    private async Task<string> GenerateTitleAsync(string userMessage, string assistantResponse, CancellationToken ct)
+    private async Task<string> GenerateTitleAsync(
+        string userMessage,
+        string assistantResponse,
+        CancellationToken ct)
     {
         const string systemPrompt = """
             Generate a concise title (10-30 characters) for this conversation.
@@ -209,6 +217,7 @@ public class ChatController(
 
         try
         {
+            var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
             var response = await llmProvider.ChatAsync(messages, ct: ct);
             var title = response.Content?.Trim() ?? userMessage[..Math.Min(30, userMessage.Length)];
             return title.Length > 50 ? title[..50] : title;

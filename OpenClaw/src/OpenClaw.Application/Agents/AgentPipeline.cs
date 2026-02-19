@@ -2,13 +2,12 @@ using System.Runtime.CompilerServices;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
-using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
 
 namespace OpenClaw.Application.Agents;
 
 public class AgentPipeline(
-    ILlmProvider llmProvider,
+    ILlmProviderFactory llmProviderFactory,
     IEnumerable<IAgentSkill> skills,
     AgentPipelineOptions options,
     IReadOnlyList<IAgentMiddleware>? middlewares = null) : IAgentPipeline
@@ -25,7 +24,7 @@ public class AgentPipeline(
         var context = new AgentContext
         {
             UserInput = userInput,
-            LlmProvider = llmProvider,
+            LlmProvider = await llmProviderFactory.GetProviderAsync(ct),
             Skills = _skillMap.Values.ToList(),
             Options = options
         };
@@ -74,6 +73,8 @@ public class AgentPipeline(
         var toolDefinitions = _skillMap.Values
             .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
             .ToList();
+
+        var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
 
         for (int i = 0; i < options.MaxIterations; i++)
         {

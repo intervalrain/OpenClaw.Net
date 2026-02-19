@@ -3,8 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 using OpenClaw.Application.Agents;
-
 using OpenClaw.Application.Agents.Middlewares;
+using OpenClaw.Application.Llm;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
@@ -47,6 +47,12 @@ public static class ServiceCollectionExtensions
         services.AddKeyedSingleton<ILlmProvider, OpenAILlmProvider>("openai");
         services.AddKeyedSingleton<ILlmProvider, OllamaLlmProvider>("ollama");
 
+        // LLM Provider Factories (keyed) - for dynamic creation with custom params
+        services.AddKeyedSingleton<Func<string, string, ILlmProvider>>("ollama",
+            (_, _) => (url, model) => new OllamaLlmProvider(url, model));
+        services.AddKeyedSingleton<Func<string, string, ILlmProvider>>("openai",
+            (_, _) => (apiKey, model) => new OpenAILlmProvider(apiKey, model));
+
         // Default LLM Provider (resolved from config)
         services.AddSingleton<ILlmProvider>(sp =>
         {
@@ -55,6 +61,9 @@ public static class ServiceCollectionExtensions
             return sp.GetRequiredKeyedService<ILlmProvider>(providerKey);
         });
 
+        // LLM Provider Factory
+        services.AddScoped<ILlmProviderFactory, LlmProviderFactory>();
+
         // skills
         services.AddSingleton<IAgentSkill>(ReadFileSkill.Default);
         services.AddSingleton<IAgentSkill>(WriteFileSkill.Default);
@@ -62,11 +71,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
         services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
 
-        // pipeline
-        services.AddSingleton<IAgentPipeline>(sp =>
+        // pipeline (Scoped to allow dynamic provider switching per request)
+        services.AddScoped<IAgentPipeline>(sp =>
         {
-            var configStore = sp.GetRequiredService<IConfigStore>();
-            var llmProvider = sp.GetRequiredKeyedService<ILlmProvider>(configStore.Get(ConfigKeys.LlmProvider));
+            var llmProviderFactory = sp.GetRequiredService<ILlmProviderFactory>();
             var skills = sp.GetServices<IAgentSkill>();
             var options = sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value;
 
@@ -75,7 +83,7 @@ public static class ServiceCollectionExtensions
                 .Use<SecretRedactionMiddleware>()  // Redact secrets before logging
                 .Use<LoggingMiddleware>()
                 .Use<TimeoutMiddleware>()
-                .Build(llmProvider, skills, options);
+                .Build(llmProviderFactory, skills, options);
 
             return pipeline;
         });
