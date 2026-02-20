@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.FileSystem\OpenClaw.Skills.FileSystem.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Http\OpenClaw.Skills.Http.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Shell\OpenClaw.Skills.Shell.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.WebSearch\OpenClaw.Skills.WebSearch.csproj" />
   </ItemGroup>
 
 </Project>

@@ -17,6 +17,7 @@ using OpenClaw.Skills.FileSystem.ReadFile;
 using OpenClaw.Skills.FileSystem.WriteFile;
 using OpenClaw.Skills.Http.HttpRequest;
 using OpenClaw.Skills.Shell.ExecuteCommand;
+using OpenClaw.Skills.WebSearch.WebSearch;
 
 using Serilog;
 
@@ -70,6 +71,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgentSkill>(ListDirectorySkill.Default);
         services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
         services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
+        services.AddSingleton<IAgentSkill>(WebSearchSkill.Default);
 
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>

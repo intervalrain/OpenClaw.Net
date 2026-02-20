@@ -1,0 +1,16 @@
+# SearXNG settings - Enable JSON API
+
+use_default_settings: true
+
+server:
+  secret_key: "openclaw-searxng-secret-key"
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "en"
+  formats:
+    - html
+    - json

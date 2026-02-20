@@ -16,6 +16,7 @@ services:
       - OLLAMA_URL=http://host.docker.internal:11434
       - Nats__Broker__Url=nats://nats-broker:4222
       - Nats__Bus__Url=nats://nats-bus:4222
+      - SEARXNG_URL=http://searxng:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +81,18 @@ services:
     networks:
       - openclaw-network
 
+  searxng:
+    container_name: openclaw-searxng
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - openclaw-network
+
 networks:
   openclaw-network:
     driver: bridge
@@ -88,3 +101,4 @@ volumes:
   postgres-data:
   nats-broker-data:
   nats-bus-data:
+  searxng-data:

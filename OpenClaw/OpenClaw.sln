@@ -47,6 +47,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Infrastructure.Llm
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Hosting", "src\OpenClaw.Hosting\OpenClaw.Hosting.csproj", "{72F53581-29F5-4B21-89E3-827A817DB2C5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.WebSearch", "skills\OpenClaw.Skills.WebSearch\OpenClaw.Skills.WebSearch.csproj", "{7122BA3A-293C-471A-8667-5E74C0FD584A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -273,6 +275,18 @@ Global
 		{72F53581-29F5-4B21-89E3-827A817DB2C5}.Release|x64.Build.0 = Release|Any CPU
 		{72F53581-29F5-4B21-89E3-827A817DB2C5}.Release|x86.ActiveCfg = Release|Any CPU
 		{72F53581-29F5-4B21-89E3-827A817DB2C5}.Release|x86.Build.0 = Release|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Debug|x64.Build.0 = Debug|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Debug|x86.Build.0 = Debug|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Release|x64.ActiveCfg = Release|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Release|x64.Build.0 = Release|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Release|x86.ActiveCfg = Release|Any CPU
+		{7122BA3A-293C-471A-8667-5E74C0FD584A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -296,5 +310,6 @@ Global
 		{1ABEBD8B-1524-441D-BEF4-81CBBB9BD7F0} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{D431A4C6-95A9-461C-AC44-19C11FC4DBBD} = {E6C0A80B-5ADC-4138-A79D-C9C128EA163B}
 		{72F53581-29F5-4B21-89E3-827A817DB2C5} = {E6C0A80B-5ADC-4138-A79D-C9C128EA163B}
+		{7122BA3A-293C-471A-8667-5E74C0FD584A} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 	EndGlobalSection
 EndGlobal
