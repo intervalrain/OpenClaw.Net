@@ -1,4 +1,5 @@
 using OpenClaw.Contracts.Llm;
+using OpenClaw.Contracts.Skills;
 
 namespace OpenClaw.Contracts.Agents;
 
@@ -14,5 +15,10 @@ public interface IAgentPipeline
         string userInput,
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
+        CancellationToken ct = default);
+
+    IAsyncEnumerable<AgentStreamEvent> ExecuteSkillDirectlyStreamAsync(
+        string skillName,
+        string arguments,
         CancellationToken ct = default);
 }

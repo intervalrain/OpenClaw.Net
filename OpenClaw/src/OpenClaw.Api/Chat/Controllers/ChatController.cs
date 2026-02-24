@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
+using OpenClaw.Application.Skills;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Chat.Requests;
 using OpenClaw.Contracts.Chat.Responses;
 using OpenClaw.Contracts.Llm;
+using OpenClaw.Contracts.Skills;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
@@ -24,6 +26,9 @@ public class ChatController(
     IAgentPipeline pipeline,
     IConversationRepository repository,
     ILlmProviderFactory llmProviderFactory,
+    ISlashCommandParser slashCommandParser,
+    ISkillRegistry skillRegistry,
+    ISkillSettingsService skillSettingsService,
     IUnitOfWork uow) : ApiController
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -76,7 +81,34 @@ public class ChatController(
         {
             string assistantResponse = "";
 
-            await foreach (var evt in pipeline.ExecuteStreamAsync(request.Message, history, request.Language, ct))
+            // Check for slash command
+            IAsyncEnumerable<AgentStreamEvent> eventStream;
+
+            if (slashCommandParser.TryParse(request.Message, out var command))
+            {
+                var skill = skillRegistry.GetSkill(command!.SkillName);
+                if (skill == null)
+                {
+                    var availableSkills = string.Join(", ", skillRegistry.GetAllSkills().Select(s => s.Name));
+                    await WriteErrorEventAsync($"Skill '{command.SkillName}' not found. Available: {availableSkills}", ct);
+                    return;
+                }
+
+                if (!await skillSettingsService.IsEnabledAsync(command.SkillName, ct))
+                {
+                    await WriteErrorEventAsync($"Skill '{command.SkillName}' is disabled.", ct);
+                    return;
+                }
+
+                var jsonArgs = slashCommandParser.ConvertToJson(command, skill);
+                eventStream = pipeline.ExecuteSkillDirectlyStreamAsync(command.SkillName, jsonArgs, ct);
+            }
+            else
+            {
+                eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, ct);
+            }
+
+            await foreach (var evt in eventStream)
             {
                 var data = JsonSerializer.Serialize(evt, JsonOptions);
                 await Response.WriteAsync($"data: {data}\n\n", ct);
@@ -109,6 +141,14 @@ public class ChatController(
         {
             // Client disconnected, ignore
         }
+    }
+
+    private async Task WriteErrorEventAsync(string errorMessage, CancellationToken ct)
+    {
+        var evt = new AgentStreamEvent(AgentStreamEventType.Error, errorMessage);
+        var data = JsonSerializer.Serialize(evt, JsonOptions);
+        await Response.WriteAsync($"data: {data}\n\n", ct);
+        await Response.Body.FlushAsync(ct);
     }
 
     private async Task<(Conversation? conversation, List<ChatMessage> history, bool isFirstMessage)> LoadConversationAsync(

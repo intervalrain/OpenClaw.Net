@@ -75,7 +75,10 @@
                 <div class="chat-container">
                     <div id="messages" class="messages"></div>
                     <div class="input-area">
-                        <textarea id="user-input" placeholder="Type a message..."></textarea>
+                        <div class="input-wrapper">
+                            <textarea id="user-input" placeholder="Type a message..."></textarea>
+                            <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+                        </div>
                         <button id="send-btn">Send</button>
                     </div>
                 </div>
@@ -120,6 +123,15 @@
                         </svg>
                         Add Model Provider
                     </button>
+                </div>
+
+                <!-- Skills Configuration -->
+                <div class="setting-group">
+                    <label>Skills</label>
+                    <p class="setting-hint">Use <code>/skill_name args</code> to directly invoke a skill</p>
+                    <div id="skills-list" class="skills-list">
+                        <!-- Skills will be rendered here -->
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">

@@ -492,8 +492,13 @@ body {
     background: transparent;
 }
 
-#user-input {
+.input-wrapper {
     flex: 1;
+    position: relative;
+}
+
+#user-input {
+    width: 100%;
     padding: 14px 18px;
     border: 1px solid var(--border-color);
     border-radius: 24px;
@@ -535,6 +540,54 @@ body {
     background: var(--bg-tertiary);
     color: var(--text-muted);
     cursor: not-allowed;
+}
+
+/* Autocomplete Dropdown */
+.autocomplete-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    display: none;
+    z-index: 100;
+}
+
+.autocomplete-dropdown.visible {
+    display: block;
+}
+
+.autocomplete-item {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+    background: var(--bg-tertiary);
+}
+
+.autocomplete-command {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--accent);
+}
+
+.autocomplete-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
 }
 
 /* Status Indicator */
@@ -628,6 +681,9 @@ body {
     border-radius: 12px;
     width: 90%;
     max-width: 440px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     animation: modalSlideIn 0.2s ease-out;
 }
@@ -674,6 +730,9 @@ body {
 
 .modal-body {
     padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
 }
 
 .setting-group {
@@ -911,4 +970,104 @@ body {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* Skills List */
+.skills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.skill-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+}
+
+.skill-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.skill-item-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.skill-item-name code {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    color: var(--text-muted);
+}
+
+.skill-item-description {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border-color);
+    transition: 0.2s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-primary);
+    transition: 0.2s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #22c55e;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.toggle-switch input:disabled + .toggle-slider {
+    opacity: 0.5;
+    cursor: not-allowed;
 }

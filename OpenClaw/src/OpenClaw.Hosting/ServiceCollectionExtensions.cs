@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System.Reflection;
+
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -9,15 +11,10 @@ using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Application.Skills;
 using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Llm.Ollama;
 using OpenClaw.Infrastructure.Llm.OpenAI;
-using OpenClaw.Skills.FileSystem.ListDirectory;
-using OpenClaw.Skills.FileSystem.ReadFile;
-using OpenClaw.Skills.FileSystem.WriteFile;
-using OpenClaw.Skills.Http.HttpRequest;
-using OpenClaw.Skills.Shell.ExecuteCommand;
-using OpenClaw.Skills.WebSearch.WebSearch;
 
 using Serilog;
 
@@ -66,12 +63,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILlmProviderFactory, LlmProviderFactory>();
 
         // skills
-        services.AddSingleton<IAgentSkill>(ReadFileSkill.Default);
-        services.AddSingleton<IAgentSkill>(WriteFileSkill.Default);
-        services.AddSingleton<IAgentSkill>(ListDirectorySkill.Default);
-        services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
-        services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
-        services.AddSingleton<IAgentSkill>(WebSearchSkill.Default);
+        services.AddSkillsFromAssemblies();
+        services.AddScoped<ISkillSettingsService, SkillSettingsService>();
+        services.AddSingleton<ISlashCommandParser, SlashCommandParser>();
+        // services.AddSingleton<IAgentSkill>(ReadFileSkill.Default);
+        // services.AddSingleton<IAgentSkill>(WriteFileSkill.Default);
+        // services.AddSingleton<IAgentSkill>(ListDirectorySkill.Default);
+        // services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
+        // services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
+        // services.AddSingleton<IAgentSkill>(WebSearchSkill.Default);
 
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>
@@ -91,5 +91,48 @@ public static class ServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    private static IServiceCollection AddSkillsFromAssemblies(this IServiceCollection services)
+    {
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => a.FullName?.StartsWith("OpenClaw.Skills") == true)
+            .ToList();
+
+        var basePath = AppDomain.CurrentDomain.BaseDirectory;
+        var skillDlls = Directory.GetFiles(basePath, "OpenClaw.Skills.*.dll");
+        
+        foreach (var dll in skillDlls)
+        {
+            var assemblyName = AssemblyName.GetAssemblyName(dll);
+            if (!assemblies.Any(a => a.GetName().Name == assemblyName.Name))
+            {
+                assemblies.Add(Assembly.Load(assemblyName));
+            }
+        }
+
+        var skillTypes = assemblies
+            .SelectMany(a => a.GetTypes())
+            .Where(t => typeof(IAgentSkill).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+        
+        foreach (var skillType in skillTypes)
+        {
+            var defaultProperty = skillType.GetProperty("Default", BindingFlags.Public | BindingFlags.Static);
+
+            if (defaultProperty != null && typeof(IAgentSkill).IsAssignableFrom(defaultProperty.PropertyType))
+            {
+                if (defaultProperty.GetValue(null) is IAgentSkill skillInstance)
+                {
+                    services.AddSingleton<IAgentSkill>(skillInstance);
+                    continue;
+                }
+            }
+
+            services.AddSingleton(typeof(IAgentSkill), skillType);
+        }
+
+        services.AddSingleton<ISkillRegistry, SkillRegistry>();
+
+        return services;   
     }
 }

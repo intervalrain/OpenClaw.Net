@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace OpenClaw.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddModelProvider : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -42,6 +42,19 @@ namespace OpenClaw.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_model_providers", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "skill_settings",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    skill_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    is_enabled = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_skill_settings", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -96,6 +109,12 @@ namespace OpenClaw.Infrastructure.Migrations
                 column: "is_active");
 
             migrationBuilder.CreateIndex(
+                name: "uq_skill_settings_skill_name",
+                table: "skill_settings",
+                column: "skill_name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
@@ -110,6 +129,9 @@ namespace OpenClaw.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "model_providers");
+
+            migrationBuilder.DropTable(
+                name: "skill_settings");
 
             migrationBuilder.DropTable(
                 name: "Users");

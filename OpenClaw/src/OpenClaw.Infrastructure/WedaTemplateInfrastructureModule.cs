@@ -11,6 +11,7 @@ using OpenClaw.Contracts.Security;
 using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
 using OpenClaw.Domain.Users.Repositories;
+using OpenClaw.Domain.Skills.Repositories;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Infrastructure.Persistence;
 using OpenClaw.Infrastructure.Security;
@@ -22,6 +23,7 @@ using OpenClaw.Infrastructure.Chat.Persistence;
 using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
+using OpenClaw.Infrastructure.Skills.Persistence;
 
 namespace OpenClaw.Infrastructure;
 
@@ -72,7 +74,8 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IModelProviderRepository, ModelProviderRepository>();
-
+        services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
+        
         // security
         services.AddSingleton<IEncryptionService, AesEncryptionService>();
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();

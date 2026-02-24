@@ -12,8 +12,8 @@ using OpenClaw.Infrastructure.Common.Persistence;
 namespace OpenClaw.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260219183600_AddModelProvider")]
-    partial class AddModelProvider
+    [Migration("20260220204717_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -125,6 +125,31 @@ namespace OpenClaw.Infrastructure.Migrations
                         .HasDatabaseName("ix_model_providers_is_active");
 
                     b.ToTable("model_providers", (string)null);
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.Skills.Entities.SkillSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("SkillName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("skill_name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SkillName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_skill_settings_skill_name");
+
+                    b.ToTable("skill_settings", (string)null);
                 });
 
             modelBuilder.Entity("OpenClaw.Domain.Users.Entities.User", b =>

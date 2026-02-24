@@ -207,4 +207,32 @@ public class AgentPipeline(
         var result = await skill.ExecuteAsync(skillContext, ct);
         return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";
     }
+
+    public async IAsyncEnumerable<AgentStreamEvent> ExecuteSkillDirectlyStreamAsync(
+        string skillName,
+        string arguments,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!_skillMap.TryGetValue(skillName, out var skill))
+        {
+            yield return new AgentStreamEvent(AgentStreamEventType.Error, $"Skill '{skillName}' not found.");
+            yield break;
+        }
+
+        yield return new AgentStreamEvent(AgentStreamEventType.ToolExecuting, ToolName: skillName);
+
+        var skillContext = new SkillContext { Arguments = arguments };
+        var result = await skill.ExecuteAsync(skillContext, ct);
+
+        if (result.IsSuccess)
+        {
+            yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, result.Output, skillName);
+            yield return new AgentStreamEvent(AgentStreamEventType.ContentDelta, result.Output);
+            yield return new AgentStreamEvent(AgentStreamEventType.Completed, result.Output);
+        }
+        else
+        {
+            yield return new AgentStreamEvent(AgentStreamEventType.Error, $"Skill error: {result.Error}");
+        }
+    }
 }

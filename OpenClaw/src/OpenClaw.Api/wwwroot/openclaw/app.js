@@ -3,6 +3,7 @@ let messagesEl, userInputEl, sendBtn, themeToggle;
 let currentConversationId = null;
 let conversations = [];
 let modelProviders = [];
+let skills = [];
 
 // Configure marked.js
 marked.setOptions({
@@ -30,11 +31,37 @@ document.addEventListener('DOMContentLoaded', () => {
     themeToggle.addEventListener('click', toggleTheme);
 
     userInputEl.addEventListener('keydown', (e) => {
+        // Handle autocomplete navigation
+        if (isAutocompleteVisible()) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                navigateAutocomplete(1);
+                return;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                navigateAutocomplete(-1);
+                return;
+            } else if (e.key === 'Tab' || e.key === 'Enter') {
+                if (getSelectedAutocompleteItem()) {
+                    e.preventDefault();
+                    selectAutocompleteItem();
+                    return;
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                hideAutocomplete();
+                return;
+            }
+        }
+
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }
     });
+
+    // Autocomplete on input
+    userInputEl.addEventListener('input', handleAutocompleteInput);
 
     // Sidebar toggle
     const sidebarToggle = document.getElementById('sidebar-toggle');
@@ -61,6 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize conversations
     document.getElementById('new-chat-btn').addEventListener('click', createNewConversation);
     loadConversations();
+
+    // Preload skills for autocomplete
+    loadSkills();
 });
 
 // Theme functions
@@ -513,16 +543,193 @@ async function openSettingsModal() {
 
     document.getElementById('language-select').value = settings.language;
 
-    // Load providers from backend
-    await loadModelProviders();
+    // Load providers and skills from backend
+    await Promise.all([loadModelProviders(), loadSkills()]);
     renderModelList();
+    renderSkillsList();
 
     modal.classList.add('active');
     document.querySelector('.profile-section').classList.remove('open');
 }
 
+// Skills Functions
+async function loadSkills() {
+    try {
+        const res = await fetch('/api/v1/skill-settings');
+        if (res.ok) {
+            skills = await res.json();
+        }
+    } catch (e) {
+        console.error('Failed to load skills:', e);
+        skills = [];
+    }
+    return skills;
+}
+
+function renderSkillsList() {
+    const listEl = document.getElementById('skills-list');
+
+    if (skills.length === 0) {
+        listEl.innerHTML = '<p class="setting-hint">No skills available.</p>';
+        return;
+    }
+
+    listEl.innerHTML = skills.map(s => `
+        <div class="skill-item" data-name="${escapeHtml(s.name)}">
+            <div class="skill-item-info">
+                <div class="skill-item-name">
+                    ${escapeHtml(s.name)}
+                    <code>/${escapeHtml(s.name)}</code>
+                </div>
+                <div class="skill-item-description">${escapeHtml(s.description)}</div>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" ${s.isEnabled ? 'checked' : ''} data-skill="${escapeHtml(s.name)}">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    `).join('');
+
+    // Add event listeners for toggle switches
+    listEl.querySelectorAll('.toggle-switch input').forEach(toggle => {
+        toggle.addEventListener('change', async (e) => {
+            const skillName = e.target.dataset.skill;
+            const enabled = e.target.checked;
+            e.target.disabled = true;
+            await toggleSkill(skillName, enabled);
+            e.target.disabled = false;
+        });
+    });
+}
+
+async function toggleSkill(skillName, enabled) {
+    try {
+        const action = enabled ? 'enable' : 'disable';
+        const res = await fetch(`/api/v1/skill-settings/${encodeURIComponent(skillName)}/${action}`, {
+            method: 'POST'
+        });
+        if (!res.ok) throw new Error('Failed to update skill');
+
+        // Update local state
+        const skill = skills.find(s => s.name === skillName);
+        if (skill) skill.isEnabled = enabled;
+    } catch (e) {
+        console.error('Failed to toggle skill:', e);
+        // Revert on error
+        await loadSkills();
+        renderSkillsList();
+    }
+}
+
 function closeSettingsModal() {
     document.getElementById('settings-modal').classList.remove('active');
+}
+
+// Slash Command Autocomplete
+let autocompleteIndex = -1;
+let filteredSkills = [];
+
+function handleAutocompleteInput() {
+    const value = userInputEl.value;
+    const cursorPos = userInputEl.selectionStart;
+
+    // Check if we're typing a slash command at the start
+    if (value.startsWith('/') && cursorPos <= value.indexOf(' ') + 1 || (value.startsWith('/') && !value.includes(' '))) {
+        const query = value.slice(1).split(' ')[0].toLowerCase();
+
+        // Filter enabled skills
+        filteredSkills = skills
+            .filter(s => s.isEnabled && s.name.toLowerCase().includes(query))
+            .slice(0, 6); // Max 6 suggestions
+
+        if (filteredSkills.length > 0) {
+            showAutocomplete(filteredSkills);
+        } else {
+            hideAutocomplete();
+        }
+    } else {
+        hideAutocomplete();
+    }
+}
+
+function showAutocomplete(skillList) {
+    const dropdown = document.getElementById('autocomplete-dropdown');
+    autocompleteIndex = -1;
+
+    dropdown.innerHTML = skillList.map((s, i) => `
+        <div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(s.name)}">
+            <span class="autocomplete-command">/${escapeHtml(s.name)}</span>
+            <span class="autocomplete-desc">${escapeHtml(s.description)}</span>
+        </div>
+    `).join('');
+
+    dropdown.classList.add('visible');
+
+    // Add click handlers
+    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+            autocompleteIndex = parseInt(item.dataset.index);
+            selectAutocompleteItem();
+        });
+        item.addEventListener('mouseenter', () => {
+            autocompleteIndex = parseInt(item.dataset.index);
+            updateAutocompleteSelection();
+        });
+    });
+}
+
+function hideAutocomplete() {
+    const dropdown = document.getElementById('autocomplete-dropdown');
+    dropdown.classList.remove('visible');
+    autocompleteIndex = -1;
+    filteredSkills = [];
+}
+
+function isAutocompleteVisible() {
+    return document.getElementById('autocomplete-dropdown').classList.contains('visible');
+}
+
+function navigateAutocomplete(direction) {
+    if (filteredSkills.length === 0) return;
+
+    autocompleteIndex += direction;
+    if (autocompleteIndex < 0) autocompleteIndex = filteredSkills.length - 1;
+    if (autocompleteIndex >= filteredSkills.length) autocompleteIndex = 0;
+
+    updateAutocompleteSelection();
+}
+
+function updateAutocompleteSelection() {
+    const dropdown = document.getElementById('autocomplete-dropdown');
+    dropdown.querySelectorAll('.autocomplete-item').forEach((item, i) => {
+        item.classList.toggle('selected', i === autocompleteIndex);
+    });
+}
+
+function getSelectedAutocompleteItem() {
+    if (autocompleteIndex >= 0 && autocompleteIndex < filteredSkills.length) {
+        return filteredSkills[autocompleteIndex];
+    }
+    return null;
+}
+
+function selectAutocompleteItem() {
+    const skill = getSelectedAutocompleteItem();
+    if (!skill) return;
+
+    // Replace the current slash command with selected one
+    const currentValue = userInputEl.value;
+    const spaceIndex = currentValue.indexOf(' ');
+    const args = spaceIndex > 0 ? currentValue.slice(spaceIndex) : ' ';
+
+    userInputEl.value = `/${skill.name}${args}`;
+    userInputEl.focus();
+
+    // Move cursor after the command
+    const newCursorPos = skill.name.length + 2; // +2 for '/' and space
+    userInputEl.setSelectionRange(newCursorPos, newCursorPos);
+
+    hideAutocomplete();
 }
 
 function saveSettingsAndClose() {

@@ -124,6 +124,31 @@ namespace OpenClaw.Infrastructure.Migrations
                     b.ToTable("model_providers", (string)null);
                 });
 
+            modelBuilder.Entity("OpenClaw.Domain.Skills.Entities.SkillSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("SkillName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("skill_name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SkillName")
+                        .IsUnique()
+                        .HasDatabaseName("uq_skill_settings_skill_name");
+
+                    b.ToTable("skill_settings", (string)null);
+                });
+
             modelBuilder.Entity("OpenClaw.Domain.Users.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
