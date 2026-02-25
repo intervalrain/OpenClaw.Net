@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Net.Security;
 using System.Text;
 
 using OpenClaw.Contracts.Skills;
@@ -15,6 +16,21 @@ public class HttpRequestSkill(
 
     private readonly TimeSpan _timeout = timeout ?? TimeSpan.FromSeconds(30);
     private readonly int _maxResponseLength = maxResponseLength;
+
+    private static readonly HttpClient SharedHttpClient = CreateHttpClient();
+
+    private static HttpClient CreateHttpClient()
+    {
+        var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (message, cert, chain, sslPolicyErrors) =>
+            {
+                return sslPolicyErrors == SslPolicyErrors.None ||
+                       sslPolicyErrors == SslPolicyErrors.RemoteCertificateChainErrors;
+            }
+        };
+        return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
+    }
 
     public override string Name => "http_request";
     public override string Description => "Send an HTTP request (GET or POST) to a URL and return the response";
@@ -41,7 +57,6 @@ public class HttpRequestSkill(
 
         try
         {
-            using var httpClient = new HttpClient { Timeout = _timeout };
             using var request = new HttpRequestMessage(method, uri);
 
             if (!string.IsNullOrEmpty(args?.Body))
@@ -49,7 +64,7 @@ public class HttpRequestSkill(
                 request.Content = new StringContent(args.Body, Encoding.UTF8, "application/json");
             }
 
-            using var response = await httpClient.SendAsync(request, ct);
+            using var response = await SharedHttpClient.SendAsync(request, ct);
             var content = await response.Content.ReadAsStringAsync(ct);
 
             if (content.Length > _maxResponseLength)

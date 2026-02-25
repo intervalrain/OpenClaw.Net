@@ -81,9 +81,6 @@ public class ChatController(
         {
             string assistantResponse = "";
 
-            // Check for slash command
-            IAsyncEnumerable<AgentStreamEvent> eventStream;
-
             if (slashCommandParser.TryParse(request.Message, out var command))
             {
                 var skill = skillRegistry.GetSkill(command!.SkillName);
@@ -100,13 +97,28 @@ public class ChatController(
                     return;
                 }
 
+                // Execute skill first
                 var jsonArgs = slashCommandParser.ConvertToJson(command, skill);
-                eventStream = pipeline.ExecuteSkillDirectlyStreamAsync(command.SkillName, jsonArgs, ct);
+                var skillContext = new SkillContext(jsonArgs);
+                var skillResult = await skill.ExecuteAsync(skillContext, ct);
+
+                if (!skillResult.IsSuccess)
+                {
+                    await WriteErrorEventAsync($"Skill error: {skillResult.Error}", ct);
+                    return;
+                }
+
+                // Inject skill result into history as tool call/result pair
+                var toolCallId = Guid.NewGuid().ToString();
+                history.Add(new ChatMessage(
+                    ChatRole.Assistant,
+                    Content: null,
+                    ToolCalls: [new ToolCall(toolCallId, command.SkillName, jsonArgs)]));
+                history.Add(new ChatMessage(ChatRole.Tool, skillResult.Output ?? "", toolCallId));
             }
-            else
-            {
-                eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, ct);
-            }
+
+            // Stream LLM response with history (including any injected skill results)
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, ct);
 
             await foreach (var evt in eventStream)
             {

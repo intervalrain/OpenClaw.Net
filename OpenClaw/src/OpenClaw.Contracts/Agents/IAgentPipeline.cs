@@ -16,9 +16,4 @@ public interface IAgentPipeline
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
         CancellationToken ct = default);
-
-    IAsyncEnumerable<AgentStreamEvent> ExecuteSkillDirectlyStreamAsync(
-        string skillName,
-        string arguments,
-        CancellationToken ct = default);
 }
