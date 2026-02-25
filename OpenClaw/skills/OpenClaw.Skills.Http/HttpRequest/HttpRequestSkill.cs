@@ -19,7 +19,7 @@ public class HttpRequestSkill(
     public override string Name => "http_request";
     public override string Description => "Send an HTTP request (GET or POST) to a URL and return the response";
 
-    protected override async Task<SkillResult> ExecuteAsync(HttpRequestArgs args, CancellationToken ct)
+    public override async Task<SkillResult> ExecuteAsync(HttpRequestArgs args, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(args.Url))
         {

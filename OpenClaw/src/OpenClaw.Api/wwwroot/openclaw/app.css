@@ -311,11 +311,51 @@ body {
 }
 
 .sidebar.collapsed .profile-dropdown {
-    left: 48px;
+    left: 56px;
     bottom: 0;
+    top: auto;
     right: auto;
     width: 200px;
     margin-bottom: 0;
+    z-index: 1000;
+}
+
+/* Collapsed sidebar: tooltip styles */
+.sidebar.collapsed .new-chat-btn,
+.sidebar.collapsed .sidebar-toggle,
+.sidebar.collapsed .profile-btn {
+    position: relative;
+}
+
+.sidebar.collapsed .new-chat-btn::after,
+.sidebar.collapsed .sidebar-toggle::after,
+.sidebar.collapsed .profile-btn::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 12px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s, visibility 0.15s;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+}
+
+.sidebar.collapsed .new-chat-btn:hover::after,
+.sidebar.collapsed .sidebar-toggle:hover::after,
+.sidebar.collapsed .profile-btn:hover::after {
+    opacity: 1;
+    visibility: visible;
 }
 
 /* Content */

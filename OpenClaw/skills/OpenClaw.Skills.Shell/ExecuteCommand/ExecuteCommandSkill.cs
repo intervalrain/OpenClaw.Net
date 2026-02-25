@@ -45,7 +45,7 @@ public class ExecuteCommandSkill(
     public override string Name => "execute_command";
     public override string Description => "Execute a shell command. Only allowed commands can be executed. Dangerous patterns are blocked";
 
-    protected override async Task<SkillResult> ExecuteAsync(ExecuteCommandArgs args, CancellationToken ct)
+    public override async Task<SkillResult> ExecuteAsync(ExecuteCommandArgs args, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(args.Command))
         {

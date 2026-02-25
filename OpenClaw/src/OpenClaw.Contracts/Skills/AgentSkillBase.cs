@@ -38,7 +38,7 @@ public abstract class AgentSkillBase<TArgs> : IAgentSkill where TArgs : class
         }
     }
 
-    protected abstract Task<SkillResult> ExecuteAsync(TArgs args, CancellationToken ct);
+    public abstract Task<SkillResult> ExecuteAsync(TArgs args, CancellationToken ct);
 
     private static ToolParameters GenerateToolParameters()
     {

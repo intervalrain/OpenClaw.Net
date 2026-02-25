@@ -11,4 +11,12 @@ public class SkillRegistry(IEnumerable<IAgentSkill> skills) : ISkillRegistry
     public IAgentSkill? GetSkill(string name) => _skills.GetValueOrDefault(name);
 
     public bool TryGetSkill(string name, out IAgentSkill? skill) => _skills.TryGetValue(name, out skill);
+
+    public TSkill? GetSkill<TSkill>() => (TSkill)_skills.FirstOrDefault(kvp => kvp.Value is TSkill).Value;
+
+    public bool TryGetSkill<TSkill>(out TSkill? skill)
+    {
+        skill = GetSkill<TSkill>();
+        return skill != null;
+    }
 }

@@ -19,7 +19,7 @@ public class WebSearchSkill(string? searxngUrl = null, TimeSpan? timeout = null)
     public override string Name => "web_search";
     public override string Description => "Search the web using SearXNG and return relevant results. Use this when you need current information from the internet.";
 
-    protected override async Task<SkillResult> ExecuteAsync(WebSearchArgs args, CancellationToken ct)
+    public override async Task<SkillResult> ExecuteAsync(WebSearchArgs args, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(args.Query))
         {

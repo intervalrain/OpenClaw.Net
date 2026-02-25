@@ -10,7 +10,7 @@ public class WriteFileSkill : AgentSkillBase<WriteFileArgs>
     public override string Name => "write_file";
     public override string Description => "Write content to a file at the specified path. Creates the file if it doesn't exist.";
 
-    protected override async Task<SkillResult> ExecuteAsync(WriteFileArgs args, CancellationToken ct)
+    public override async Task<SkillResult> ExecuteAsync(WriteFileArgs args, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(args.Path))
         {

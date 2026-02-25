@@ -28,7 +28,7 @@ public class ReadFileSkill : AgentSkillBase<ReadFileArgs>
     public override string Name => "read_file";
     public override string Description => "Read the contents of a file at the specified path. Sensitive files (.env, credentials, secrets, keys) are blocked for security.";
 
-    protected override async Task<SkillResult> ExecuteAsync(ReadFileArgs args, CancellationToken ct)
+    public override async Task<SkillResult> ExecuteAsync(ReadFileArgs args, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(args.Path))
         {

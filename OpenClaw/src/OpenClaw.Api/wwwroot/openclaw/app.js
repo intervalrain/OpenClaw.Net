@@ -413,7 +413,7 @@ async function selectConversation(id) {
     const messagesDiv = document.getElementById('messages');
     messagesDiv.innerHTML = '';
     conversation.messages.forEach(msg => {
-        addMessage(msg.content, msg.role === 'User' ? 'user' : 'assistant');
+        addMessage(msg.content, msg.role === 1 ? 'user' : 'assistant');
     });
 }
 

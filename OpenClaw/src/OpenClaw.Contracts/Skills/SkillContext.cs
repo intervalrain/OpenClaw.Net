@@ -1,6 +1,6 @@
 namespace OpenClaw.Contracts.Skills;
 
-public class SkillContext
+public class SkillContext(string? arguments)
 {
-    public string? Arguments { get; init; }
+    public string? Arguments { get; init; } = arguments;
 }

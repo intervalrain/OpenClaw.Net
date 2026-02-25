@@ -10,7 +10,7 @@ public class ListDirectorySkill : AgentSkillBase<ListDirectoryArgs>
     public override string Name => "list_directory";
     public override string Description => "List files and directories at the specified path.";
 
-    protected override Task<SkillResult> ExecuteAsync(ListDirectoryArgs args, CancellationToken ct)
+    public override Task<SkillResult> ExecuteAsync(ListDirectoryArgs args, CancellationToken ct)
     {
         var path = args.Path ?? ".";
 

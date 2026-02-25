@@ -203,7 +203,7 @@ public class AgentPipeline(
             return $"Error: skill '{toolCall.Name}' not found.";
         }
 
-        var skillContext = new SkillContext { Arguments = toolCall.Arguments };
+        var skillContext = new SkillContext(toolCall.Arguments);
         var result = await skill.ExecuteAsync(skillContext, ct);
         return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";
     }
@@ -221,7 +221,7 @@ public class AgentPipeline(
 
         yield return new AgentStreamEvent(AgentStreamEventType.ToolExecuting, ToolName: skillName);
 
-        var skillContext = new SkillContext { Arguments = arguments };
+        var skillContext = new SkillContext(arguments);
         var result = await skill.ExecuteAsync(skillContext, ct);
 
         if (result.IsSuccess)
