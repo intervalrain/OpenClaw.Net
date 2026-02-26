@@ -5,6 +5,10 @@ let conversations = [];
 let modelProviders = [];
 let skills = [];
 
+// Input history navigation (from current conversation)
+let historyIndex = -1;
+let tempInput = ''; // Store current input when navigating history
+
 // Configure marked.js
 marked.setOptions({
     highlight: function(code, lang) {
@@ -53,6 +57,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
         }
+
+        // Handle input history navigation (↑↓ keys)
+        // Only navigate history when:
+        // - Input is empty, OR
+        // - Already navigating history (historyIndex >= 0)
+        // AND cursor is at the end (not editing middle of text)
+        const isAtEnd = userInputEl.selectionStart === userInputEl.value.length;
+        const canNavigateHistory = (userInputEl.value === '' || historyIndex >= 0) && isAtEnd;
+
+        // ↑ = go to older messages (direction +1), ↓ = go to newer (direction -1)
+        if (e.key === 'ArrowUp' && canNavigateHistory) {
+            e.preventDefault();
+            navigateInputHistory(1);
+            return;
+        } else if (e.key === 'ArrowDown' && historyIndex >= 0 && isAtEnd) {
+            e.preventDefault();
+            navigateInputHistory(-1);
+            return;
+        }
+        // Otherwise, let ↑↓ keys work normally (cursor movement in textarea)
 
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -233,9 +257,55 @@ function renderMarkdown(content) {
     return marked.parse(content);
 }
 
+// Input history navigation - get user messages from current conversation
+function getInputHistory() {
+    // Get user messages from DOM (role === 'user')
+    const userMessages = Array.from(messagesEl.querySelectorAll('.message.user'))
+        .map(el => el.textContent.trim())
+        .filter(text => text.length > 0);
+    return userMessages;
+}
+
+function navigateInputHistory(direction) {
+    const inputHistory = getInputHistory();
+    if (inputHistory.length === 0) return;
+
+    // Save current input when starting to navigate
+    if (historyIndex === -1 && direction === 1) {
+        tempInput = userInputEl.value;
+    }
+
+    // direction: 1 = up (older), -1 = down (newer)
+    const newIndex = historyIndex + direction;
+
+    // Going down past current input
+    if (newIndex < 0) {
+        historyIndex = -1;
+        userInputEl.value = tempInput;
+        return;
+    }
+
+    // Going up past oldest message
+    if (newIndex >= inputHistory.length) {
+        return; // Stay at oldest
+    }
+
+    historyIndex = newIndex;
+
+    // Set value from history (most recent is at end of array)
+    userInputEl.value = inputHistory[inputHistory.length - 1 - historyIndex];
+
+    // Move cursor to end
+    userInputEl.setSelectionRange(userInputEl.value.length, userInputEl.value.length);
+}
+
 async function sendMessage() {
     const message = userInputEl.value.trim();
     if (!message) return;
+
+    // Reset history navigation
+    historyIndex = -1;
+    tempInput = '';
 
     addMessage(message, 'user');
     userInputEl.value = '';
