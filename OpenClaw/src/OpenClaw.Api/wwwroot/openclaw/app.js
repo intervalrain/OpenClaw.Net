@@ -424,6 +424,27 @@ async function sendMessage() {
     } finally {
         sendBtn.disabled = false;
         userInputEl.focus();
+
+        // Refresh conversation title (may have been updated by backend on first message)
+        await refreshCurrentConversationTitle();
+    }
+}
+
+async function refreshCurrentConversationTitle() {
+    if (!currentConversationId) return;
+
+    try {
+        const response = await fetch(`/api/v1/conversation/${currentConversationId}`);
+        if (!response.ok) return;
+
+        const conversation = await response.json();
+        const idx = conversations.findIndex(c => c.id === currentConversationId);
+        if (idx >= 0 && conversations[idx].title !== conversation.title) {
+            conversations[idx].title = conversation.title;
+            renderConversationList();
+        }
+    } catch (e) {
+        // Ignore errors, title refresh is not critical
     }
 }
 
