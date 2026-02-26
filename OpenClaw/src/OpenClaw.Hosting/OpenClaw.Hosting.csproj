@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Http\OpenClaw.Skills.Http.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Shell\OpenClaw.Skills.Shell.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.WebSearch\OpenClaw.Skills.WebSearch.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.GitHub\OpenClaw.Skills.GitHub.csproj" />
   </ItemGroup>
 
 </Project>
