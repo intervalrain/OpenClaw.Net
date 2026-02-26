@@ -907,32 +907,26 @@ async function validateModel() {
     saveBtn.disabled = true;
 
     try {
-        if (type === 'ollama') {
-            // Check if Ollama model exists
-            const res = await fetch(`${url}/api/tags`);
-            if (!res.ok) throw new Error('Cannot connect to Ollama');
-            const data = await res.json();
-            const models = data.models || [];
-            const modelExists = models.some(m => m.name === model || m.name.startsWith(model + ':'));
-            if (!modelExists) {
-                statusEl.className = 'validation-status error';
-                statusEl.textContent = `Model "${model}" not found. Available: ${models.slice(0, 3).map(m => m.name).join(', ')}...`;
-                return;
-            }
-        } else if (type === 'openai') {
-            // Validate OpenAI API key by listing models
-            const res = await fetch('https://api.openai.com/v1/models', {
-                headers: { 'Authorization': `Bearer ${apiKey}` }
-            });
-            if (!res.ok) throw new Error('Invalid API Key');
-        } else if (type === 'anthropic') {
-            // Anthropic doesn't have a simple validation endpoint
-            // Just check key format
-            if (!apiKey.startsWith('sk-ant-')) {
-                throw new Error('Invalid Anthropic API Key format (should start with sk-ant-)');
-            }
+        // Validate through backend API to avoid CORS issues
+        const res = await fetch('/api/v1/model-provider/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: type,
+                url: url,
+                modelName: model,
+                apiKey: apiKey || null
+            })
+        });
+
+        const result = await res.json();
+
+        if (!res.ok || !result.success) {
+            statusEl.className = 'validation-status error';
+            statusEl.textContent = result.message || 'Validation failed';
+            saveBtn.disabled = true;
+            return;
         }
-        // For custom providers, skip validation (user responsibility)
 
         statusEl.className = 'validation-status success';
         statusEl.textContent = 'Validation successful!';
