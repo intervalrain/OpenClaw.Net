@@ -32,6 +32,13 @@ public static class ServiceCollectionExtensions
         // Logging
         services.AddLogging(builder => builder.AddSerilog());
 
+        // HttpClient with SSL validation bypass (for local/dev scenarios)
+        services.AddHttpClient("SkipSslValidation")
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            });
+
         // Middlewares
         services.AddSingleton<LoggingMiddleware>();
         services.AddSingleton<ErrorHandlingMiddleware>();
