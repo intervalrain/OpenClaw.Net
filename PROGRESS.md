@@ -52,6 +52,8 @@
 | `list_directory` | 列出目錄內容 | ✅ 啟用 |
 | `execute_command` | 執行 shell 命令（有安全限制） | ✅ 啟用 |
 | `web_search` | 使用 SearXNG 搜尋網路 | ✅ 啟用 |
+| `weather` | 查詢天氣和預報（wttr.in） | ✅ 啟用 |
+| `github` | GitHub 操作（gh CLI: issues, PRs, CI） | ✅ 啟用 |
 
 ### 3. 技術架構改進
 
@@ -71,8 +73,8 @@
 
 | Priority | Skill | 描述 | 需求 | 預估工時 |
 |----------|-------|------|------|----------|
-| 🔴 P0-1 | **Weather** | 查詢天氣和預報（wttr.in） | `curl`（已內建） | 2-3h |
-| 🔴 P0-2 | **GitHub** | GitHub 操作（issues, PRs, CI） | `gh` CLI | 4-6h |
+| ✅ ~~P0-1~~ | ~~**Weather**~~ | ~~查詢天氣和預報（wttr.in）~~ | ~~`curl`（已內建）~~ | ~~2-3h~~ |
+| ✅ ~~P0-2~~ | ~~**GitHub**~~ | ~~GitHub 操作（issues, PRs, CI）~~ | ~~`gh` CLI~~ | ~~4-6h~~ |
 | 🔴 P0-3 | **Git Operations** | 本地 git 操作（commit, branch, log） | `git`（已內建） | 3-4h |
 | 🔴 P0-4 | **Azure DevOps** | Azure DevOps 操作（work items, PRs, pipelines） | `az devops` CLI / REST API | 6-8h |
 | 🔴 P0-5 | **Image Generation** | OpenAI DALL-E 圖片生成 | OpenAI API Key | 4-5h |
@@ -144,12 +146,11 @@
 ## 下一步行動
 
 ### 立即可做
-1. ✅ **優先級已確認**: Weather → GitHub → Git → Azure DevOps → Image Gen → PDF → Tmux → Notion
-2. **開始實作 Weather Skill** (P0-1)
-   - 使用 `wttr.in` API（無需 API key）
-   - 參考 `/Users/rainhu/workspace/openclaw/skills/weather/SKILL.md`
-   - 預估工時: 2-3 小時
-3. 建立 skill 開發範本和最佳實踐文檔
+1. ✅ **Weather Skill 完成** (P0-1) - 使用 `wttr.in` API
+2. ✅ **GitHub Skill 完成** (P0-2) - 使用 `gh` CLI + `GH_TOKEN` 環境變數
+3. **開始實作 Git Operations Skill** (P0-3)
+   - 本地 git 操作（commit, branch, log, diff）
+   - 預估工時: 3-4 小時
 
 ### 技術準備事項
 - **Azure DevOps Skill** 需要:
@@ -171,5 +172,5 @@
 
 ---
 
-**更新時間**: 2026-02-24
+**更新時間**: 2026-02-27
 **狀態**: Skills 系統核心功能完成，準備擴充 skill 生態系統

@@ -115,7 +115,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Preload skills for autocomplete
     loadSkills();
+
+    // Check setup status - show onboarding if no provider configured
+    checkSetupStatus();
 });
+
+// Setup check - onboarding flow
+async function checkSetupStatus() {
+    try {
+        const res = await fetch('/api/v1/setup/status');
+        if (!res.ok) return;
+
+        const status = await res.json();
+        if (!status.isConfigured) {
+            // No active provider - show onboarding
+            showOnboardingModal();
+        }
+    } catch (e) {
+        console.error('Failed to check setup status:', e);
+    }
+}
+
+function showOnboardingModal() {
+    // Directly open Add Model Modal for first-time setup
+    openAddModelModal();
+
+    // Update the modal title to indicate first-time setup
+    const modalHeader = document.querySelector('#add-model-modal .modal-header h3');
+    if (modalHeader) {
+        modalHeader.textContent = 'Welcome! Configure your first Model Provider';
+    }
+
+    // Pre-fill with Ollama defaults for easy local setup
+    document.getElementById('provider-type').value = 'ollama';
+    document.getElementById('provider-name').value = 'Local Ollama';
+    document.getElementById('provider-url').value = 'http://localhost:11434';
+    document.getElementById('provider-model').value = 'qwen2.5:7b';
+    updateProviderTypeUI();
+}
 
 // Theme functions
 function initTheme() {
