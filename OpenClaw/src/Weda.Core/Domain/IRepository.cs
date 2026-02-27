@@ -13,4 +13,6 @@ public interface IRepository<T, TId>
     Task UpdateAsync(T entity, CancellationToken cancellationToken = default);
 
     Task DeleteAsync(T entity, CancellationToken cancellationToken = default);
+
+    Task<bool> AnyAsync(CancellationToken cancellationToken = default);
 }

@@ -37,4 +37,9 @@ public class GenericRepository<T, TId, TDbContext>(TDbContext dbContext) : IRepo
         DbSet.Remove(entity);
         return Task.CompletedTask;
     }
+
+    public virtual Task<bool> AnyAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(DbSet.Any());
+    }
 }

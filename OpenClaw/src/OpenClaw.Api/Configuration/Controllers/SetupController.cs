@@ -1,9 +1,13 @@
 using Asp.Versioning;
 
+using Mediator;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-using OpenClaw.Domain.Configuration.Repositories;
+using OpenClaw.Contracts.Configuration.Requests;
+using OpenClaw.Contracts.Setup.Commands;
+using OpenClaw.Contracts.Setup.Queries;
 
 using Weda.Core.Presentation;
 
@@ -11,23 +15,23 @@ namespace OpenClaw.Api.Configuration.Controllers;
 
 [AllowAnonymous]
 [ApiVersion("1.0")]
-public class SetupController(IModelProviderRepository repository) : ApiController
+public class SetupController(ISender sender) : ApiController
 {
     [HttpGet("status")]
     public async Task<IActionResult> GetStatus(CancellationToken ct)
     {
-        var activeProvider = await repository.GetActiveAsync(ct);
+        var query = new GetSetupStatusQuery();
+        var result = await sender.Send(query, ct);
 
-        return Ok(new
-        {
-            isConfigured = activeProvider is not null,
-            activeProvider = activeProvider is null ? null : new
-            {
-                activeProvider.Id,
-                activeProvider.Type,
-                activeProvider.Name,
-                activeProvider.ModelName
-            } 
-        });
+        return result.Match(Ok, Problem);
+    }
+
+    [HttpPost("init")]
+    public async Task<IActionResult> Initialize([FromBody] InitRequest request, CancellationToken ct)
+    {
+        var command = new InitializeSystemCommand(request.Email, request.Password, request.Name);
+        var result = await sender.Send(command, ct);
+
+        return result.Match(Ok, Problem);
     }
 }
