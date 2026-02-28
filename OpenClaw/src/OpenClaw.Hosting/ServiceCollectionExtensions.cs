@@ -13,6 +13,7 @@ using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
 using OpenClaw.Infrastructure.Configuration;
+using OpenClaw.Channels.Telegram;
 using OpenClaw.Infrastructure.Llm.Ollama;
 using OpenClaw.Infrastructure.Llm.OpenAI;
 
@@ -79,6 +80,9 @@ public static class ServiceCollectionExtensions
         // services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
         // services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
         // services.AddSingleton<IAgentSkill>(WebSearchSkill.Default);
+
+        // Channel Adapters
+        services.AddTelegramChannel(configuration);
 
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>
