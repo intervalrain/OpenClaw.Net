@@ -5,12 +5,14 @@ using Microsoft.Extensions.Options;
 using OpenClaw.Contracts.Channels;
 
 using Telegram.Bot;
+using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 
 namespace OpenClaw.Channels.Telegram;
 
 public class TelegramChannelAdapter(
-    ITelegramBotClient botClient,
+    TelegramBotClient botClient,
     TelegramMessageHandler messageHandler,
     IOptions<TelegramBotOptions> options,
     ILogger<TelegramChannelAdapter> logger) : BackgroundService, IChannelAdapter

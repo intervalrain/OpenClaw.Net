@@ -20,11 +20,12 @@ public static class TelegramServiceCollectionExtensions
 
         services.Configure<TelegramBotOptions>(section);
 
-        services.AddSingleton<ITelegramBotClient>(sp =>
+        services.AddSingleton(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<TelegramBotOptions>>();
             return new TelegramBotClient(opts.Value.BotToken);
         });
+        services.AddSingleton<ITelegramBotClient>(sp => sp.GetRequiredService<TelegramBotClient>());
 
         services.AddSingleton<TelegramConversationMapper>();
         services.AddSingleton<TelegramMessageHandler>();

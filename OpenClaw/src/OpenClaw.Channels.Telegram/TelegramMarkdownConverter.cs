@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace OpenClaw.Channels.Telegram;
 
@@ -7,7 +6,7 @@ namespace OpenClaw.Channels.Telegram;
 /// Converts standard Markdown to Telegram MarkdownV2 format.
 /// Telegram MarkdownV2 requires escaping special characters outside of code blocks.
 /// </summary>
-public static partial class TelegramMarkdownConverter
+public static class TelegramMarkdownConverter
 {
     // Characters that must be escaped in Telegram MarkdownV2
     private const string SpecialChars = @"_*[]()~`>#+-=|{}.!";
