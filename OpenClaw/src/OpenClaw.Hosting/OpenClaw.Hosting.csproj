@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Shell\OpenClaw.Skills.Shell.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.WebSearch\OpenClaw.Skills.WebSearch.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.GitHub\OpenClaw.Skills.GitHub.csproj" />
+    <ProjectReference Include="..\OpenClaw.Channels.Telegram\OpenClaw.Channels.Telegram.csproj" />
   </ItemGroup>
 
 </Project>
