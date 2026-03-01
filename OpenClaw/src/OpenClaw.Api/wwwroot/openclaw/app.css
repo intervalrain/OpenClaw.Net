@@ -279,6 +279,17 @@ body {
     flex-shrink: 0;
 }
 
+.dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
+
+.dropdown-item.logout-item:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
 /* Sidebar collapsed state */
 .sidebar.collapsed {
     width: 48px;

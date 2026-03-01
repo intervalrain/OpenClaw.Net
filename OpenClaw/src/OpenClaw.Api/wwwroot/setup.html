@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw - Setup</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="css/home.css">
+    <style>
+        .setup-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-color);
+        }
+
+        .setup-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .setup-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .setup-header h1 {
+            font-size: 1.8rem;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .setup-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .setup-steps {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .step-indicator {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .step-indicator.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .step-indicator.inactive {
+            background: var(--border-color);
+            color: var(--text-muted);
+        }
+
+        .step-connector {
+            width: 40px;
+            height: 2px;
+            background: var(--border-color);
+            align-self: center;
+        }
+
+        .form-success {
+            color: var(--success-color);
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            min-height: 20px;
+        }
+
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-card">
+            <div class="setup-header">
+                <h1>Welcome to OpenClaw</h1>
+                <p>Let's set up your account to get started</p>
+            </div>
+
+            <div class="setup-steps">
+                <div class="step-indicator active" id="step1">1</div>
+                <div class="step-connector"></div>
+                <div class="step-indicator inactive" id="step2">2</div>
+            </div>
+
+            <form id="setupForm">
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="name" required placeholder="Your display name">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required placeholder="your@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required 
+                           placeholder="At least 8 characters" minlength="8">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required 
+                           placeholder="Re-enter your password">
+                </div>
+                <div class="form-error" id="setupError"></div>
+                <div class="form-success" id="setupSuccess"></div>
+                <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        const setupForm = document.getElementById('setupForm');
+        const errorEl = document.getElementById('setupError');
+        const successEl = document.getElementById('setupSuccess');
+
+        // Check if setup is already complete
+        async function checkSetupStatus() {
+            try {
+                const response = await fetch('/api/v1/setup/status');
+                const data = await response.json();
+                
+                if (data.hasUser) {
+                    // Already has user, redirect to login
+                    window.location.href = '/login.html';
+                }
+            } catch (e) {
+                console.error('Failed to check setup status:', e);
+            }
+        }
+
+        setupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorEl.textContent = '';
+            successEl.textContent = '';
+
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                errorEl.textContent = 'Passwords do not match';
+                return;
+            }
+
+            setupForm.classList.add('loading');
+
+            try {
+                const response = await fetch('/api/v1/setup/init', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, name })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || data.title || 'Setup failed');
+                }
+
+                successEl.textContent = 'Account created! Redirecting to login...';
+                
+                setTimeout(() => {
+                    window.location.href = '/login.html';
+                }, 1500);
+
+            } catch (err) {
+                errorEl.textContent = err.message;
+                setupForm.classList.remove('loading');
+            }
+        });
+
+        // Check status on page load
+        checkSetupStatus();
+    </script>
+</body>
+</html>

@@ -1,14 +1,12 @@
 using ErrorOr;
 
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-
 using OpenClaw.Contracts.Setup.Dtos;
 using OpenClaw.Domain.Configuration.Repositories;
 using OpenClaw.Domain.Users.Repositories;
 
 using Weda.Core.Application.Interfaces;
 
-namespace OpenClaw.Contracts.Setup.Queries;
+namespace OpenClaw.Application.Setup.Queries;
 
 public record GetSetupStatusQuery : IQuery<ErrorOr<GetSetupStatusResult>>;
 

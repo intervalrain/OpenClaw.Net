@@ -1,7 +1,6 @@
 using System.Text.Json;
 
 using Asp.Versioning;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using OpenClaw.Contracts.Configuration.Dtos;
@@ -16,7 +15,6 @@ using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Configuration.Controllers;
 
-[AllowAnonymous]
 [ApiVersion("1.0")]
 public class ModelProviderController(
     IModelProviderRepository repository,

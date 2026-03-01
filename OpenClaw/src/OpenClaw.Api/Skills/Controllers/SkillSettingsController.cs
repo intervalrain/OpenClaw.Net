@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using OpenClaw.Contracts.Skills;
@@ -8,7 +7,6 @@ using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Skills.Controllers;
 
-[AllowAnonymous]
 [ApiVersion("1.0")]
 public class SkillSettingsController(ISkillSettingsService skillSettingsService) : ApiController
 {

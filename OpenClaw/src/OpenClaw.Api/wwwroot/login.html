@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw - Login</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="css/home.css">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-color);
+        }
+
+        .login-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-header h1 {
+            font-size: 1.8rem;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>OpenClaw</h1>
+                <p>Sign in to continue</p>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required placeholder="your@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                <div class="form-error" id="loginError"></div>
+                <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const errorEl = document.getElementById('loginError');
+
+        // Check if setup is needed first
+        async function checkSetupStatus() {
+            try {
+                const response = await fetch('/api/v1/setup/status');
+                const data = await response.json();
+                
+                if (!data.hasUser) {
+                    // No user yet, redirect to setup
+                    window.location.href = '/setup.html';
+                    return;
+                }
+
+                // Already logged in? Go to app
+                if (isAuthenticated()) {
+                    window.location.href = '/openclaw/index.html';
+                }
+            } catch (e) {
+                console.error('Failed to check setup status:', e);
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorEl.textContent = '';
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            loginForm.classList.add('loading');
+
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || data.title || 'Login failed');
+                }
+
+                // Store auth data
+                localStorage.setItem('weda_auth_token', data.token);
+                localStorage.setItem('weda_user', JSON.stringify({
+                    id: data.id,
+                    name: data.name,
+                    email: data.email,
+                    roles: data.roles,
+                    permissions: data.permissions
+                }));
+
+                // Redirect to main app
+                window.location.href = '/openclaw/index.html';
+
+            } catch (err) {
+                errorEl.textContent = err.message;
+                loginForm.classList.remove('loading');
+            }
+        });
+
+        // Check status on page load
+        checkSetupStatus();
+    </script>
+</body>
+</html>

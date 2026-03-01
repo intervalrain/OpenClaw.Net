@@ -1,6 +1,5 @@
 using Asp.Versioning;
 
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using OpenClaw.Contracts.Chat.Requests;
@@ -12,7 +11,6 @@ using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Chat.Controllers;
 
-[AllowAnonymous]
 [ApiVersion("1.0")]
 public class ConversationController(IConversationRepository repository, IUnitOfWork uow) : ApiController
 {

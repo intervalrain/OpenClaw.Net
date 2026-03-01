@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Asp.Versioning;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,7 +19,6 @@ using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Chat.Controllers;
 
-[AllowAnonymous]
 [ApiVersion("1.0")]
 public class ChatController(
     IAgentPipeline pipeline,

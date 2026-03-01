@@ -116,9 +116,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Preload skills for autocomplete
     loadSkills();
 
+    // Logout button
+    document.getElementById('logout-btn').addEventListener('click', logout);
+
     // Check setup status - show onboarding if no provider configured
     checkSetupStatus();
+
+    // Update user profile display
+    updateUserProfile();
 });
+
+// Update user profile display from localStorage
+function updateUserProfile() {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const avatarEl = document.querySelector('.profile-avatar');
+    const nameEl = document.querySelector('.profile-name');
+
+    if (avatarEl && user.name) {
+        avatarEl.textContent = user.name.charAt(0).toUpperCase();
+    }
+    if (nameEl && user.name) {
+        nameEl.textContent = user.name;
+    }
+}
+
+// Logout and redirect to login
+function logout() {
+    clearAuth();
+    window.location.href = '/login.html';
+}
 
 // Setup check - onboarding flow
 async function checkSetupStatus() {
@@ -127,8 +155,18 @@ async function checkSetupStatus() {
         if (!res.ok) return;
 
         const status = await res.json();
-        if (!status.isConfigured) {
-            // No active provider - show onboarding
+        
+        if (!status.hasUser) {
+            window.location.href = '/setup.html';
+            return;
+        }
+
+        if (!isAuthenticated()) {
+            window.location.href = '/login.html'
+            return;
+        }
+
+        if (!status.hasModelProvider) {
             showOnboardingModal();
         }
     } catch (e) {
@@ -354,9 +392,8 @@ async function sendMessage() {
 
     try {
         const settings = getSettings();
-        const res = await fetch('/api/v1/chat/stream', {
+        const res = await authFetch('/api/v1/chat/stream', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message,
                 conversationId: currentConversationId,
@@ -471,7 +508,7 @@ async function refreshCurrentConversationTitle() {
     if (!currentConversationId) return;
 
     try {
-        const response = await fetch(`/api/v1/conversation/${currentConversationId}`);
+        const response = await authFetch(`/api/v1/conversation/${currentConversationId}`);
         if (!response.ok) return;
 
         const conversation = await response.json();
@@ -488,7 +525,8 @@ async function refreshCurrentConversationTitle() {
 
 // Load conversations on startup
 async function loadConversations() {
-    const response = await fetch('/api/v1/conversation');
+    const response = await authFetch('/api/v1/conversation');
+    if (!response.ok) return;
     conversations = await response.json();
 
     // Auto-create or select first conversation
@@ -518,11 +556,11 @@ function renderConversationList() {
 }
 
 async function createNewConversation() {
-    const response = await fetch('/api/v1/conversation', {
+    const response = await authFetch('/api/v1/conversation', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New Chat' })
     });
+    if (!response.ok) return;
     const { id, title } = await response.json();
     conversations.unshift({ id, title, messageCount: 0 });
     selectConversation(id);
@@ -534,7 +572,8 @@ async function selectConversation(id) {
     renderConversationList();
 
     // Load messages
-    const response = await fetch(`/api/v1/conversation/${id}`);
+    const response = await authFetch(`/api/v1/conversation/${id}`);
+    if (!response.ok) return;
     const conversation = await response.json();
 
     // Clear and render messages
@@ -549,7 +588,7 @@ async function deleteConversation(id, event) {
     event.stopPropagation();
     if (!confirm('Are you sure to delete this conversation?')) return;
 
-    await fetch(`/api/v1/conversation/${id}`, { method: 'DELETE' });
+    await authFetch(`/api/v1/conversation/${id}`, { method: 'DELETE' });
     conversations = conversations.filter(c => c.id !== id);
 
     if (currentConversationId === id) {
@@ -577,7 +616,7 @@ function saveSettings(settings) {
 
 async function loadModelProviders() {
     try {
-        const res = await fetch('/api/v1/model-provider');
+        const res = await authFetch('/api/v1/model-provider');
         if (res.ok) {
             modelProviders = await res.json();
         }
@@ -683,7 +722,7 @@ async function openSettingsModal() {
 // Skills Functions
 async function loadSkills() {
     try {
-        const res = await fetch('/api/v1/skill-settings');
+        const res = await authFetch('/api/v1/skill-settings');
         if (res.ok) {
             skills = await res.json();
         }
@@ -945,9 +984,8 @@ async function validateModel() {
 
     try {
         // Validate through backend API to avoid CORS issues
-        const res = await fetch('/api/v1/model-provider/validate', {
+        const res = await authFetch('/api/v1/model-provider/validate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 type: type,
                 url: url,
@@ -999,9 +1037,8 @@ async function saveModelProvider() {
     };
 
     try {
-        const res = await fetch('/api/v1/model-provider', {
+        const res = await authFetch('/api/v1/model-provider', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(provider)
         });
 

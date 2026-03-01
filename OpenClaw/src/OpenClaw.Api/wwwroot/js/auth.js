@@ -54,11 +54,10 @@ async function authFetch(url, options = {}) {
 
     const response = await fetch(url, options);
 
-    // Handle 401 Unauthorized - redirect to login or clear auth
+    // Handle 401 Unauthorized - redirect to login
     if (response.status === 401) {
         clearAuth();
-        // Optionally redirect to home page for login
-        // window.location.href = '/';
+        window.location.href = '/login.html';
     }
 
     return response;

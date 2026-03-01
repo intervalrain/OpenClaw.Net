@@ -5,9 +5,9 @@ using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using OpenClaw.Application.Setup.Queries;
 using OpenClaw.Contracts.Configuration.Requests;
 using OpenClaw.Contracts.Setup.Commands;
-using OpenClaw.Contracts.Setup.Queries;
 
 using Weda.Core.Presentation;
 
