@@ -649,6 +649,12 @@ function renderModelList() {
                 <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
             </div>
             <div class="model-item-actions">
+                <button class="model-item-btn edit" data-id="${p.id}" title="Edit">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
                 <button class="model-item-btn delete" data-id="${p.id}" title="Delete">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -667,6 +673,15 @@ function renderModelList() {
         });
     });
 
+    // Add event listeners for edit buttons
+    listEl.querySelectorAll('.model-item-btn.edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.id;
+            openEditModelModal(id);
+        });
+    });
+
     // Add event listeners for delete buttons
     listEl.querySelectorAll('.model-item-btn.delete').forEach(btn => {
         btn.addEventListener('click', async (e) => {
@@ -678,6 +693,32 @@ function renderModelList() {
             }
         });
     });
+}
+
+// Edit Model Provider
+function openEditModelModal(id) {
+    const provider = modelProviders.find(p => p.id === id);
+    if (!provider) return;
+
+    // Set modal title for edit mode
+    document.getElementById('model-modal-title').textContent = 'Edit Model Provider';
+    document.getElementById('provider-id').value = id;
+
+    // Fill form with existing values
+    document.getElementById('provider-type').value = provider.type.toLowerCase();
+    document.getElementById('provider-name').value = provider.name;
+    document.getElementById('provider-url').value = provider.url || '';
+    document.getElementById('provider-api-key').value = ''; // Don't show existing API key
+    document.getElementById('provider-model').value = provider.modelName;
+
+    updateProviderTypeUI();
+
+    // Reset validation status
+    document.getElementById('validation-status').textContent = '';
+    document.getElementById('validation-status').className = 'validation-status';
+    document.getElementById('save-model-btn').disabled = false; // Allow save for edit
+
+    document.getElementById('add-model-modal').classList.add('active');
 }
 
 async function activateModelProvider(id) {
@@ -715,8 +756,50 @@ async function openSettingsModal() {
     renderModelList();
     renderSkillsList();
 
+    // Update account info
+    const user = getCurrentUser();
+    if (user) {
+        const avatarEl = document.getElementById('settings-avatar');
+        const nameEl = document.getElementById('settings-name');
+        const emailEl = document.getElementById('settings-email');
+        if (avatarEl) avatarEl.textContent = user.name ? user.name.charAt(0).toUpperCase() : 'U';
+        if (nameEl) nameEl.textContent = user.name || 'User';
+        if (emailEl) emailEl.textContent = user.email || '';
+    }
+
+    // Initialize tab switching
+    initSettingsTabs();
+
     modal.classList.add('active');
     document.querySelector('.profile-section').classList.remove('open');
+}
+
+// Settings Tab Switching
+function initSettingsTabs() {
+    const tabs = document.querySelectorAll('.settings-tab');
+    const panels = document.querySelectorAll('.settings-panel');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetPanel = tab.dataset.tab;
+
+            // Update active tab
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Update active panel
+            panels.forEach(p => p.classList.remove('active'));
+            document.querySelector(`.settings-panel[data-panel="${targetPanel}"]`).classList.add('active');
+        });
+    });
+
+    // Logout button
+    const logoutBtn = document.getElementById('settings-logout-btn');
+    if (logoutBtn) {
+        logoutBtn.onclick = () => {
+            logout();
+        };
+    }
 }
 
 // Skills Functions
@@ -909,7 +992,9 @@ function saveSettingsAndClose() {
 // Add Model Modal
 function openAddModelModal() {
     const modal = document.getElementById('add-model-modal');
-    // Reset form
+    // Reset form for add mode
+    document.getElementById('model-modal-title').textContent = 'Add Model Provider';
+    document.getElementById('provider-id').value = '';
     document.getElementById('provider-type').value = 'ollama';
     document.getElementById('provider-name').value = '';
     document.getElementById('provider-url').value = '';
@@ -1014,6 +1099,9 @@ async function validateModel() {
 }
 
 async function saveModelProvider() {
+    const providerId = document.getElementById('provider-id').value;
+    const isEditMode = !!providerId;
+
     const type = document.getElementById('provider-type').value;
     const name = document.getElementById('provider-name').value.trim();
 
@@ -1025,24 +1113,35 @@ async function saveModelProvider() {
         url = 'https://api.anthropic.com';
     }
 
-    const isFirstProvider = modelProviders.length === 0;
+    const apiKey = document.getElementById('provider-api-key').value.trim();
 
     const provider = {
         type: type,
         name: name || getDefaultProviderName(type),
         url: url,
         modelName: document.getElementById('provider-model').value.trim(),
-        apiKey: document.getElementById('provider-api-key').value.trim() || null,
-        isActive: isFirstProvider
+        apiKey: apiKey || null
     };
 
     try {
-        const res = await authFetch('/api/v1/model-provider', {
-            method: 'POST',
-            body: JSON.stringify(provider)
-        });
-
-        if (!res.ok) throw new Error('Failed to create provider');
+        let res;
+        if (isEditMode) {
+            // Update existing provider
+            res = await authFetch(`/api/v1/model-provider/${providerId}`, {
+                method: 'PUT',
+                body: JSON.stringify(provider)
+            });
+            if (!res.ok) throw new Error('Failed to update provider');
+        } else {
+            // Create new provider
+            const isFirstProvider = modelProviders.length === 0;
+            provider.isActive = isFirstProvider;
+            res = await authFetch('/api/v1/model-provider', {
+                method: 'POST',
+                body: JSON.stringify(provider)
+            });
+            if (!res.ok) throw new Error('Failed to create provider');
+        }
 
         await loadModelProviders();
         closeAddModelModal();
