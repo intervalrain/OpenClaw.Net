@@ -42,4 +42,11 @@ public class JwtTokenGenerator(IOptions<JwtSettings> jwtOptions) : IJwtTokenGene
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public (string, DateTime) GenerateRefreshToken()
+    {
+        var refreshToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        var refreshTokenExpiry = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryInDays);
+        return (refreshToken, refreshTokenExpiry);
+    }
 }

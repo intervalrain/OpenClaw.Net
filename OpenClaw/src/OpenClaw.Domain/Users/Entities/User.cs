@@ -6,6 +6,8 @@ using OpenClaw.Domain.Users.Enums;
 using OpenClaw.Domain.Users.Errors;
 using OpenClaw.Domain.Users.ValueObjects;
 
+using Microsoft.AspNetCore.Mvc.Diagnostics;
+
 namespace OpenClaw.Domain.Users.Entities;
 
 public class User : AggregateRoot<Guid>
@@ -14,6 +16,8 @@ public class User : AggregateRoot<Guid>
     public PasswordHash PasswordHash { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public UserStatus Status { get; private set; }
+    public string? RefreshToken { get; private set; }
+    public DateTime? RefreshTokenExpiresAt { get; private set; }
 
     private readonly List<string> _roles = [];
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
@@ -141,9 +145,24 @@ public class User : AggregateRoot<Guid>
         return Result.Success;
     }
 
-    public void RecordLogin()
+    public ErrorOr<Success> RecordLogin()
     {
         LastLoginAt = DateTime.UtcNow;
+        return Result.Success;
+    }
+
+    public ErrorOr<Success> SetRefreshToken(string token, DateTime expiresAt)
+    {
+        RefreshToken = token;
+        RefreshTokenExpiresAt = expiresAt;
+        return Result.Success;        
+    }
+
+    public bool IsRefreshTokenValid(string token)
+    {
+        return RefreshToken == token
+            && RefreshTokenExpiresAt.HasValue
+            && RefreshTokenExpiresAt > DateTime.UtcNow;
     }
 
     private User()

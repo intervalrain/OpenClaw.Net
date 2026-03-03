@@ -11,4 +11,6 @@ public sealed class JwtSettings
     public string Audience { get; set; } = null!;
 
     public int TokenExpirationInMinutes { get; set; }
+
+    public int RefreshTokenExpiryInDays { get; set; }
 }

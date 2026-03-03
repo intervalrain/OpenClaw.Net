@@ -8,4 +8,6 @@ public interface IJwtTokenGenerator
         string email,
         List<string> permissions,
         List<string> roles);
+
+    (string, DateTime) GenerateRefreshToken();
 }

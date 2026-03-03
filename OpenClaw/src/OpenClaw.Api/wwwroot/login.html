@@ -119,14 +119,7 @@
                 }
 
                 // Store auth data
-                localStorage.setItem('weda_auth_token', data.token);
-                localStorage.setItem('weda_user', JSON.stringify({
-                    id: data.id,
-                    name: data.name,
-                    email: data.email,
-                    roles: data.roles,
-                    permissions: data.permissions
-                }));
+                saveAuth(data);
 
                 // Redirect to main app
                 window.location.href = '/openclaw/index.html';

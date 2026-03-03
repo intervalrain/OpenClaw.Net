@@ -3,21 +3,24 @@ using ErrorOr;
 using Mediator;
 
 using Weda.Core.Application.Security;
-using OpenClaw.Contracts.Auth;
+
 using OpenClaw.Contracts.Auth.Commands;
 using OpenClaw.Domain.Users.Errors;
 using OpenClaw.Domain.Users.Repositories;
+using OpenClaw.Contracts.Auth.Responses;
+using Weda.Core.Application.Interfaces;
 
-namespace OpenClaw.Application.Auth.Commands.Login;
+namespace OpenClaw.Application.Auth.Commands;
 
 public class LoginCommandHandler(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
-    IJwtTokenGenerator jwtTokenGenerator) : IRequestHandler<LoginCommand, ErrorOr<AuthResponse>>
+    IJwtTokenGenerator jwtTokenGenerator,
+    IUnitOfWork uow) : IRequestHandler<LoginCommand, ErrorOr<AuthResponse>>
 {
-    public async ValueTask<ErrorOr<AuthResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
+    public async ValueTask<ErrorOr<AuthResponse>> Handle(LoginCommand request, CancellationToken ct)
     {
-        var user = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
+        var user = await userRepository.GetByEmailAsync(request.Email, ct);
         if (user is null)
         {
             return UserErrors.InvalidCredentials;
@@ -34,8 +37,13 @@ public class LoginCommandHandler(
         }
 
         user.RecordLogin();
-        await userRepository.UpdateAsync(user, cancellationToken);
 
+        var (refreshToken, refreshTokenExpiry) = jwtTokenGenerator.GenerateRefreshToken();
+        user.SetRefreshToken(refreshToken, refreshTokenExpiry);
+
+        await userRepository.UpdateAsync(user, ct);
+        await uow.SaveChangesAsync(ct);
+        
         var token = jwtTokenGenerator.GenerateToken(
             user.Id,
             user.Name,
@@ -45,6 +53,7 @@ public class LoginCommandHandler(
 
         return new AuthResponse(
             Token: token,
+            RefreshToken: refreshToken,
             Id: user.Id,
             Name: user.Name,
             Email: user.Email.Value,

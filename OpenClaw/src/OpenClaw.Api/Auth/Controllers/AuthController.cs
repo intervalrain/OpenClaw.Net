@@ -1,11 +1,16 @@
 using Asp.Versioning;
+
 using Mediator;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+
 using Weda.Core.Presentation;
-using OpenClaw.Contracts.Auth;
+
 using OpenClaw.Contracts.Auth.Commands;
 using OpenClaw.Contracts.Auth.Requests;
+using OpenClaw.Contracts.Auth.Responses;
+using OpenClaw.Application.Auth.Commands;
 
 namespace OpenClaw.Api.Auth.Controllers;
 
@@ -29,6 +34,20 @@ public class AuthController(ISender _mediator) : ApiController
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var command = new LoginCommand(request.Email, request.Password);
+        var result = await _mediator.Send(command);
+
+        return result.Match(Ok, Problem);
+    }
+    
+    /// <summary>
+    /// Refresh access token using refresh token
+    /// </summary>
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
+    {
+        var command = new RefreshTokenCommand(request.RefreshToken);
         var result = await _mediator.Send(command);
 
         return result.Match(Ok, Problem);

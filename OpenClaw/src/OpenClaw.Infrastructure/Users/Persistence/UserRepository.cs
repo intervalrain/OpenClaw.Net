@@ -34,4 +34,9 @@ public class UserRepository(AppDbContext dbContext)
         var userEmail = emailResult.Value;
         return await DbSet.AnyAsync(u => u.Email == userEmail, cancellationToken);
     }
+
+    public async Task<User?> GetByRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        return await DbSet.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken, cancellationToken);
+    }
 }

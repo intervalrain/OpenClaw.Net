@@ -10,6 +10,8 @@ namespace OpenClaw.Application.Users.Mapping;
 public static partial class UserMapper
 {
     [MapperIgnoreSource(nameof(User.PasswordHash))]
+    [MapperIgnoreSource(nameof(User.RefreshToken))]
+    [MapperIgnoreSource(nameof(User.RefreshTokenExpiresAt))]
     [MapProperty(nameof(User.Email), nameof(UserDto.Email), Use = nameof(MapEmail))]
     [MapProperty(nameof(User.Roles), nameof(UserDto.Roles), Use = nameof(MapRoles))]
     [MapProperty(nameof(User.Permissions), nameof(UserDto.Permissions), Use = nameof(MapPermissions))]

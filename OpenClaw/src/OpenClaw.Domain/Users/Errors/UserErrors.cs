@@ -71,4 +71,8 @@ public static class UserErrors
     public static readonly Error CannotDeleteSuperAdmin = Error.Forbidden(
         code: "User.CannotDeleteSuperAdmin",
         description: "Only SuperAdmin can delete another SuperAdmin.");
+    
+    public static readonly Error InvalidRefreshToken = Error.Validation(
+        code: "User.InvalidRefreshToken",
+        description: "Invalid refresh token."); 
 }

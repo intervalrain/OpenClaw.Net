@@ -682,7 +682,7 @@ function renderModelList() {
 
 async function activateModelProvider(id) {
     try {
-        await fetch(`/api/v1/model-provider/${id}/activate`, { method: 'POST' });
+        await authFetch(`/api/v1/model-provider/${id}/activate`, { method: 'POST' });
         await loadModelProviders();
     } catch (e) {
         console.error('Failed to activate provider:', e);
@@ -691,7 +691,7 @@ async function activateModelProvider(id) {
 
 async function deleteModelProvider(id) {
     try {
-        await fetch(`/api/v1/model-provider/${id}`, { method: 'DELETE' });
+        await authFetch(`/api/v1/model-provider/${id}`, { method: 'DELETE' });
         await loadModelProviders();
     } catch (e) {
         console.error('Failed to delete provider:', e);
