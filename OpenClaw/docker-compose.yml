@@ -15,6 +15,7 @@ services:
       - Nats__Broker__Url=nats://nats-broker:4222
       - Nats__Bus__Url=nats://nats-bus:4222
       - SEARXNG_URL=http://searxng:8080
+      - OPENCLAW_ENCRYPTION_KEY=${OPENCLAW_ENCRYPTION_KEY}
     depends_on:
       postgres:
         condition: service_healthy

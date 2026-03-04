@@ -4,6 +4,23 @@ using Weda.Core.Infrastructure.Messaging.Nats.Abstractions;
 
 namespace Weda.Protocol;
 
+/// <summary>
+/// Resolves and parses ECO (Eco Protocol) subject strings for NATS messaging.
+/// 
+/// Subject Pattern: eco{version}{format}.{groupId}.{resourceId}.{from}.{to}.{messageType}[.{params}]
+/// 
+/// Where:
+/// - version: Single digit (0-9) representing the protocol version
+/// - format: Single character - 'j' for JSON or 'p' for Protobuf
+/// - groupId: Message group identifier
+/// - resourceId: Resource identifier
+/// - from: Source identifier
+/// - to: Destination identifier
+/// - messageType: Type of message being sent
+/// - params: Optional additional parameters separated by dots
+/// 
+/// Example: eco1j.group1.resource1.service1.service2.EventCreated.param1.param2
+/// </summary>
 public partial class WedaSubjectResolver : ISubjectResolver
 {
     // eco + version(1 digit) + format(j/p)

@@ -12,6 +12,7 @@ using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
+using OpenClaw.Channels.Telegram.Extensions;
 using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Llm.Ollama;
 using OpenClaw.Infrastructure.Llm.OpenAI;
@@ -96,6 +97,9 @@ public static class ServiceCollectionExtensions
 
             return pipeline;
         });
+
+        // Channels
+        services.AddTelegramChannel(configuration);
 
         return services;
     }

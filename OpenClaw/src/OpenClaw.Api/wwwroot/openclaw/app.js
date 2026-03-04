@@ -751,10 +751,11 @@ async function openSettingsModal() {
 
     document.getElementById('language-select').value = settings.language;
 
-    // Load providers and skills from backend
-    await Promise.all([loadModelProviders(), loadSkills()]);
+    // Load providers, skills, and channel settings from backend
+    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings()]);
     renderModelList();
     renderSkillsList();
+    renderTelegramSettings();
 
     // Update account info
     const user = getCurrentUser();
@@ -875,6 +876,169 @@ function closeSettingsModal() {
     document.getElementById('settings-modal').classList.remove('active');
 }
 
+// Channel Settings Functions
+let telegramSettings = null;
+
+async function loadTelegramSettings() {
+    try {
+        const res = await authFetch('/api/v1/channel-settings/telegram');
+        if (res.ok) {
+            telegramSettings = await res.json();
+        }
+    } catch (e) {
+        console.error('Failed to load Telegram settings:', e);
+        telegramSettings = null;
+    }
+    return telegramSettings;
+}
+
+function renderTelegramSettings() {
+    const enabledToggle = document.getElementById('telegram-enabled');
+    const statusEl = document.getElementById('telegram-status');
+    const tokenInput = document.getElementById('telegram-bot-token');
+    const webhookInput = document.getElementById('telegram-webhook-url');
+    const secretInput = document.getElementById('telegram-secret-token');
+    const allowedUsersInput = document.getElementById('telegram-allowed-users');
+
+    if (!telegramSettings) {
+        statusEl.textContent = 'Not configured';
+        statusEl.className = 'channel-status';
+        enabledToggle.checked = false;
+        tokenInput.value = '';
+        webhookInput.value = '';
+        secretInput.value = '';
+        allowedUsersInput.value = '';
+        return;
+    }
+
+    enabledToggle.checked = telegramSettings.enabled;
+    tokenInput.value = ''; // Don't show actual token
+    tokenInput.placeholder = telegramSettings.botTokenMasked || 'Enter bot token...';
+    webhookInput.value = telegramSettings.webhookUrl || '';
+    secretInput.value = telegramSettings.secretToken || '';
+    allowedUsersInput.value = (telegramSettings.allowedUserIds || []).join(', ');
+
+    if (telegramSettings.enabled && telegramSettings.botTokenMasked) {
+        statusEl.textContent = 'Connected';
+        statusEl.className = 'channel-status connected';
+    } else if (telegramSettings.botTokenMasked) {
+        statusEl.textContent = 'Configured (disabled)';
+        statusEl.className = 'channel-status';
+    } else {
+        statusEl.textContent = 'Not configured';
+        statusEl.className = 'channel-status';
+    }
+}
+
+async function validateTelegramBot() {
+    const tokenInput = document.getElementById('telegram-bot-token');
+    const botInfoEl = document.getElementById('telegram-bot-info');
+    const validateBtn = document.getElementById('validate-telegram-btn');
+
+    const token = tokenInput.value.trim();
+    if (!token) {
+        botInfoEl.style.display = 'none';
+        botInfoEl.innerHTML = '';
+        return;
+    }
+
+    validateBtn.disabled = true;
+    validateBtn.textContent = 'Validating...';
+
+    try {
+        const res = await authFetch('/api/v1/channel-settings/telegram/validate', {
+            method: 'POST',
+            body: JSON.stringify({ botToken: token })
+        });
+
+        const result = await res.json();
+
+        if (!res.ok || !result.success) {
+            botInfoEl.style.display = 'block';
+            botInfoEl.className = 'bot-info-card channel-validation-status error';
+            botInfoEl.innerHTML = `<span>Validation failed: ${result.message || 'Invalid token'}</span>`;
+            return;
+        }
+
+        botInfoEl.style.display = 'block';
+        botInfoEl.className = 'bot-info-card';
+        botInfoEl.innerHTML = `
+            <div class="bot-name">${escapeHtml(result.botInfo.firstName)}</div>
+            <div class="bot-username">@${escapeHtml(result.botInfo.username || 'N/A')}</div>
+            <div class="bot-details">
+                Bot ID: ${result.botInfo.id}<br>
+                Can join groups: ${result.botInfo.canJoinGroups ? 'Yes' : 'No'}
+            </div>
+        `;
+    } catch (e) {
+        console.error('Telegram validation error:', e);
+        botInfoEl.style.display = 'block';
+        botInfoEl.className = 'bot-info-card channel-validation-status error';
+        botInfoEl.innerHTML = `<span>Validation failed: ${e.message}</span>`;
+    } finally {
+        validateBtn.disabled = false;
+        validateBtn.textContent = 'Validate';
+    }
+}
+
+async function saveTelegramSettings() {
+    const enabled = document.getElementById('telegram-enabled').checked;
+    const token = document.getElementById('telegram-bot-token').value.trim();
+    const webhookUrl = document.getElementById('telegram-webhook-url').value.trim();
+    const secretToken = document.getElementById('telegram-secret-token').value.trim();
+    const allowedUsersText = document.getElementById('telegram-allowed-users').value.trim();
+
+    // Parse allowed user IDs
+    const allowedUserIds = allowedUsersText
+        ? allowedUsersText.split(',')
+            .map(s => s.trim())
+            .filter(s => /^\d+$/.test(s))
+            .map(s => parseInt(s, 10))
+        : [];
+
+    const settings = {
+        enabled: enabled,
+        botToken: token || null,
+        webhookUrl: webhookUrl || null,
+        secretToken: secretToken || null,
+        allowedUserIds: allowedUserIds
+    };
+
+    try {
+        const res = await authFetch('/api/v1/channel-settings/telegram', {
+            method: 'PUT',
+            body: JSON.stringify(settings)
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to save Telegram settings');
+        }
+
+        telegramSettings = await res.json();
+        renderTelegramSettings();
+        return true;
+    } catch (e) {
+        console.error('Failed to save Telegram settings:', e);
+        alert('Failed to save Telegram settings');
+        return false;
+    }
+}
+
+function initTelegramChannel() {
+    const validateBtn = document.getElementById('validate-telegram-btn');
+    if (validateBtn) {
+        validateBtn.addEventListener('click', validateTelegramBot);
+    }
+
+    const enabledToggle = document.getElementById('telegram-enabled');
+    if (enabledToggle) {
+        enabledToggle.addEventListener('change', () => {
+            // Auto-save when toggling
+            saveTelegramSettings();
+        });
+    }
+}
+
 // Slash Command Autocomplete
 let autocompleteIndex = -1;
 let filteredSkills = [];
@@ -982,10 +1146,14 @@ function selectAutocompleteItem() {
     hideAutocomplete();
 }
 
-function saveSettingsAndClose() {
+async function saveSettingsAndClose() {
     const settings = getSettings();
     settings.language = document.getElementById('language-select').value;
     saveSettings(settings);
+
+    // Save Telegram settings
+    await saveTelegramSettings();
+
     closeSettingsModal();
 }
 
@@ -1193,4 +1361,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize model providers from backend
     loadModelProviders();
+
+    // Initialize Telegram channel
+    initTelegramChannel();
 });

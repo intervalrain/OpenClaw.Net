@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenClaw.Application\OpenClaw.Application.csproj" />
+    <ProjectReference Include="..\OpenClaw.Channels.Telegram\OpenClaw.Channels.Telegram.csproj" />
     <ProjectReference Include="..\OpenClaw.Infrastructure\OpenClaw.Infrastructure.csproj" />
     <ProjectReference Include="..\OpenClaw.Infrastructure.Llm.Ollama\OpenClaw.Infrastructure.Llm.Ollama.csproj" />
     <ProjectReference Include="..\OpenClaw.Infrastructure.Llm.OpenAI\OpenClaw.Infrastructure.Llm.OpenAI.csproj" />

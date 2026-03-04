@@ -74,6 +74,7 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IModelProviderRepository, ModelProviderRepository>();
+        services.AddScoped<IChannelSettingsRepository, ChannelSettingsRepository>();
         services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
         
         // security
