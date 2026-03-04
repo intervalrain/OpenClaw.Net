@@ -55,12 +55,23 @@
 | `weather` | 查詢天氣和預報（wttr.in） | ✅ 啟用 |
 | `github` | GitHub 操作（gh CLI: issues, PRs, CI） | ✅ 啟用 |
 
-### 3. 技術架構改進
+### 3. Telegram Channel 整合 ✅
+
+- ✅ 實作 `OpenClaw.Channels.Telegram` 專案
+- ✅ Telegram Bot Webhook 整合（`TelegramController`）
+- ✅ 訊息處理流程（`HandleTelegramMessageCommandHandler`）
+- ✅ Markdown 格式轉換（`TelegramMarkdownConverter`）
+- ✅ 對話映射（`TelegramConversationMapper`）
+- ✅ 支援 streaming 回覆
+- ✅ 環境變數設定：`TELEGRAM__BOTTOKEN`
+
+### 4. 技術架構改進
 
 - ✅ Clean Architecture 設計（Domain → Application → Infrastructure → API）
 - ✅ Skills 完全解耦，透過 `IAgentSkill` 介面統一管理
 - ✅ 動態參數驗證（`ToolParameters` with JSON Schema）
 - ✅ SSE (Server-Sent Events) 串流輸出
+- ✅ Multi-Channel 架構（Web, Telegram）
 - ✅ Docker Compose 完整基礎設施（PostgreSQL, NATS, SearXNG）
 
 ---
@@ -129,10 +140,392 @@
 
 ---
 
+## 🔄 CQRS + Mediator 重構計畫
+
+### 問題背景
+
+目前系統使用 Mediator source generator，但遇到以下問題：
+
+1. **跨 Assembly Handler 註冊問題**
+   - Mediator source generator 只在有 `[assembly: MediatorOptions]` 的 assembly 中生成 handlers
+   - `OpenClaw.Channels.Telegram` 的 `HandleTelegramMessageCommandHandler` 無法被 `OpenClaw.Application` 的 Mediator 識別
+   - 目前 workaround：改用 `TelegramMessageService` 直接處理，繞過 Mediator
+
+2. **Application 層混合模式**
+   - 部分使用 CQRS (Commands/Queries + Handlers)：`Users/*`, `Auth/*`, `Setup/*`
+   - 部分使用傳統 Service 類：`SkillSettingsService`, `SkillRegistry`, `LlmProviderFactory`, `AgentPipeline`
+   - 導致程式碼風格不一致，難以統一使用 Mediator behaviors (logging, validation, etc.)
+
+3. **架構不一致**
+   - `OpenClaw.Application` 使用 Mediator pattern (Commands/Queries)
+   - `OpenClaw.Channels.*` 直接使用 Service 類
+   - 導致處理邏輯分散在不同層級
+
+### 目前 Application 層分析
+
+| 類別 | 模式 | 檔案 |
+|------|------|------|
+| **CQRS (✅)** | Commands/Queries | `Users/*`, `Auth/*`, `Setup/*` |
+| **Service (❌)** | 傳統服務類 | `SkillSettingsService`, `SkillRegistry`, `LlmProviderFactory`, `AgentPipeline` |
+
+**Service 類詳細分析：**
+
+| Service | 職責 | 是否需轉 CQRS | 原因 |
+|---------|------|---------------|------|
+| `SkillSettingsService` | CRUD + 查詢 | ✅ 是 | 典型 CRUD，適合 Commands/Queries |
+| `SkillRegistry` | 純讀取 (Registry) | ❌ 否 | Singleton 查表，無狀態變更 |
+| `LlmProviderFactory` | Factory | ❌ 否 | Factory 模式，不適合 CQRS |
+| `AgentPipeline` | 複雜業務邏輯 | ⚠️ 可選 | 可保留為 Domain Service |
+| `SlashCommandParser` | 純工具 | ❌ 否 | 無狀態，純解析 |
+
+### 重構目標
+
+建立統一的 CQRS + Mediator 架構：
+1. Application 層所有業務邏輯都透過 Commands/Queries 處理
+2. 所有 Channel 都能透過 Mediator 派發命令
+3. 統一使用 Mediator behaviors (logging, validation, authorization)
+
+---
+
+## Part 1: Application 層 Service → CQRS 重構
+
+### 專案 CQRS 模式規範
+
+**重要：Contracts vs Application 職責分離**
+
+| 層級 | 職責 | 命名規範 |
+|------|------|----------|
+| `OpenClaw.Contracts` | API Controller / EventController 專用 | `*Request` / `*Response` |
+| `OpenClaw.Application` | 內部 CQRS 邏輯 | `*Command` / `*Query` (與 Handler 同檔案) |
+
+**Handler 返回值規範：統一使用 `ErrorOr<T>`**
+
+所有 Handler 的返回類型必須是 `ErrorOr<T>`，讓 Controller 可透過繼承 `ApiController` 使用 FP-like `Match` function：
+
+```csharp
+// Controller 端 - 使用 Match 處理結果
+[HttpPost]
+public async Task<IActionResult> EnableSkill([FromRoute] string skillName)
+{
+    var result = await mediator.Send(new EnableSkillCommand(skillName));
+    return result.Match(
+        _ => NoContent(),    // Success case
+        Problem);            // Error case - 自動轉換為適當的 HTTP status
+}
+
+// ApiController base class 提供 Problem method
+// 自動將 ErrorOr errors 轉換為對應的 HTTP status codes:
+// - ErrorType.Validation → 400 Bad Request
+// - ErrorType.NotFound → 404 Not Found
+// - ErrorType.Conflict → 409 Conflict
+// - ErrorType.Unauthorized → 403 Forbidden
+```
+
+**正確的 CQRS 模式：Command/Query 與 Handler 寫在同一個 .cs 檔案內**
+
+```
+OpenClaw.Application/
+├── Skills/
+│   ├── Commands/
+│   │   ├── EnableSkillCommandHandler.cs      # 包含 EnableSkillCommand record + Handler
+│   │   └── DisableSkillCommandHandler.cs     # 包含 DisableSkillCommand record + Handler
+│   ├── Queries/
+│   │   ├── ListSkillSettingsQueryHandler.cs  # 包含 Query record + Handler
+│   │   └── IsSkillEnabledQueryHandler.cs     # 包含 Query record + Handler
+│   └── SkillRegistry.cs  # 保留 (Singleton 查表)
+```
+
+**範例：HandleTelegramMessageCommandHandler.cs (正確模式)**
+```csharp
+// Command record 與 Handler 在同一檔案
+public record HandleTelegramMessageCommand(ChannelMessageReceivedEvent Event)
+    : ICommand<ErrorOr<HandleTelegramMessageResult>>;
+
+public record HandleTelegramMessageResult;
+
+public class HandleTelegramMessageCommandHandler(...)
+    : IRequestHandler<HandleTelegramMessageCommand, ErrorOr<HandleTelegramMessageResult>>
+{
+    public async ValueTask<ErrorOr<HandleTelegramMessageResult>> Handle(...) { ... }
+}
+```
+
+### 需要重構的 Service: SkillSettingsService
+
+**現狀：**
+```csharp
+// OpenClaw.Application/Skills/SkillSettingsService.cs
+public class SkillSettingsService : ISkillSettingsService
+{
+    Task<List<SkillSettingDto>> GetListAsync();      // → Query
+    Task<bool> IsEnabledAsync(string skillName);     // → Query
+    Task EnableAsync(string skillName);              // → Command
+    Task DisableAsync(string skillName);             // → Command
+    Task<List<IAgentSkill>> GetEnabledSkillsAsync(); // → Query
+}
+```
+
+**重構後：(Command/Query 都在 Handler 檔案內)**
+
+```
+OpenClaw.Application/
+├── Skills/
+│   ├── Commands/
+│   │   ├── EnableSkillCommandHandler.cs      # EnableSkillCommand + Handler
+│   │   └── DisableSkillCommandHandler.cs     # DisableSkillCommand + Handler
+│   ├── Queries/
+│   │   ├── ListSkillSettingsQueryHandler.cs  # ListSkillSettingsQuery + Handler
+│   │   ├── IsSkillEnabledQueryHandler.cs     # IsSkillEnabledQuery + Handler
+│   │   └── GetEnabledSkillsQueryHandler.cs   # GetEnabledSkillsQuery + Handler
+│   └── SkillRegistry.cs  # 保留 (Singleton 查表)
+```
+
+**EnableSkillCommandHandler.cs 範例：**
+```csharp
+using ErrorOr;
+using Mediator;
+
+namespace OpenClaw.Application.Skills.Commands;
+
+// Command record 與 Handler 在同一檔案
+public record EnableSkillCommand(string SkillName) : ICommand<ErrorOr<Unit>>;
+
+public class EnableSkillCommandHandler(
+    ISkillSettingRepository repository,
+    IUnitOfWork uow) : IRequestHandler<EnableSkillCommand, ErrorOr<Unit>>
+{
+    public async ValueTask<ErrorOr<Unit>> Handle(EnableSkillCommand request, CancellationToken ct)
+    {
+        var setting = await repository.GetByNameAsync(request.SkillName, ct);
+        if (setting is null)
+        {
+            setting = new SkillSetting(request.SkillName, isEnabled: true);
+            await repository.AddAsync(setting, ct);
+        }
+        else
+        {
+            setting.Enable();
+        }
+        await uow.SaveChangesAsync(ct);
+        return Unit.Value;
+    }
+}
+```
+
+**ListSkillSettingsQueryHandler.cs 範例：**
+```csharp
+using ErrorOr;
+using Mediator;
+
+namespace OpenClaw.Application.Skills.Queries;
+
+// Query record 與 Handler 在同一檔案
+public record ListSkillSettingsQuery : IQuery<ErrorOr<List<SkillSettingDto>>>;
+
+public class ListSkillSettingsQueryHandler(
+    ISkillSettingRepository repository,
+    ISkillRegistry registry) : IRequestHandler<ListSkillSettingsQuery, ErrorOr<List<SkillSettingDto>>>
+{
+    public async ValueTask<ErrorOr<List<SkillSettingDto>>> Handle(
+        ListSkillSettingsQuery request, CancellationToken ct)
+    {
+        var skills = registry.GetAllSkills();
+        var settings = await repository.GetAllAsync(ct);
+        // ... mapping logic
+        return skillDtos;
+    }
+}
+```
+
+### 舊版 CQRS 模式 (需逐步遷移)
+
+目前 `Users/*`, `Auth/*`, `Setup/*` 仍使用舊模式：
+- Commands 在 `OpenClaw.Contracts` (❌ 不正確，Contracts 應只有 Request/Response)
+- Handlers 在 `OpenClaw.Application`
+
+這些需要在後續重構中遷移到新模式。
+
+### 保留的 Services (不需重構)
+
+| Service | 原因 |
+|---------|------|
+| `SkillRegistry` | Singleton 查表，啟動時載入，無狀態變更 |
+| `LlmProviderFactory` | Factory 模式，動態建立 Provider |
+| `AgentPipeline` | 複雜的串流處理邏輯，不適合 Request/Response |
+| `SlashCommandParser` | 純工具類，無副作用 |
+
+### Part 1 實作步驟
+
+| 步驟 | 任務 |
+|------|------|
+| 1.1 | `EnableSkillCommandHandler.cs` (Command + Handler) |
+| 1.2 | `DisableSkillCommandHandler.cs` (Command + Handler) |
+| 1.3 | `ListSkillSettingsQueryHandler.cs` (Query + Handler) |
+| 1.4 | `IsSkillEnabledQueryHandler.cs` (Query + Handler) |
+| 1.5 | `GetEnabledSkillsQueryHandler.cs` (Query + Handler) |
+| 1.6 | 更新 `SkillSettingsController` 使用 Mediator |
+| 1.7 | 更新 `TelegramMessageService` 使用 Mediator |
+| 1.8 | 移除 `SkillSettingsService` 和 `ISkillSettingsService` |
+
+---
+
+## Part 2: Channel 層整合
+
+### 方案比較
+
+| 方案 | 優點 | 缺點 | 推薦度 |
+|------|------|------|--------|
+| **A. 統一 Application Layer** | 架構清晰、handlers 集中管理 | Channel 特定邏輯需抽象化 | ⭐⭐⭐⭐ |
+| **B. 多 Mediator 實例** | 各 assembly 獨立、低耦合 | 複雜度高、難以跨 assembly 通訊 | ⭐⭐ |
+| **C. 改用 MediatR** | 運行時註冊、靈活 | 需遷移現有 handlers、效能略差 | ⭐⭐⭐ |
+
+### 推薦方案：A. 統一 Application Layer
+
+#### Phase 1: 抽象化 Channel 介面
+
+```
+OpenClaw.Contracts/
+├── Channels/
+│   ├── IChannelMessageSender.cs      # 發送訊息介面
+│   ├── IChannelTypingIndicator.cs    # 打字指示介面
+│   └── ChannelMessageReceivedEvent.cs # 已存在
+```
+
+**IChannelMessageSender.cs**
+```csharp
+public interface IChannelMessageSender
+{
+    string ChannelName { get; }
+    Task SendAsync(string chatId, string message, CancellationToken ct = default);
+    Task SendTypingAsync(string chatId, CancellationToken ct = default);
+}
+```
+
+#### Phase 2: 通用 Message Handler
+
+將 Handler 移到 `OpenClaw.Application`，使用抽象介面：
+
+```
+OpenClaw.Application/
+├── Channels/
+│   ├── Commands/
+│   │   └── HandleChannelMessageCommandHandler.cs  # Command + Handler 同檔案
+│   └── Services/
+│       └── ChannelMessageProcessor.cs
+```
+
+**HandleChannelMessageCommandHandler.cs (Command + Handler 同檔案)**
+```csharp
+public record HandleChannelMessageCommand(
+    ChannelMessageReceivedEvent Event,
+    string ChannelName) : ICommand<ErrorOr<Unit>>;
+
+public class HandleChannelMessageCommandHandler(...)
+    : IRequestHandler<HandleChannelMessageCommand, ErrorOr<Unit>>
+{
+    // 處理邏輯
+}
+```
+
+#### Phase 3: Channel 實作介面
+
+```
+OpenClaw.Channels.Telegram/
+├── Services/
+│   └── TelegramMessageSender.cs  # 實作 IChannelMessageSender
+├── EventControllers/
+│   └── TelegramEventController.cs  # 只負責轉發到 Mediator
+```
+
+#### Phase 4: DI 註冊
+
+```csharp
+// TelegramServiceCollectionExtensions.cs
+services.AddScoped<IChannelMessageSender, TelegramMessageSender>();
+
+// Program.cs - Mediator 只需 Application assembly
+services.AddMediator(options =>
+{
+    options.Assemblies = [typeof(IApplicationMarker).Assembly];
+});
+```
+
+### 實作步驟
+
+| 步驟 | 任務 | 預估工時 |
+|------|------|----------|
+| 1 | 建立 `IChannelMessageSender` 介面 | 0.5h |
+| 2 | 建立通用 `HandleChannelMessageCommand` | 1h |
+| 3 | 將 `TelegramMessageService` 邏輯遷移到 Handler | 2h |
+| 4 | 實作 `TelegramMessageSender` | 1h |
+| 5 | 更新 `TelegramEventController` 使用 Mediator | 0.5h |
+| 6 | 移除舊的 `HandleTelegramMessageCommandHandler` | 0.5h |
+| 7 | 測試和修復 | 1h |
+| 8 | 更新文件 | 0.5h |
+
+**總預估工時**: 7-8 小時
+
+### 遷移後架構
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     OpenClaw.Api                             │
+│  ┌──────────────────┐  ┌──────────────────────────────────┐ │
+│  │ ChatController   │  │ TelegramEventController          │ │
+│  │ (Web Channel)    │  │ (JetStream Consumer)             │ │
+│  └────────┬─────────┘  └─────────────┬────────────────────┘ │
+│           │                          │                       │
+│           ▼                          ▼                       │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              IMediator.Send(HandleChannelMessageCmd)   │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  OpenClaw.Application                        │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │         HandleChannelMessageCommandHandler             │ │
+│  │  ┌──────────────────────────────────────────────────┐  │ │
+│  │  │ 1. Load conversation                             │  │ │
+│  │  │ 2. Parse slash commands                          │  │ │
+│  │  │ 3. Execute Agent Pipeline                        │  │ │
+│  │  │ 4. Send response via IChannelMessageSender       │  │ │
+│  │  └──────────────────────────────────────────────────┘  │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  OpenClaw.Contracts                          │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ IChannelMessageSender                                │   │
+│  │ - SendAsync(chatId, message)                         │   │
+│  │ - SendTypingAsync(chatId)                            │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ Telegram        │ │ Discord         │ │ Line            │
+│ MessageSender   │ │ MessageSender   │ │ MessageSender   │
+│ (ITelegramBot)  │ │ (IDiscordClient)│ │ (ILineMessaging)│
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+```
+
+### 優先級
+
+🔴 **高優先級** - 在新增更多 Channel 之前完成
+
+建議在實作 Discord、Line 等其他 Channel 之前先完成此重構，避免重複相同的 workaround。
+
+---
+
 ## 技術債務和改進項目
 
 ### 需要修復
-- ⚠️ 無明顯技術債務，目前架構健康
+- ⚠️ CQRS + Mediator 跨 Assembly 問題（見上方重構計畫）
 
 ### 可選優化
 - 🔧 加入 Skill 版本管理
@@ -172,5 +565,5 @@
 
 ---
 
-**更新時間**: 2026-02-27
-**狀態**: Skills 系統核心功能完成，準備擴充 skill 生態系統
+**更新時間**: 2026-03-04
+**狀態**: Skills 系統核心功能完成，Telegram Channel 整合完成，準備擴充更多 channels 和 skills
