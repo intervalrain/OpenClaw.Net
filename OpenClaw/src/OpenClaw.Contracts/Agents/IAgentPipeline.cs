@@ -9,11 +9,13 @@ public interface IAgentPipeline
         string userInput,
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
+        IReadOnlyList<ImageContent>? images = null,
         CancellationToken ct = default);
 
     IAsyncEnumerable<AgentStreamEvent> ExecuteStreamAsync(
         string userInput,
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
+        IReadOnlyList<ImageContent>? images = null,
         CancellationToken ct = default);
 }

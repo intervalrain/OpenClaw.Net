@@ -143,6 +143,27 @@ public class OpenAILlmProvider : ILlmProvider
             case ChatRole.System:
                 return new SystemChatMessage(msg.Content);
             case ChatRole.User:
+                // Check if message contains images for Vision API
+                if (msg.HasImages)
+                {
+                    var contentParts = new List<ChatMessageContentPart>();
+
+                    // Add images first
+                    foreach (var image in msg.Images!)
+                    {
+                        // Create data URI for base64 image
+                        var dataUri = $"data:{image.MimeType};base64,{image.Base64Data}";
+                        contentParts.Add(ChatMessageContentPart.CreateImagePart(new Uri(dataUri)));
+                    }
+
+                    // Add text content if present
+                    if (!string.IsNullOrEmpty(msg.Content))
+                    {
+                        contentParts.Add(ChatMessageContentPart.CreateTextPart(msg.Content));
+                    }
+
+                    return new UserChatMessage(contentParts);
+                }
                 return new UserChatMessage(msg.Content);
             case ChatRole.Assistant:
                 if (msg.ToolCalls is { Count: > 0 })

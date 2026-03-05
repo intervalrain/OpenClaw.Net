@@ -9,6 +9,9 @@ let skills = [];
 let historyIndex = -1;
 let tempInput = ''; // Store current input when navigating history
 
+// Pending images for upload
+let pendingImages = []; // Array of { base64Data, mimeType, previewUrl }
+
 // Configure marked.js
 marked.setOptions({
     highlight: function(code, lang) {
@@ -118,6 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Logout button
     document.getElementById('logout-btn').addEventListener('click', logout);
+
+    // Image upload handling
+    initImageUpload();
 
     // Check setup status - show onboarding if no provider configured
     checkSetupStatus();
@@ -276,6 +282,37 @@ function addMessage(content, role) {
     return messageEl;
 }
 
+function addMessageWithImages(content, role, images) {
+    const messageEl = document.createElement('div');
+    messageEl.className = `message ${role}`;
+
+    // Add images first if present
+    if (images && images.length > 0) {
+        const imagesContainer = document.createElement('div');
+        imagesContainer.className = 'message-images';
+        images.forEach(img => {
+            const imgEl = document.createElement('img');
+            imgEl.src = img.previewUrl;
+            imgEl.alt = 'Uploaded image';
+            imgEl.className = 'message-image';
+            imagesContainer.appendChild(imgEl);
+        });
+        messageEl.appendChild(imagesContainer);
+    }
+
+    // Add text content
+    if (content && content !== '[Image]') {
+        const textEl = document.createElement('div');
+        textEl.className = 'message-text';
+        textEl.textContent = content;
+        messageEl.appendChild(textEl);
+    }
+
+    messagesEl.appendChild(messageEl);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return messageEl;
+}
+
 function createStreamingMessage() {
     const messageEl = document.createElement('div');
     messageEl.className = 'message assistant';
@@ -376,15 +413,28 @@ function navigateInputHistory(direction) {
 
 async function sendMessage() {
     const message = userInputEl.value.trim();
-    if (!message) return;
+    const hasImages = pendingImages.length > 0;
+
+    // Require either message or images
+    if (!message && !hasImages) return;
 
     // Reset history navigation
     historyIndex = -1;
     tempInput = '';
 
-    addMessage(message, 'user');
+    // Add user message with image previews if any
+    addMessageWithImages(message || '[Image]', 'user', pendingImages);
     userInputEl.value = '';
     sendBtn.disabled = true;
+
+    // Prepare images for API
+    const images = hasImages ? pendingImages.map(img => ({
+        base64Data: img.base64Data,
+        mimeType: img.mimeType
+    })) : null;
+
+    // Clear pending images
+    clearImages();
 
     let statusIndicator = null;
     let streamingMessage = null;
@@ -395,9 +445,10 @@ async function sendMessage() {
         const res = await authFetch('/api/v1/chat/stream', {
             method: 'POST',
             body: JSON.stringify({
-                message,
+                message: message || 'What is in this image?',
                 conversationId: currentConversationId,
-                language: settings.language
+                language: settings.language,
+                images: images
             })
         });
 
@@ -1365,3 +1416,122 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Telegram channel
     initTelegramChannel();
 });
+
+// ==================== Image Upload Functions ====================
+
+function initImageUpload() {
+    const attachBtn = document.getElementById('attach-btn');
+    const imageInput = document.getElementById('image-input');
+
+    // Attach button click
+    attachBtn.addEventListener('click', () => {
+        imageInput.click();
+    });
+
+    // File input change
+    imageInput.addEventListener('change', (e) => {
+        handleFileSelect(e.target.files);
+        e.target.value = ''; // Reset input to allow selecting same file again
+    });
+
+    // Paste event on textarea
+    userInputEl.addEventListener('paste', handlePaste);
+
+    // Drag and drop on input area
+    const inputArea = document.querySelector('.input-area');
+    inputArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        inputArea.classList.add('drag-over');
+    });
+    inputArea.addEventListener('dragleave', () => {
+        inputArea.classList.remove('drag-over');
+    });
+    inputArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        inputArea.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+            handleFileSelect(e.dataTransfer.files);
+        }
+    });
+}
+
+function handlePaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'));
+    if (imageItems.length === 0) return;
+
+    e.preventDefault();
+
+    for (const item of imageItems) {
+        const file = item.getAsFile();
+        if (file) {
+            processImageFile(file);
+        }
+    }
+}
+
+function handleFileSelect(files) {
+    for (const file of files) {
+        if (file.type.startsWith('image/')) {
+            processImageFile(file);
+        }
+    }
+}
+
+function processImageFile(file) {
+    // Limit file size (10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+        alert(`Image "${file.name}" is too large. Maximum size is 10MB.`);
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        // Extract base64 data and mime type
+        const [header, base64Data] = dataUrl.split(',');
+        const mimeMatch = header.match(/data:(image\/\w+);/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+
+        const imageData = {
+            base64Data: base64Data,
+            mimeType: mimeType,
+            previewUrl: dataUrl
+        };
+
+        pendingImages.push(imageData);
+        renderImagePreviews();
+    };
+    reader.readAsDataURL(file);
+}
+
+function renderImagePreviews() {
+    const previewArea = document.getElementById('image-preview-area');
+
+    if (pendingImages.length === 0) {
+        previewArea.style.display = 'none';
+        previewArea.innerHTML = '';
+        return;
+    }
+
+    previewArea.style.display = 'flex';
+    previewArea.innerHTML = pendingImages.map((img, index) => `
+        <div class="image-preview-item" data-index="${index}">
+            <img src="${img.previewUrl}" alt="Preview ${index + 1}">
+            <button class="remove-btn" onclick="removeImage(${index})">&times;</button>
+        </div>
+    `).join('');
+}
+
+function removeImage(index) {
+    pendingImages.splice(index, 1);
+    renderImagePreviews();
+}
+
+function clearImages() {
+    pendingImages = [];
+    renderImagePreviews();
+}

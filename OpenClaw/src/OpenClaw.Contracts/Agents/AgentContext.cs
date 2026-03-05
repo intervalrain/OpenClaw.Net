@@ -6,6 +6,7 @@ namespace OpenClaw.Contracts.Agents;
 public class AgentContext
 {
     public required string UserInput { get; init; }
+    public IReadOnlyList<ImageContent>? Images { get; init; }
     public required ILlmProvider LlmProvider { get; init; }
     public required IReadOnlyList<IAgentSkill> Skills { get; init; }
     public required AgentPipelineOptions Options { get; init; }

@@ -40,7 +40,10 @@ public class ChatController(
     {
         var (conversation, history, isFirstMessage) = await LoadConversationAsync(request.ConversationId, ct);
 
-        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, ct);
+        // Convert image attachments to ImageContent
+        var images = ConvertToImageContent(request.Images);
+
+        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, ct);
 
         // Save messages to DB
         if (conversation != null)
@@ -115,8 +118,11 @@ public class ChatController(
                 history.Add(new ChatMessage(ChatRole.Tool, skillResult.Output ?? "", toolCallId));
             }
 
+            // Convert image attachments to ImageContent
+            var images = ConvertToImageContent(request.Images);
+
             // Stream LLM response with history (including any injected skill results)
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, ct);
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, ct);
 
             await foreach (var evt in eventStream)
             {
@@ -277,5 +283,18 @@ public class ChatController(
             // Fallback to truncation if LLM fails
             return userMessage.Length > 30 ? userMessage[..30] + "..." : userMessage;
         }
+    }
+
+    /// <summary>
+    /// Converts chat image attachments to ImageContent for LLM processing.
+    /// </summary>
+    private static IReadOnlyList<ImageContent>? ConvertToImageContent(IReadOnlyList<ChatImageAttachment>? attachments)
+    {
+        if (attachments is not { Count: > 0 })
+            return null;
+
+        return attachments
+            .Select(a => new ImageContent(a.Base64Data, a.MimeType))
+            .ToList();
     }
 }

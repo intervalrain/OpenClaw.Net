@@ -84,11 +84,23 @@
                 <div class="chat-container">
                     <div id="messages" class="messages"></div>
                     <div class="input-area">
-                        <div class="input-wrapper">
-                            <textarea id="user-input" placeholder="Type a message..."></textarea>
-                            <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+                        <!-- Image preview area -->
+                        <div id="image-preview-area" class="image-preview-area" style="display: none;">
+                            <!-- Image thumbnails will be added here -->
                         </div>
-                        <button id="send-btn">Send</button>
+                        <div class="input-row">
+                            <button id="attach-btn" class="attach-btn" title="Attach image">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                                </svg>
+                            </button>
+                            <input type="file" id="image-input" accept="image/*" multiple style="display: none;">
+                            <div class="input-wrapper">
+                                <textarea id="user-input" placeholder="Type a message or paste an image..."></textarea>
+                                <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                            <button id="send-btn">Send</button>
+                        </div>
                     </div>
                 </div>
             </div>

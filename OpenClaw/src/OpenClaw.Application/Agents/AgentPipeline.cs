@@ -19,11 +19,13 @@ public class AgentPipeline(
         string userInput,
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
+        IReadOnlyList<ImageContent>? images = null,
         CancellationToken ct = default)
     {
         var context = new AgentContext
         {
             UserInput = userInput,
+            Images = images,
             LlmProvider = await llmProviderFactory.GetProviderAsync(ct),
             Skills = _skillMap.Values.ToList(),
             Options = options
@@ -51,6 +53,7 @@ public class AgentPipeline(
         string userInput,
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
+        IReadOnlyList<ImageContent>? images = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
@@ -68,7 +71,8 @@ public class AgentPipeline(
             messages.AddRange(history);
         }
 
-        messages.Add(new ChatMessage(ChatRole.User, userInput));
+        // Add user message with images if present
+        messages.Add(new ChatMessage(ChatRole.User, userInput, Images: images));
 
         var toolDefinitions = _skillMap.Values
             .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
@@ -168,7 +172,8 @@ public class AgentPipeline(
 
     private async Task<string> ExecuteCoreAsync(AgentContext context, CancellationToken ct)
     {
-        context.Messages.Add(new ChatMessage(ChatRole.User, context.UserInput));
+        // Add user message with images if present
+        context.Messages.Add(new ChatMessage(ChatRole.User, context.UserInput, Images: context.Images));
 
         var toolDefinitions = _skillMap.Values
             .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
