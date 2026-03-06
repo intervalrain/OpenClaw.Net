@@ -4,7 +4,7 @@ using System.Text;
 
 using OpenClaw.Contracts.Skills;
 
-namespace OpenClaw.Skills.GitHub;
+namespace OpenClaw.Skills.GitHub.GitHubCommand;
 
 /// <summary>
 /// GitHub operations via gh CLI: issues, PRs, CI runs, code review, API queries.

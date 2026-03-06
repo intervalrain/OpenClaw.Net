@@ -32,6 +32,10 @@
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Shell\OpenClaw.Skills.Shell.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.WebSearch\OpenClaw.Skills.WebSearch.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.GitHub\OpenClaw.Skills.GitHub.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Git\OpenClaw.Skills.Git.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.AzureDevOps\OpenClaw.Skills.AzureDevOps.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.ImageGen\OpenClaw.Skills.ImageGen.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Pdf\OpenClaw.Skills.Pdf.csproj" />
   </ItemGroup>
 
 </Project>

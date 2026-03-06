@@ -61,6 +61,8 @@
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
     <!-- Markdown -->
     <PackageVersion Include="Markdig" Version="0.40.0" />
+    <!-- PDF Processing -->
+    <PackageVersion Include="PdfPig" Version="0.1.10" />
     <!-- Auth -->
     <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.2" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.3.1" />

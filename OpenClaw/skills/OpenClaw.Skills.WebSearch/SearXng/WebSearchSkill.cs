@@ -5,7 +5,7 @@ using System.Web;
 
 using OpenClaw.Contracts.Skills;
 
-namespace OpenClaw.Skills.WebSearch.WebSearch;
+namespace OpenClaw.Skills.WebSearch.SearXng;
 
 public class WebSearchSkill(string? searxngUrl = null, TimeSpan? timeout = null) : AgentSkillBase<WebSearchArgs>
 {

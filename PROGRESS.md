@@ -65,7 +65,22 @@
 - ✅ 支援 streaming 回覆
 - ✅ 環境變數設定：`TELEGRAM__BOTTOKEN`
 
-### 4. 技術架構改進
+### 4. Image/Vision 支援 ✅
+
+- ✅ OpenAI Vision API 整合（`OpenAILlmProvider` 使用 `ChatMessageContentPart`）
+- ✅ `ChatMessage` 支援 `ImageContent` 和 `HasImages` 屬性
+- ✅ `ChatRequest` 新增 `ChatImageAttachment` 參數
+- ✅ `IAgentPipeline` 和 `AgentPipeline` 支援 `images` 參數
+- ✅ 前端圖片上傳功能：
+  - 剪貼簿貼上支援（Ctrl+V）
+  - 拖放上傳支援
+  - 檔案選擇按鈕
+  - 圖片預覽和移除功能
+  - 多圖片支援
+- ✅ Base64 編碼和 MIME type 處理
+- ✅ SSE streaming 保持圖片上下文
+
+### 5. 技術架構改進
 
 - ✅ Clean Architecture 設計（Domain → Application → Infrastructure → API）
 - ✅ Skills 完全解耦，透過 `IAgentSkill` 介面統一管理
@@ -73,6 +88,7 @@
 - ✅ SSE (Server-Sent Events) 串流輸出
 - ✅ Multi-Channel 架構（Web, Telegram）
 - ✅ Docker Compose 完整基礎設施（PostgreSQL, NATS, SearXNG）
+- ✅ OpenAI Vision API 整合（多模態支援）
 
 ---
 
@@ -565,5 +581,5 @@ services.AddMediator(options =>
 
 ---
 
-**更新時間**: 2026-03-04
-**狀態**: Skills 系統核心功能完成，Telegram Channel 整合完成，準備擴充更多 channels 和 skills
+**更新時間**: 2026-03-06
+**狀態**: Skills 系統核心功能完成，Telegram Channel 整合完成，Image/Vision 支援完成，準備擴充更多 skills
