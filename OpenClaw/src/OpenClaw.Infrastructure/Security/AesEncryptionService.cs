@@ -7,13 +7,15 @@ using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure.Security;
 
-public class AesEncryptionService(IConfigStore configStore) : IEncryptionService
+public class AesEncryptionService : IEncryptionService
 {
-    private readonly byte[] _key = InitializeKey(configStore);
+    private readonly byte[] _key = InitializeKey();
 
-    private static byte[] InitializeKey(IConfigStore configStore)
+    private static byte[] InitializeKey()
     {
-        var keyString = configStore.Get(ConfigKeys.EncryptionKey);
+        // Read directly from environment (encryption key should not be in DB)
+        var envStore = new EnvironmentConfigStore();
+        var keyString = envStore.Get(ConfigKeys.EncryptionKey);
 
         if (string.IsNullOrEmpty(keyString))
         {

@@ -70,5 +70,4 @@ public class SkillSettingsService(
 
         await uow.SaveChangesAsync(ct);
     }
-
 }

@@ -149,6 +149,13 @@
                         </svg>
                         <span>Channels</span>
                     </button>
+                    <button class="settings-tab" data-tab="configs">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0110 0v4"/>
+                        </svg>
+                        <span>Configs</span>
+                    </button>
                     <button class="settings-tab" data-tab="account">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
@@ -248,6 +255,28 @@
                                     <p class="setting-hint">Comma-separated list of Telegram user IDs. Leave empty to allow all users.</p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Configs Tab -->
+                    <div class="settings-panel" data-panel="configs">
+                        <h4>Config Management</h4>
+                        <p class="setting-hint">Manage encrypted secrets (API keys, tokens). All values are encrypted at rest.</p>
+
+                        <!-- Add Config Form - Single Line -->
+                        <div class="config-add-row">
+                            <input type="text" id="config-new-key" placeholder="KEY" class="config-input-key">
+                            <input type="password" id="config-new-value" placeholder="Value (encrypted)" class="config-input-value">
+                            <button class="config-add-btn" id="add-config-btn" title="Add Config">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Config List -->
+                        <div id="config-list" class="config-list">
+                            <!-- Configs will be rendered here -->
                         </div>
                     </div>
 

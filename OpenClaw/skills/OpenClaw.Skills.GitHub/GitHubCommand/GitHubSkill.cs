@@ -2,15 +2,18 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
+using Microsoft.Extensions.DependencyInjection;
+
+using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Skills;
 
 namespace OpenClaw.Skills.GitHub.GitHubCommand;
 
 /// <summary>
 /// GitHub operations via gh CLI: issues, PRs, CI runs, code review, API queries.
-/// Requires: gh CLI installed and authenticated (via GH_TOKEN env var or gh auth login)
+/// Requires: gh CLI installed and authenticated (via GH_TOKEN config or gh auth login)
 /// </summary>
-public class GitHubSkill : AgentSkillBase<GitHubSkillArgs>
+public class GitHubSkill(IServiceProvider serviceProvider) : AgentSkillBase<GitHubSkillArgs>
 {
     public override string Name => "github";
     public override string Description => """
@@ -44,7 +47,12 @@ public class GitHubSkill : AgentSkillBase<GitHubSkillArgs>
 
         try
         {
-            var result = await ExecuteGhCommandAsync(ghCommand, args.WorkingDirectory, ct);
+            // Get config store from scoped service provider to access DB configs
+            using var scope = serviceProvider.CreateScope();
+            var configStore = scope.ServiceProvider.GetRequiredService<IConfigStore>();
+            var ghToken = configStore.Get(ConfigKeys.GitHubToken);
+
+            var result = await ExecuteGhCommandAsync(ghCommand, args.WorkingDirectory, ghToken, ct);
             return result;
         }
         catch (OperationCanceledException)
@@ -88,6 +96,7 @@ public class GitHubSkill : AgentSkillBase<GitHubSkillArgs>
     private static async Task<SkillResult> ExecuteGhCommandAsync(
         string command,
         string? workingDirectory,
+        string? ghToken,
         CancellationToken ct)
     {
         var psi = new ProcessStartInfo
@@ -107,7 +116,11 @@ public class GitHubSkill : AgentSkillBase<GitHubSkillArgs>
             psi.WorkingDirectory = workingDirectory;
         }
 
-        // GH_TOKEN will be automatically picked up from environment if set
+        // Set GH_TOKEN from config if available
+        if (!string.IsNullOrWhiteSpace(ghToken))
+        {
+            psi.Environment["GH_TOKEN"] = ghToken;
+        }
 
         using var process = new Process { StartInfo = psi };
         var outputBuilder = new StringBuilder();

@@ -4,6 +4,7 @@ let currentConversationId = null;
 let conversations = [];
 let modelProviders = [];
 let skills = [];
+let appConfigs = [];
 
 // Input history navigation (from current conversation)
 let historyIndex = -1;
@@ -802,11 +803,12 @@ async function openSettingsModal() {
 
     document.getElementById('language-select').value = settings.language;
 
-    // Load providers, skills, and channel settings from backend
-    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings()]);
+    // Load providers, skills, channel settings, and app configs from backend
+    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs()]);
     renderModelList();
     renderSkillsList();
     renderTelegramSettings();
+    renderConfigList();
 
     // Update account info
     const user = getCurrentUser();
@@ -1088,6 +1090,189 @@ function initTelegramChannel() {
             saveTelegramSettings();
         });
     }
+}
+
+// App Config Functions
+async function loadAppConfigs() {
+    try {
+        const res = await authFetch('/api/v1/app-config');
+        if (res.ok) {
+            appConfigs = await res.json();
+        }
+    } catch (e) {
+        console.error('Failed to load app configs:', e);
+        appConfigs = [];
+    }
+    return appConfigs;
+}
+
+function renderConfigList() {
+    const listEl = document.getElementById('config-list');
+
+    if (appConfigs.length === 0) {
+        listEl.innerHTML = `
+            <div class="config-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+                <p>No configuration values set</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">Add secrets like GH_TOKEN, API keys, etc.</p>
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = appConfigs.map(c => `
+        <div class="config-item" data-key="${escapeHtml(c.key)}">
+            <div class="config-item-icon ${c.isSecret ? 'secret' : ''}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+            </div>
+            <div class="config-item-info">
+                <span class="config-item-key">${escapeHtml(c.key)}</span>
+                <span class="config-item-badge ${c.isSecret ? 'secret' : 'plain'}">
+                    ${c.isSecret ? 'ENCRYPTED' : 'PLAIN'}
+                </span>
+            </div>
+            <div class="config-item-actions">
+                <button class="config-item-btn edit" data-key="${escapeHtml(c.key)}" title="Edit">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
+                <button class="config-item-btn delete" data-key="${escapeHtml(c.key)}" title="Delete">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add event listeners for reveal buttons
+    // Add event listeners for edit buttons
+    listEl.querySelectorAll('.config-item-btn.edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.key;
+            openEditConfigModal(key);
+        });
+    });
+
+    // Add event listeners for delete buttons
+    listEl.querySelectorAll('.config-item-btn.delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.key;
+            if (confirm(`Delete config "${key}"?`)) {
+                await deleteAppConfig(key);
+                await loadAppConfigs();
+                renderConfigList();
+            }
+        });
+    });
+}
+
+function openEditConfigModal(key) {
+    // Don't show the current value - just prompt for new value
+    const newValue = prompt(`Set new value for "${key}":`);
+    if (newValue !== null && newValue !== '') {
+        saveAppConfig(key, newValue, true); // Always encrypted
+    }
+}
+
+async function addAppConfig() {
+    const keyInput = document.getElementById('config-new-key');
+    const valueInput = document.getElementById('config-new-value');
+
+    const key = keyInput.value.trim().toUpperCase(); // Normalize to uppercase
+    const value = valueInput.value;
+
+    if (!key) {
+        alert('Please enter a key');
+        return;
+    }
+
+    if (!value) {
+        alert('Please enter a value');
+        return;
+    }
+
+    try {
+        await saveAppConfig(key, value, true); // Always encrypted
+
+        // Clear form
+        keyInput.value = '';
+        valueInput.value = '';
+
+        await loadAppConfigs();
+        renderConfigList();
+    } catch (e) {
+        console.error('Failed to add config:', e);
+        alert('Failed to add config');
+    }
+}
+
+async function saveAppConfig(key, value, isSecret) {
+    try {
+        const res = await authFetch(`/api/v1/app-config/${encodeURIComponent(key)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ value, isSecret })
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to save config');
+        }
+
+        await loadAppConfigs();
+        renderConfigList();
+        return true;
+    } catch (e) {
+        console.error('Failed to save config:', e);
+        alert('Failed to save config');
+        return false;
+    }
+}
+
+async function deleteAppConfig(key) {
+    try {
+        const res = await authFetch(`/api/v1/app-config/${encodeURIComponent(key)}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to delete config');
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to delete config:', e);
+        alert('Failed to delete config');
+        return false;
+    }
+}
+
+function initConfigManagement() {
+    const addBtn = document.getElementById('add-config-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', addAppConfig);
+    }
+
+    // Allow Enter key to add config
+    const keyInput = document.getElementById('config-new-key');
+    const valueInput = document.getElementById('config-new-value');
+
+    const handleEnter = (e) => {
+        if (e.key === 'Enter') {
+            addAppConfig();
+        }
+    };
+
+    if (keyInput) keyInput.addEventListener('keydown', handleEnter);
+    if (valueInput) valueInput.addEventListener('keydown', handleEnter);
 }
 
 // Slash Command Autocomplete
@@ -1415,6 +1600,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Telegram channel
     initTelegramChannel();
+
+    // Initialize Config Management
+    initConfigManagement();
 });
 
 // ==================== Image Upload Functions ====================

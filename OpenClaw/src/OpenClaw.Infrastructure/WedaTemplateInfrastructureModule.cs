@@ -24,6 +24,8 @@ using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
 using OpenClaw.Infrastructure.Skills.Persistence;
+using OpenClaw.Contracts.Configuration;
+using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure;
 
@@ -76,7 +78,21 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IModelProviderRepository, ModelProviderRepository>();
         services.AddScoped<IChannelSettingsRepository, ChannelSettingsRepository>();
         services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
-        
+        services.AddScoped<IAppConfigRepository, AppConfigRepository>();
+
+        // configuration (chain: Database -> Environment)
+        // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)
+        services.AddSingleton(new EnvironmentConfigStore());
+        services.AddScoped<IConfigStore>(sp =>
+        {
+            var envStore = sp.GetRequiredService<EnvironmentConfigStore>();
+            var repository = sp.GetRequiredService<IAppConfigRepository>();
+            var encryption = sp.GetRequiredService<IEncryptionService>();
+            var uow = sp.GetRequiredService<IUnitOfWork>();
+
+            return new DatabaseConfigStore(repository, encryption, uow, fallback: envStore);
+        });
+
         // security
         services.AddSingleton<IEncryptionService, AesEncryptionService>();
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();

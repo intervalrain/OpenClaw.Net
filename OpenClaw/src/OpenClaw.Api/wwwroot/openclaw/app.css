@@ -676,6 +676,7 @@ body {
 
 #send-btn {
     padding: 0 20px;
+    height: 52px;
     background: var(--accent);
     color: var(--bg-secondary);
     border: none;
@@ -684,6 +685,8 @@ body {
     font-size: 0.9rem;
     cursor: pointer;
     transition: background 0.15s;
+    flex-shrink: 0;
+    align-self: flex-end;
 }
 
 #send-btn:hover {
@@ -1528,5 +1531,216 @@ body {
 
     .settings-content {
         padding: 16px;
+    }
+}
+
+/* Config Management Styles */
+.config-add-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.config-input-key {
+    width: 120px;
+    flex-shrink: 0;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    text-transform: uppercase;
+}
+
+.config-input-value {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.config-input-key:focus,
+.config-input-value:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.config-input-key::placeholder,
+.config-input-value::placeholder {
+    color: var(--text-muted);
+    text-transform: none;
+}
+
+.config-add-btn {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.config-add-btn:hover {
+    opacity: 0.9;
+}
+
+.config-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.config-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.config-empty svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+}
+
+.config-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    transition: all 0.15s;
+}
+
+.config-item:hover {
+    border-color: var(--border-color);
+}
+
+.config-item-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.config-item-icon svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+}
+
+.config-item-icon.secret svg {
+    color: var(--accent);
+}
+
+.config-item-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.config-item-key {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 0.85rem;
+}
+
+.config-item-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.config-item-badge.secret {
+    background: rgba(var(--accent-rgb), 0.15);
+    color: var(--accent);
+}
+
+.config-item-badge.plain {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.config-item-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.config-item-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.config-item-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border-color: var(--border-subtle);
+}
+
+.config-item-btn.edit:hover {
+    color: var(--accent);
+}
+
+.config-item-btn.delete:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Responsive Config Form */
+@media (max-width: 600px) {
+    .config-field-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .config-field-group.key {
+        flex: 1;
+    }
+
+    .config-add-actions {
+        flex-direction: column;
+    }
+
+    .config-key-input {
+        flex: 1 1 100%;
+    }
+
+    .config-value-input {
+        flex: 1 1 auto;
     }
 }

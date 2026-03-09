@@ -46,12 +46,17 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TimeoutMiddleware>();
         services.AddSingleton<SecretRedactionMiddleware>();
 
-        // ConfigStore
-        services.AddSingleton<IConfigStore, EnvironmentConfigStore>();
-
-        // LLM Providers (keyed)
-        services.AddKeyedSingleton<ILlmProvider, OpenAILlmProvider>("openai");
-        services.AddKeyedSingleton<ILlmProvider, OllamaLlmProvider>("ollama");
+        // LLM Providers (keyed) - use EnvironmentConfigStore for startup config
+        services.AddKeyedSingleton<ILlmProvider>("openai", (sp, _) =>
+        {
+            var envConfig = sp.GetRequiredService<EnvironmentConfigStore>();
+            return new OpenAILlmProvider(envConfig);
+        });
+        services.AddKeyedSingleton<ILlmProvider>("ollama", (sp, _) =>
+        {
+            var envConfig = sp.GetRequiredService<EnvironmentConfigStore>();
+            return new OllamaLlmProvider(envConfig);
+        });
 
         // LLM Provider Factories (keyed) - for dynamic creation with custom params
         services.AddKeyedSingleton<Func<string, string, ILlmProvider>>("ollama",
@@ -62,8 +67,8 @@ public static class ServiceCollectionExtensions
         // Default LLM Provider (resolved from config)
         services.AddSingleton<ILlmProvider>(sp =>
         {
-            var configStore = sp.GetRequiredService<IConfigStore>();
-            var providerKey = configStore.Get(ConfigKeys.LlmProvider) ?? "ollama";
+            var envConfig = sp.GetRequiredService<EnvironmentConfigStore>();
+            var providerKey = envConfig.Get(ConfigKeys.LlmProvider) ?? "ollama";
             return sp.GetRequiredKeyedService<ILlmProvider>(providerKey);
         });
 
