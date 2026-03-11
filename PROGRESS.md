@@ -42,7 +42,7 @@
 
 ### 2. 現有 Skills
 
-目前已實作的 6 個基礎 skills：
+目前已實作的 13 個 skills：
 
 | Skill | 描述 | 狀態 |
 |-------|------|------|
@@ -54,6 +54,11 @@
 | `web_search` | 使用 SearXNG 搜尋網路 | ✅ 啟用 |
 | `weather` | 查詢天氣和預報（wttr.in） | ✅ 啟用 |
 | `github` | GitHub 操作（gh CLI: issues, PRs, CI） | ✅ 啟用 |
+| `git` | 本地 Git 操作（status, log, diff, branch） | ✅ 啟用 |
+| `azure_devops` | Azure DevOps 操作（my_work_items, PRs, builds） | ✅ 啟用 |
+| `image_generation` | OpenAI DALL-E 圖片生成 | ✅ 啟用 |
+| `pdf` | PDF 解析和處理（read, search, metadata） | ✅ 啟用 |
+| `tmux` | Tmux session 管理（list, new, kill, send_keys） | ✅ 啟用 |
 
 ### 3. Telegram Channel 整合 ✅
 
@@ -102,11 +107,11 @@
 |----------|-------|------|------|----------|
 | ✅ ~~P0-1~~ | ~~**Weather**~~ | ~~查詢天氣和預報（wttr.in）~~ | ~~`curl`（已內建）~~ | ~~2-3h~~ |
 | ✅ ~~P0-2~~ | ~~**GitHub**~~ | ~~GitHub 操作（issues, PRs, CI）~~ | ~~`gh` CLI~~ | ~~4-6h~~ |
-| 🔴 P0-3 | **Git Operations** | 本地 git 操作（commit, branch, log） | `git`（已內建） | 3-4h |
-| 🔴 P0-4 | **Azure DevOps** | Azure DevOps 操作（work items, PRs, pipelines） | `az devops` CLI / REST API | 6-8h |
-| 🔴 P0-5 | **Image Generation** | OpenAI DALL-E 圖片生成 | OpenAI API Key | 4-5h |
-| 🔴 P0-6 | **PDF Processing** | PDF 解析和處理 | `iTextSharp` / `PdfSharp` | 6-8h |
-| 🔴 P0-7 | **Tmux Control** | Tmux session 管理 | `tmux` | 4-5h |
+| ✅ ~~P0-3~~ | ~~**Git Operations**~~ | ~~本地 git 操作（commit, branch, log）~~ | ~~`git`（已內建）~~ | ~~3-4h~~ |
+| ✅ ~~P0-4~~ | ~~**Azure DevOps**~~ | ~~Azure DevOps 操作（work items, PRs, pipelines）~~ | ~~REST API~~ | ~~6-8h~~ |
+| ✅ ~~P0-5~~ | ~~**Image Generation**~~ | ~~OpenAI DALL-E 圖片生成~~ | ~~OpenAI API Key~~ | ~~4-5h~~ |
+| ✅ ~~P0-6~~ | ~~**PDF Processing**~~ | ~~PDF 解析和處理~~ | ~~PdfPig~~ | ~~6-8h~~ |
+| ✅ ~~P0-7~~ | ~~**Tmux Control**~~ | ~~Tmux session 管理~~ | ~~`tmux`~~ | ~~4-5h~~ |
 | 🔴 P0-8 | **Notion** | Notion API（頁面、資料庫管理） | API Key | 6-8h |
 
 ### 中優先級（待評估）
@@ -132,27 +137,21 @@
 
 ## 建議開發順序（已按優先級調整）
 
-### Phase 1: 基礎整合（第 1-2 週）
-1. **Weather Skill** (P0-1) - 最簡單，立即可用，無需額外設定
-2. **GitHub Skill** (P0-2) - 開發者必備工具
-3. **Git Operations Skill** (P0-3) - 完善本地 Git 工作流程
+### Phase 1: 基礎整合 ✅ 完成
+1. ~~**Weather Skill** (P0-1)~~ ✅
+2. ~~**GitHub Skill** (P0-2)~~ ✅
+3. ~~**Git Operations Skill** (P0-3)~~ ✅
 
-**預估總工時**: 9-13 小時
+### Phase 2: 企業協作工具 ✅ 完成
+4. ~~**Azure DevOps Skill** (P0-4)~~ ✅ - 支援 `my_work_items` (current iteration)
+5. ~~**Image Generation Skill** (P0-5)~~ ✅ - OpenAI DALL-E 整合
+6. ~~**PDF Processing Skill** (P0-6)~~ ✅ - 使用 PdfPig 庫
 
-### Phase 2: 企業協作工具（第 2-3 週）
-4. **Azure DevOps Skill** (P0-4) - 企業級專案管理和 CI/CD
-5. **Image Generation Skill** (P0-5) - AI 創意功能
-6. **PDF Processing Skill** (P0-6) - 文件解析和處理
+### Phase 3: 開發環境和知識管理（進行中）
+7. ~~**Tmux Control Skill** (P0-7)~~ ✅
+8. **Notion Skill** (P0-8) - 知識庫和資料庫整合 🔴 待實作
 
-**預估總工時**: 16-21 小時
-
-### Phase 3: 開發環境和知識管理（第 4 週）
-7. **Tmux Control Skill** (P0-7) - Terminal session 管理
-8. **Notion Skill** (P0-8) - 知識庫和資料庫整合
-
-**預估總工時**: 10-13 小時
-
-**Phase 1-3 總工時**: 35-47 小時（約 1 個月）
+**Phase 1-2 完成，Phase 3 進行中（僅剩 Notion）**
 
 ---
 
@@ -554,32 +553,29 @@ services.AddMediator(options =>
 
 ## 下一步行動
 
-### 立即可做
-1. ✅ **Weather Skill 完成** (P0-1) - 使用 `wttr.in` API
-2. ✅ **GitHub Skill 完成** (P0-2) - 使用 `gh` CLI + `GH_TOKEN` 環境變數
-3. **開始實作 Git Operations Skill** (P0-3)
-   - 本地 git 操作（commit, branch, log, diff）
-   - 預估工時: 3-4 小時
+### P0 Skills 完成狀態
+| Skill | 狀態 | 備註 |
+|-------|------|------|
+| P0-1 Weather | ✅ 完成 | `wttr.in` API |
+| P0-2 GitHub | ✅ 完成 | `gh` CLI + `GH_TOKEN` |
+| P0-3 Git | ✅ 完成 | 本地 git CLI wrapper |
+| P0-4 Azure DevOps | ✅ 完成 | REST API，支援 `my_work_items` |
+| P0-5 Image Generation | ✅ 完成 | OpenAI DALL-E |
+| P0-6 PDF Processing | ✅ 完成 | PdfPig 庫 |
+| P0-7 Tmux Control | ✅ 完成 | tmux CLI wrapper |
+| P0-8 Notion | 🔴 待實作 | 需要 Notion API Key |
 
-### 技術準備事項
-- **Azure DevOps Skill** 需要:
-  - Azure DevOps PAT (Personal Access Token)
-  - 或使用 `az devops` CLI extension
-- **Image Generation** 需要:
-  - OpenAI API Key（已有 Model Provider 系統可複用）
-- **PDF Processing** 需要:
-  - 選擇 .NET PDF 庫: `iTextSharp`, `PdfSharp`, 或 `Docnet.Core`
-- **Notion** 需要:
-  - Notion Integration API Key
+### 技術決策記錄
+- ✅ **Azure DevOps**: 使用 REST API（更靈活，支援 `@Me` 和 `@currentIteration` 宏）
+- ✅ **PDF Processing**: 使用 `PdfPig`（輕量、免費、純 .NET）
+- **Notion**: 需要 Notion Integration API Key
 
-### 需要決策
-- ~~確認優先開發哪些 skills~~ ✅ **已確認**
-- Azure DevOps 使用 CLI 還是 REST API？（建議：REST API 更靈活）
-- PDF 處理庫選擇？（建議：`iTextSharp` 功能最完整）
-- 是否需要 Skill marketplace 機制？（可延後到 Phase 4）
-- Multi-tenant 支援？（可延後，目前 single-user 即可）
+### 下一步
+1. 實作 **Notion Skill** (P0-8)
+2. 開始 **CQRS + Mediator 重構** (Part 1)
+3. 考慮新增 P1 skills（Slack, Discord, Trello）
 
 ---
 
-**更新時間**: 2026-03-06
-**狀態**: Skills 系統核心功能完成，Telegram Channel 整合完成，Image/Vision 支援完成，準備擴充更多 skills
+**更新時間**: 2026-03-11
+**狀態**: P0-1 到 P0-7 完成，僅剩 Notion (P0-8) 待實作

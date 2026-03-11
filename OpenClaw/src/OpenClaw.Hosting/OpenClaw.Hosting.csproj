@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.AzureDevOps\OpenClaw.Skills.AzureDevOps.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.ImageGen\OpenClaw.Skills.ImageGen.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Pdf\OpenClaw.Skills.Pdf.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Tmux\OpenClaw.Skills.Tmux.csproj" />
   </ItemGroup>
 
 </Project>

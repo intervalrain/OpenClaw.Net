@@ -46,6 +46,13 @@ public partial class SlashCommandParser : ISlashCommandParser
         if (command.RawArguments.StartsWith('{'))
             return command.RawArguments;
 
+        // Try to parse key:value or key=value pairs
+        var keyValueArgs = ParseKeyValueArguments(command.RawArguments);
+        if (keyValueArgs.Count > 0)
+        {
+            return JsonSerializer.Serialize(keyValueArgs);
+        }
+
         // Get first parameter name from skill
         if (skill.Parameters is ToolParameters toolParams && toolParams.Properties?.Count > 0)
         {
@@ -61,5 +68,23 @@ public partial class SlashCommandParser : ISlashCommandParser
         {
             ["input"] = command.RawArguments
         });
+    }
+
+    [GeneratedRegex(@"(\w+)\s*[:=]\s*([^\s,]+|""[^""]*""|'[^']*')", RegexOptions.Compiled)]
+    private static partial Regex KeyValueRegex();
+
+    private static Dictionary<string, string> ParseKeyValueArguments(string arguments)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var matches = KeyValueRegex().Matches(arguments);
+
+        foreach (Match match in matches)
+        {
+            var key = match.Groups[1].Value;
+            var value = match.Groups[2].Value.Trim('"', '\'');
+            result[key] = value;
+        }
+
+        return result;
     }
 }

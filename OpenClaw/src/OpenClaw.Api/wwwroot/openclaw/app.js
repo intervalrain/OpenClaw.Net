@@ -234,11 +234,16 @@ function updateHljsTheme(theme) {
 
 // Status indicator
 function createStatusIndicator() {
+    const wasNearBottom = isNearBottom(150);
+
     const indicator = document.createElement('div');
     indicator.className = 'message assistant status-indicator';
     indicator.innerHTML = '<span class="status-dot"></span><span class="status-text">Thinking...</span>';
     messagesEl.appendChild(indicator);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    if (wasNearBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
     return indicator;
 }
 
@@ -265,6 +270,8 @@ function removeStatusIndicator(indicator) {
 
 // Chat Functions
 function addMessage(content, role) {
+    const wasNearBottom = isNearBottom(150);
+
     const messageEl = document.createElement('div');
     messageEl.className = `message ${role}`;
 
@@ -279,11 +286,17 @@ function addMessage(content, role) {
     }
 
     messagesEl.appendChild(messageEl);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // Only auto-scroll if user was near bottom
+    if (wasNearBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
     return messageEl;
 }
 
 function addMessageWithImages(content, role, images) {
+    const wasNearBottom = isNearBottom(150);
+
     const messageEl = document.createElement('div');
     messageEl.className = `message ${role}`;
 
@@ -310,7 +323,11 @@ function addMessageWithImages(content, role, images) {
     }
 
     messagesEl.appendChild(messageEl);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // Only auto-scroll if user was near bottom
+    if (wasNearBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
     return messageEl;
 }
 
@@ -321,12 +338,32 @@ function createStreamingMessage() {
     return messageEl;
 }
 
+// Check if user is near the bottom of the chat (within threshold)
+function isNearBottom(threshold = 100) {
+    const scrollBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    return scrollBottom <= threshold;
+}
+
+// Smooth scroll to bottom only if user was already near bottom
+function scrollToBottomIfNeeded() {
+    if (isNearBottom(150)) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+}
+
 function updateStreamingMessage(messageEl, content) {
+    // Remember scroll position before update
+    const wasNearBottom = isNearBottom(150);
+
     messageEl.innerHTML = renderMarkdown(content);
     messageEl.querySelectorAll('pre code').forEach(block => {
         hljs.highlightElement(block);
     });
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // Only auto-scroll if user was already near the bottom
+    if (wasNearBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
 }
 
 // Render markdown with LaTeX support
