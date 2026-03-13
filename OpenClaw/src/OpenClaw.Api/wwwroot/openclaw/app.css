@@ -1687,6 +1687,16 @@ body {
     color: var(--text-muted);
 }
 
+.config-item-value {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
 .config-item-actions {
     display: flex;
     gap: 4px;

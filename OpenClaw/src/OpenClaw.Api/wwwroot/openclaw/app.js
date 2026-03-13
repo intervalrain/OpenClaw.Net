@@ -840,12 +840,13 @@ async function openSettingsModal() {
 
     document.getElementById('language-select').value = settings.language;
 
-    // Load providers, skills, channel settings, and app configs from backend
-    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs()]);
+    // Load providers, skills, channel settings, app configs, and preferences from backend
+    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences()]);
     renderModelList();
     renderSkillsList();
     renderTelegramSettings();
     renderConfigList();
+    renderPreferenceList();
 
     // Update account info
     const user = getCurrentUser();
@@ -1312,6 +1313,184 @@ function initConfigManagement() {
     if (valueInput) valueInput.addEventListener('keydown', handleEnter);
 }
 
+// User Preferences Functions
+let userPreferences = [];
+
+async function loadUserPreferences() {
+    try {
+        const res = await authFetch('/api/v1/user-preference');
+        if (res.ok) {
+            userPreferences = await res.json();
+        }
+    } catch (e) {
+        console.error('Failed to load user preferences:', e);
+        userPreferences = [];
+    }
+    return userPreferences;
+}
+
+function renderPreferenceList() {
+    const listEl = document.getElementById('preference-list');
+
+    if (userPreferences.length === 0) {
+        listEl.innerHTML = `
+            <div class="config-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                <p>No preferences set</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">Add preferences like ado.assignedTo, user.language, etc.</p>
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = userPreferences.map(p => `
+        <div class="config-item" data-key="${escapeHtml(p.key)}">
+            <div class="config-item-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+            </div>
+            <div class="config-item-info">
+                <span class="config-item-key">${escapeHtml(p.key)}</span>
+                <span class="config-item-value">${escapeHtml(p.value || '(empty)')}</span>
+            </div>
+            <div class="config-item-actions">
+                <button class="config-item-btn edit" data-key="${escapeHtml(p.key)}" title="Edit">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
+                <button class="config-item-btn delete" data-key="${escapeHtml(p.key)}" title="Delete">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add event listeners for edit buttons
+    listEl.querySelectorAll('.config-item-btn.edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.key;
+            openEditPreferenceModal(key);
+        });
+    });
+
+    // Add event listeners for delete buttons
+    listEl.querySelectorAll('.config-item-btn.delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.key;
+            if (confirm(`Delete preference "${key}"?`)) {
+                await deleteUserPreference(key);
+                await loadUserPreferences();
+                renderPreferenceList();
+            }
+        });
+    });
+}
+
+function openEditPreferenceModal(key) {
+    const pref = userPreferences.find(p => p.key === key);
+    const currentValue = pref ? pref.value : '';
+    const newValue = prompt(`Set new value for "${key}":`, currentValue);
+    if (newValue !== null) {
+        saveUserPreference(key, newValue);
+    }
+}
+
+async function addUserPreference() {
+    const keyInput = document.getElementById('pref-new-key');
+    const valueInput = document.getElementById('pref-new-value');
+
+    const key = keyInput.value.trim().toLowerCase();
+    const value = valueInput.value;
+
+    if (!key) {
+        alert('Please enter a key');
+        return;
+    }
+
+    try {
+        await saveUserPreference(key, value);
+
+        // Clear form
+        keyInput.value = '';
+        valueInput.value = '';
+
+        await loadUserPreferences();
+        renderPreferenceList();
+    } catch (e) {
+        console.error('Failed to add preference:', e);
+        alert('Failed to add preference');
+    }
+}
+
+async function saveUserPreference(key, value) {
+    try {
+        const res = await authFetch(`/api/v1/user-preference/${encodeURIComponent(key)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ value })
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to save preference');
+        }
+
+        await loadUserPreferences();
+        renderPreferenceList();
+        return true;
+    } catch (e) {
+        console.error('Failed to save preference:', e);
+        alert('Failed to save preference');
+        return false;
+    }
+}
+
+async function deleteUserPreference(key) {
+    try {
+        const res = await authFetch(`/api/v1/user-preference/${encodeURIComponent(key)}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to delete preference');
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to delete preference:', e);
+        alert('Failed to delete preference');
+        return false;
+    }
+}
+
+function initPreferenceManagement() {
+    const addBtn = document.getElementById('add-pref-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', addUserPreference);
+    }
+
+    // Allow Enter key to add preference
+    const keyInput = document.getElementById('pref-new-key');
+    const valueInput = document.getElementById('pref-new-value');
+
+    const handleEnter = (e) => {
+        if (e.key === 'Enter') {
+            addUserPreference();
+        }
+    };
+
+    if (keyInput) keyInput.addEventListener('keydown', handleEnter);
+    if (valueInput) valueInput.addEventListener('keydown', handleEnter);
+}
+
 // Slash Command Autocomplete
 let autocompleteIndex = -1;
 let filteredSkills = [];
@@ -1640,6 +1819,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Config Management
     initConfigManagement();
+
+    // Initialize Preference Management
+    initPreferenceManagement();
 });
 
 // ==================== Image Upload Functions ====================

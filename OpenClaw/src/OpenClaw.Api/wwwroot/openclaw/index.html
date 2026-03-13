@@ -143,6 +143,13 @@
                         </svg>
                         <span>Skills</span>
                     </button>
+                    <button class="settings-tab" data-tab="preferences">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"/>
+                            <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                        <span>Preferences</span>
+                    </button>
                     <button class="settings-tab" data-tab="channels">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -202,6 +209,28 @@
                         <p class="setting-hint">Use <code>/skill_name args</code> to directly invoke a skill</p>
                         <div id="skills-list" class="skills-list">
                             <!-- Skills will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Preferences Tab -->
+                    <div class="settings-panel" data-panel="preferences">
+                        <h4>Preferences</h4>
+                        <p class="setting-hint">Personal preferences that can be set via chat or this UI</p>
+
+                        <!-- Add Preference Form -->
+                        <div class="config-add-row">
+                            <input type="text" id="pref-new-key" placeholder="key (e.g., ado.assignedTo)" class="config-input-key">
+                            <input type="text" id="pref-new-value" placeholder="value" class="config-input-value">
+                            <button class="config-add-btn" id="add-pref-btn" title="Add Preference">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Preference List -->
+                        <div id="preference-list" class="config-list">
+                            <!-- Preferences will be rendered here -->
                         </div>
                     </div>
 

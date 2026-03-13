@@ -79,6 +79,7 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IChannelSettingsRepository, ChannelSettingsRepository>();
         services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
         services.AddScoped<IAppConfigRepository, AppConfigRepository>();
+        services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
 
         // configuration (chain: Database -> Environment)
         // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)

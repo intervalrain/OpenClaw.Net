@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.ImageGen\OpenClaw.Skills.ImageGen.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Pdf\OpenClaw.Skills.Pdf.csproj" />
     <ProjectReference Include="..\..\skills\OpenClaw.Skills.Tmux\OpenClaw.Skills.Tmux.csproj" />
+    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Preference\OpenClaw.Skills.Preference.csproj" />
   </ItemGroup>
 
 </Project>

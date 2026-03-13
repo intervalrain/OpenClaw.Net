@@ -127,10 +127,26 @@ public static class ServiceCollectionExtensions
             }
         }
 
-        var skillTypes = assemblies
-            .SelectMany(a => a.GetTypes())
+        var allTypes = assemblies.SelectMany(a => a.GetTypes()).ToList();
+
+        // Register skill dependencies (classes in skill assemblies that are not skills themselves)
+        var skillDependencyTypes = allTypes
+            .Where(t => !typeof(IAgentSkill).IsAssignableFrom(t)
+                && !t.IsInterface && !t.IsAbstract
+                && t.GetConstructors().Any(c => c.GetParameters().Length > 0));
+
+        foreach (var depType in skillDependencyTypes)
+        {
+            if (!services.Any(s => s.ServiceType == depType))
+            {
+                services.AddSingleton(depType);
+            }
+        }
+
+        // Register skills
+        var skillTypes = allTypes
             .Where(t => typeof(IAgentSkill).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-        
+
         foreach (var skillType in skillTypes)
         {
             var defaultProperty = skillType.GetProperty("Default", BindingFlags.Public | BindingFlags.Static);

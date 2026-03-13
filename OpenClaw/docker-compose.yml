@@ -16,6 +16,10 @@ services:
       - Nats__Bus__Url=nats://nats-bus:4222
       - SEARXNG_URL=http://searxng:8080
       - OPENCLAW_ENCRYPTION_KEY=${OPENCLAW_ENCRYPTION_KEY}
+      - TRACKED_PROJECTS_HOST_PATH=${OPENCLAW_TRACKED_PROJECTS_PATH:-${HOME}/projects}
+      - TRACKED_PROJECTS_CONTAINER_PATH=/tracked-projects
+    volumes:
+      - ${OPENCLAW_TRACKED_PROJECTS_PATH:-${HOME}/projects}:/tracked-projects:ro
     depends_on:
       postgres:
         condition: service_healthy
