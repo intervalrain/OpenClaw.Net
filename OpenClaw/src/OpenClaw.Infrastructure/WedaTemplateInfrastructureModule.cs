@@ -25,7 +25,9 @@ using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
 using OpenClaw.Infrastructure.Skills.Persistence;
 using OpenClaw.Contracts.Configuration;
+using OpenClaw.Contracts.Pipelines;
 using OpenClaw.Infrastructure.Configuration;
+using OpenClaw.Infrastructure.Pipelines;
 
 namespace OpenClaw.Infrastructure;
 
@@ -59,6 +61,7 @@ public static class WedaTemplateInfrastructureModule
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+        services.AddSingleton<IPipelineExecutionStore, InMemoryPipelineExecutionStore>();
 
         return services;
     }

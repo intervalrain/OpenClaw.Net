@@ -573,6 +573,15 @@ async function sendMessage() {
                             }
                             addMessage(`Error: ${event.content}`, 'assistant');
                             break;
+
+                        case 'ApprovalRequired':
+                            if (statusIndicator) {
+                                removeStatusIndicator(statusIndicator);
+                                statusIndicator = null;
+                            }
+                            // Create approval UI inline in chat
+                            handleApprovalRequired(event.executionId, event.approvalRequest);
+                            break;
                     }
                 } catch (parseError) {
                     console.error('Failed to parse SSE event:', parseError);
@@ -1942,3 +1951,511 @@ function clearImages() {
     pendingImages = [];
     renderImagePreviews();
 }
+
+// ==================== Pipeline Approval ====================
+
+function handleApprovalRequired(executionId, approvalRequest) {
+    if (!approvalRequest) return;
+
+    // Create approval UI using the shared ApprovalUI component
+    const approvalEl = ApprovalUI.createInlineApproval(
+        executionId,
+        approvalRequest,
+        async (execId) => {
+            await submitApprovalDecision(execId, true);
+        },
+        async (execId) => {
+            await submitApprovalDecision(execId, false);
+        }
+    );
+
+    // Wrap in a message container
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message assistant';
+    messageDiv.appendChild(approvalEl);
+
+    messagesEl.appendChild(messageDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function submitApprovalDecision(executionId, approved) {
+    const action = approved ? 'approve' : 'reject';
+
+    try {
+        const response = await authFetch(`/api/v1/pipeline/executions/${executionId}/${action}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to ${action} execution`);
+        }
+
+        // Update the UI to show the decision
+        ApprovalUI.markDecision(executionId, approved);
+
+        // Add a follow-up message
+        addMessage(approved ? 'Approved. Continuing execution...' : 'Rejected. Execution cancelled.', 'assistant');
+
+        // Refresh executions list
+        await loadExecutions();
+
+    } catch (error) {
+        console.error('Approval error:', error);
+        addMessage(`Error: Failed to submit approval - ${error.message}`, 'assistant');
+    }
+}
+
+// ==================== Toast Notifications ====================
+
+const ToastManager = {
+    show(type, title, message, options = {}) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+
+        const iconHtml = this.getIcon(type);
+        const duration = options.duration || 5000;
+        const actions = options.actions || [];
+
+        let actionsHtml = '';
+        if (actions.length > 0) {
+            actionsHtml = '<div class="toast-actions">' +
+                actions.map((action, i) =>
+                    `<button class="toast-btn ${action.type || ''}" data-action="${i}">${action.label}</button>`
+                ).join('') +
+                '</div>';
+        }
+
+        toast.innerHTML = `
+            <div class="toast-icon ${type}">${iconHtml}</div>
+            <div class="toast-content">
+                <div class="toast-title">${escapeHtml(title)}</div>
+                <div class="toast-message">${escapeHtml(message)}</div>
+                ${actionsHtml}
+            </div>
+            <button class="toast-close">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        `;
+
+        container.appendChild(toast);
+
+        // Bind action handlers
+        actions.forEach((action, i) => {
+            const btn = toast.querySelector(`[data-action="${i}"]`);
+            if (btn && action.onClick) {
+                btn.addEventListener('click', () => {
+                    action.onClick();
+                    this.dismiss(toast);
+                });
+            }
+        });
+
+        // Bind close button
+        toast.querySelector('.toast-close').addEventListener('click', () => {
+            this.dismiss(toast);
+        });
+
+        // Auto-dismiss (unless has actions)
+        if (actions.length === 0 && duration > 0) {
+            setTimeout(() => this.dismiss(toast), duration);
+        }
+
+        return toast;
+    },
+
+    dismiss(toast) {
+        toast.classList.add('toast-exit');
+        setTimeout(() => toast.remove(), 200);
+    },
+
+    getIcon(type) {
+        switch (type) {
+            case 'success':
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+            case 'error':
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
+            case 'warning':
+            case 'approval':
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+            case 'info':
+            default:
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+        }
+    }
+};
+
+// ==================== Pipeline Drawer ====================
+
+let pipelines = [];
+let executions = [];
+let executionPollingInterval = null;
+
+function initPipelineDrawer() {
+    const drawer = document.getElementById('pipeline-drawer');
+    const toggleBtn = document.getElementById('pipeline-toggle-btn');
+    const closeBtn = document.getElementById('drawer-close-btn');
+
+    toggleBtn.addEventListener('click', () => {
+        openPipelineDrawer();
+    });
+
+    closeBtn.addEventListener('click', () => {
+        closePipelineDrawer();
+    });
+
+    // Close on escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && drawer.classList.contains('open')) {
+            closePipelineDrawer();
+        }
+    });
+
+    // Load pipelines on init
+    loadPipelines();
+}
+
+function openPipelineDrawer() {
+    const drawer = document.getElementById('pipeline-drawer');
+    const toggleBtn = document.getElementById('pipeline-toggle-btn');
+
+    drawer.classList.add('open');
+    toggleBtn.classList.add('hidden');
+
+    // Start polling executions
+    loadExecutions();
+    startExecutionPolling();
+}
+
+function closePipelineDrawer() {
+    const drawer = document.getElementById('pipeline-drawer');
+    const toggleBtn = document.getElementById('pipeline-toggle-btn');
+
+    drawer.classList.remove('open');
+    toggleBtn.classList.remove('hidden');
+
+    // Stop polling
+    stopExecutionPolling();
+}
+
+async function loadPipelines() {
+    try {
+        const res = await authFetch('/api/v1/pipeline');
+        if (res.ok) {
+            const data = await res.json();
+            // API returns { pipelines: [...] }
+            pipelines = data.pipelines || data || [];
+            renderPipelineList();
+        }
+    } catch (e) {
+        console.error('Failed to load pipelines:', e);
+    }
+}
+
+function renderPipelineList() {
+    const listEl = document.getElementById('pipeline-list');
+
+    if (pipelines.length === 0) {
+        listEl.innerHTML = '<p class="setting-hint" style="text-align: center; padding: 20px;">No pipelines available</p>';
+        return;
+    }
+
+    listEl.innerHTML = pipelines.map(p => `
+        <div class="pipeline-card" data-name="${escapeHtml(p.name)}">
+            <div class="pipeline-card-header">
+                <span class="pipeline-card-name">${escapeHtml(p.displayName || p.name)}</span>
+                <span class="pipeline-card-status idle">Ready</span>
+            </div>
+            <div class="pipeline-card-desc">${escapeHtml(p.description || 'No description')}</div>
+            <div class="pipeline-card-actions">
+                <button class="pipeline-run-btn" data-pipeline="${escapeHtml(p.name)}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Run
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    // Bind run buttons
+    listEl.querySelectorAll('.pipeline-run-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const pipelineName = btn.dataset.pipeline;
+            await executePipeline(pipelineName, btn);
+        });
+    });
+}
+
+async function executePipeline(pipelineName, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="status-dot"></span> Running...';
+
+    const card = btn.closest('.pipeline-card');
+    const statusEl = card.querySelector('.pipeline-card-status');
+    statusEl.textContent = 'Running';
+    statusEl.className = 'pipeline-card-status running';
+
+    try {
+        const res = await authFetch(`/api/v1/pipeline/${pipelineName}/execute`, {
+            method: 'POST',
+            body: JSON.stringify({})
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to start pipeline');
+        }
+
+        const execution = await res.json();
+        ToastManager.show('info', 'Pipeline Started', `${pipelineName} is now running`, { duration: 3000 });
+
+        // Start polling for this execution
+        pollExecution(execution.executionId, pipelineName, btn, card);
+
+    } catch (e) {
+        console.error('Failed to execute pipeline:', e);
+        ToastManager.show('error', 'Pipeline Error', e.message);
+
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run';
+        statusEl.textContent = 'Ready';
+        statusEl.className = 'pipeline-card-status idle';
+    }
+}
+
+async function pollExecution(executionId, pipelineName, btn, card) {
+    const statusEl = card.querySelector('.pipeline-card-status');
+
+    const poll = async () => {
+        try {
+            const res = await authFetch(`/api/v1/pipeline/executions/${executionId}`);
+            if (!res.ok) return;
+
+            const execution = await res.json();
+            // Normalize status to lowercase for comparison
+            const status = (execution.status || '').toString().toLowerCase();
+
+            console.log(`Pipeline ${executionId} status: ${status}`);
+
+            // Check if waiting for approval
+            if (status === 'waitingforapproval' && execution.approvalInfo) {
+                statusEl.textContent = 'Approval';
+                statusEl.className = 'pipeline-card-status waiting';
+
+                // Show approval toast
+                showApprovalToast(executionId, pipelineName, execution.approvalInfo);
+
+                // Refresh executions
+                await loadExecutions();
+                return; // Stop polling, will be updated via approval action
+            }
+
+            // Check if completed
+            if (status === 'completed') {
+                statusEl.textContent = 'Ready';
+                statusEl.className = 'pipeline-card-status idle';
+                btn.disabled = false;
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run';
+
+                ToastManager.show('success', 'Pipeline Completed', `${pipelineName} finished successfully`);
+                await loadExecutions();
+                return;
+            }
+
+            // Check if failed
+            if (status === 'failed' || status === 'rejected') {
+                statusEl.textContent = 'Ready';
+                statusEl.className = 'pipeline-card-status idle';
+                btn.disabled = false;
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run';
+
+                ToastManager.show('error', 'Pipeline Failed', execution.summary || `${pipelineName} execution failed`);
+                await loadExecutions();
+                return;
+            }
+
+            // Continue polling
+            setTimeout(poll, 2000);
+
+        } catch (e) {
+            console.error('Polling error:', e);
+            setTimeout(poll, 5000);
+        }
+    };
+
+    poll();
+}
+
+function showApprovalToast(executionId, pipelineName, approvalInfo) {
+    ToastManager.show('approval', 'Approval Required', approvalInfo.message || `${pipelineName} requires approval`, {
+        duration: 0, // Don't auto-dismiss
+        actions: [
+            {
+                label: 'Approve',
+                type: 'approve',
+                onClick: async () => {
+                    await submitDrawerApproval(executionId, true, pipelineName);
+                }
+            },
+            {
+                label: 'Reject',
+                type: 'reject',
+                onClick: async () => {
+                    await submitDrawerApproval(executionId, false, pipelineName);
+                }
+            }
+        ]
+    });
+}
+
+async function submitDrawerApproval(executionId, approved, pipelineName) {
+    const action = approved ? 'approve' : 'reject';
+
+    try {
+        const response = await authFetch(`/api/v1/pipeline/executions/${executionId}/${action}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to ${action} execution`);
+        }
+
+        ToastManager.show(
+            approved ? 'success' : 'info',
+            approved ? 'Approved' : 'Rejected',
+            `${pipelineName} ${approved ? 'will continue' : 'was cancelled'}`
+        );
+
+        // Refresh executions and pipeline status
+        await loadExecutions();
+        await loadPipelines();
+
+    } catch (error) {
+        console.error('Drawer approval error:', error);
+        ToastManager.show('error', 'Approval Failed', error.message);
+    }
+}
+
+async function loadExecutions() {
+    try {
+        const res = await authFetch('/api/v1/pipeline/executions?limit=10');
+        if (res.ok) {
+            executions = await res.json();
+            renderExecutionList();
+            updateBadge();
+        }
+    } catch (e) {
+        console.error('Failed to load executions:', e);
+    }
+}
+
+function renderExecutionList() {
+    const listEl = document.getElementById('execution-list');
+
+    if (executions.length === 0) {
+        listEl.innerHTML = '<p class="setting-hint" style="text-align: center; padding: 16px; font-size: 0.8rem;">No recent executions</p>';
+        return;
+    }
+
+    listEl.innerHTML = executions.map(e => {
+        const statusClass = e.status.toLowerCase().replace(' ', '-');
+        const statusIcon = getStatusIconClass(e.status);
+        const timeAgo = formatTimeAgo(e.startedAt);
+
+        let actionsHtml = '';
+        if ((e.status || '').toLowerCase() === 'waitingforapproval') {
+            actionsHtml = `
+                <div class="execution-actions">
+                    <button class="execution-action-btn approve" data-id="${e.id}">Approve</button>
+                    <button class="execution-action-btn reject" data-id="${e.id}">Reject</button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="execution-item" data-id="${e.id}">
+                <div class="execution-status-icon ${statusIcon}"></div>
+                <div class="execution-info">
+                    <div class="execution-name">${escapeHtml(e.pipelineName)}</div>
+                    <div class="execution-time">${timeAgo}</div>
+                </div>
+                ${actionsHtml}
+            </div>
+        `;
+    }).join('');
+
+    // Bind approval buttons
+    listEl.querySelectorAll('.execution-action-btn.approve').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const exec = executions.find(e => e.id === id);
+            await submitDrawerApproval(id, true, exec?.pipelineName || 'Pipeline');
+        });
+    });
+
+    listEl.querySelectorAll('.execution-action-btn.reject').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const exec = executions.find(e => e.id === id);
+            await submitDrawerApproval(id, false, exec?.pipelineName || 'Pipeline');
+        });
+    });
+}
+
+function getStatusIconClass(status) {
+    const s = (status || '').toLowerCase();
+    switch (s) {
+        case 'running': return 'running';
+        case 'waitingforapproval': return 'waiting';
+        case 'completed': return 'completed';
+        case 'failed':
+        case 'rejected': return 'failed';
+        default: return 'idle';
+    }
+}
+
+function formatTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    return date.toLocaleDateString();
+}
+
+function updateBadge() {
+    const badge = document.getElementById('pipeline-badge');
+    const waitingCount = executions.filter(e => (e.status || '').toLowerCase() === 'waitingforapproval').length;
+
+    if (waitingCount > 0) {
+        badge.textContent = waitingCount;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function startExecutionPolling() {
+    stopExecutionPolling();
+    executionPollingInterval = setInterval(loadExecutions, 5000);
+}
+
+function stopExecutionPolling() {
+    if (executionPollingInterval) {
+        clearInterval(executionPollingInterval);
+        executionPollingInterval = null;
+    }
+}
+
+// Initialize pipeline drawer on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    initPipelineDrawer();
+});

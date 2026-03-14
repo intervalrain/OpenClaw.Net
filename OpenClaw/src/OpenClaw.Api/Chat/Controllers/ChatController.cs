@@ -9,12 +9,15 @@ using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Chat.Requests;
 using OpenClaw.Contracts.Chat.Responses;
 using OpenClaw.Contracts.Llm;
+using OpenClaw.Contracts.Pipelines;
+using OpenClaw.Contracts.Pipelines.Responses;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
 
 using Weda.Core.Application.Interfaces;
+using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Chat.Controllers;
@@ -27,8 +30,13 @@ public class ChatController(
     ISlashCommandParser slashCommandParser,
     ISkillRegistry skillRegistry,
     ISkillSettingsService skillSettingsService,
+    IEnumerable<ISkillPipeline> skillPipelines,
+    IPipelineExecutionStore pipelineExecutionStore,
+    ICurrentUserProvider currentUserProvider,
     IUnitOfWork uow) : ApiController
 {
+    private readonly Dictionary<string, ISkillPipeline> _pipelines = skillPipelines
+        .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -84,11 +92,19 @@ public class ChatController(
 
             if (slashCommandParser.TryParse(request.Message, out var command))
             {
+                // Check if this is a pipeline command (e.g., /pipeline:ado_task_sync or /ado-sync)
+                if (TryHandlePipelineCommand(command!, out var pipelineName, out var argsJson))
+                {
+                    await ExecutePipelineStreamAsync(pipelineName, argsJson, ct);
+                    return;
+                }
+
                 var skill = skillRegistry.GetSkill(command!.SkillName);
                 if (skill == null)
                 {
                     var availableSkills = string.Join(", ", skillRegistry.GetAllSkills().Select(s => s.Name));
-                    await WriteErrorEventAsync($"Skill '{command.SkillName}' not found. Available: {availableSkills}", ct);
+                    var availablePipelines = string.Join(", ", _pipelines.Keys);
+                    await WriteErrorEventAsync($"Skill '{command.SkillName}' not found. Available skills: {availableSkills}. Pipelines: {availablePipelines}", ct);
                     return;
                 }
 
@@ -296,5 +312,156 @@ public class ChatController(
         return attachments
             .Select(a => new ImageContent(a.Base64Data, a.MimeType))
             .ToList();
+    }
+
+    /// <summary>
+    /// Check if slash command is a pipeline command.
+    /// Formats: /pipeline:name, /ado-sync (alias for ado_task_sync)
+    /// </summary>
+    private bool TryHandlePipelineCommand(SlashCommand command, out string pipelineName, out string? argsJson)
+    {
+        pipelineName = "";
+        argsJson = null;
+
+        // Format 1: /pipeline:name args
+        if (command.SkillName.StartsWith("pipeline:", StringComparison.OrdinalIgnoreCase))
+        {
+            pipelineName = command.SkillName[9..]; // Remove "pipeline:" prefix
+            argsJson = string.IsNullOrWhiteSpace(command.RawArguments) ? null : command.RawArguments;
+            return _pipelines.ContainsKey(pipelineName);
+        }
+
+        // Format 2: Alias mappings
+        var aliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ado-sync"] = "ado_task_sync",
+            ["ado_sync"] = "ado_task_sync"
+        };
+
+        if (aliasMap.TryGetValue(command.SkillName, out var mappedName))
+        {
+            pipelineName = mappedName;
+            argsJson = string.IsNullOrWhiteSpace(command.RawArguments) ? null : command.RawArguments;
+            return _pipelines.ContainsKey(pipelineName);
+        }
+
+        // Format 3: Direct pipeline name
+        if (_pipelines.ContainsKey(command.SkillName))
+        {
+            pipelineName = command.SkillName;
+            argsJson = string.IsNullOrWhiteSpace(command.RawArguments) ? null : command.RawArguments;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Execute pipeline and stream events (including approval requests) to client.
+    /// </summary>
+    private async Task ExecutePipelineStreamAsync(string pipelineName, string? argsJson, CancellationToken ct)
+    {
+        if (!_pipelines.TryGetValue(pipelineName, out var skillPipeline))
+        {
+            await WriteErrorEventAsync($"Pipeline '{pipelineName}' not found.", ct);
+            return;
+        }
+
+        // Create execution record
+        var execution = await pipelineExecutionStore.CreateAsync(pipelineName, argsJson, ct);
+
+        // Send initial "thinking" event
+        await WriteEventAsync(new AgentStreamEvent(AgentStreamEventType.ToolExecuting, $"Starting pipeline: {pipelineName}", pipelineName), ct);
+
+        try
+        {
+            // Get current user for pipeline context
+            var userId = currentUserProvider.GetCurrentUser().Id;
+            var context = new PipelineExecutionContext(userId, argsJson);
+
+            // Run pipeline with approval callback
+            var result = await skillPipeline.RunAsync(
+                context,
+                async approvalRequest =>
+                {
+                    // Update execution status
+                    await pipelineExecutionStore.SetPendingApprovalAsync(
+                        execution.Id,
+                        new PipelineApprovalInfo(approvalRequest.StepName, approvalRequest.Description, approvalRequest.ProposedChanges),
+                        ct);
+                    await pipelineExecutionStore.UpdateStatusAsync(execution.Id, PipelineExecutionStatus.WaitingForApproval, ct);
+
+                    // Send approval event to client
+                    await WriteEventAsync(new AgentStreamEvent(
+                        AgentStreamEventType.ApprovalRequired,
+                        approvalRequest.Description,
+                        approvalRequest.StepName,
+                        approvalRequest,
+                        execution.Id), ct);
+
+                    // Wait for user decision
+                    var approved = await pipelineExecutionStore.WaitForApprovalAsync(execution.Id, ct);
+
+                    // Update status based on decision
+                    await pipelineExecutionStore.UpdateStatusAsync(
+                        execution.Id,
+                        approved ? PipelineExecutionStatus.Running : PipelineExecutionStatus.Rejected,
+                        ct);
+
+                    return approved;
+                },
+                ct);
+
+            // Store result
+            await pipelineExecutionStore.SetResultAsync(execution.Id, result, ct);
+            await pipelineExecutionStore.UpdateStatusAsync(
+                execution.Id,
+                result.IsSuccess ? PipelineExecutionStatus.Completed : PipelineExecutionStatus.Failed,
+                ct);
+
+            // Send completion event with summary
+            await WriteEventAsync(new AgentStreamEvent(
+                AgentStreamEventType.ToolCompleted,
+                result.Summary,
+                pipelineName), ct);
+
+            // Send final content as markdown
+            var summaryContent = FormatPipelineResult(result);
+            await WriteEventAsync(new AgentStreamEvent(AgentStreamEventType.ContentDelta, summaryContent), ct);
+            await WriteEventAsync(new AgentStreamEvent(AgentStreamEventType.Completed, summaryContent), ct);
+        }
+        catch (Exception ex)
+        {
+            await pipelineExecutionStore.UpdateStatusAsync(execution.Id, PipelineExecutionStatus.Failed, ct);
+            await WriteErrorEventAsync($"Pipeline error: {ex.Message}", ct);
+        }
+    }
+
+    private static string FormatPipelineResult(SkillPipelineResult result)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"## Pipeline Result: {(result.IsSuccess ? "Success" : "Failed")}");
+        sb.AppendLine();
+        sb.AppendLine(result.Summary);
+
+        if (result.Steps.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("### Steps");
+            foreach (var step in result.Steps)
+            {
+                var icon = step.IsSuccess ? "✓" : "✗";
+                sb.AppendLine($"- {icon} **{step.StepName}**: {step.Output ?? (step.IsSuccess ? "OK" : step.Error)}");
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task WriteEventAsync(AgentStreamEvent evt, CancellationToken ct)
+    {
+        var data = JsonSerializer.Serialize(evt, JsonOptions);
+        await Response.WriteAsync($"data: {data}\n\n", ct);
+        await Response.Body.FlushAsync(ct);
     }
 }

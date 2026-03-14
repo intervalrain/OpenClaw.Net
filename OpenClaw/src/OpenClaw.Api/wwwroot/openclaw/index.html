@@ -388,7 +388,42 @@
         </div>
     </div>
 
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Pipeline Drawer -->
+    <div id="pipeline-drawer" class="pipeline-drawer">
+        <div class="drawer-header">
+            <h3>Pipelines</h3>
+            <button id="drawer-close-btn" class="drawer-close-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="drawer-content">
+            <div id="pipeline-list" class="pipeline-list">
+                <!-- Pipelines will be loaded here -->
+            </div>
+        </div>
+        <div id="drawer-executions" class="drawer-executions">
+            <div class="executions-header">Recent Executions</div>
+            <div id="execution-list" class="execution-list">
+                <!-- Executions will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Pipeline Toggle Button -->
+    <button id="pipeline-toggle-btn" class="pipeline-toggle-btn" title="Open Pipelines">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+        <span id="pipeline-badge" class="pipeline-badge" style="display: none;">0</span>
+    </button>
+
     <script src="/js/auth.js"></script>
+    <script src="/js/approval.js"></script>
     <script src="/openclaw/app.js"></script>
 </body>
 </html>

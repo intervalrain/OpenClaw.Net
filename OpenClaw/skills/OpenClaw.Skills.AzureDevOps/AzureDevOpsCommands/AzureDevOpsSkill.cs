@@ -28,6 +28,7 @@ public class AzureDevOpsSkill(
     private string? _queryId;
     private string? _assignedTo;
     private ISender _mediator = null!;
+    private IConfigStore _configStore = null!;
     private GitRepoMapper _gitRepoMapper = null!;
     private CancellationToken _ct;
 
@@ -44,7 +45,7 @@ public class AzureDevOpsSkill(
     {
         _ct = ct;
         using var scope = serviceProvider.CreateScope();
-        var configStore = scope.ServiceProvider.GetRequiredService<IConfigStore>();
+        _configStore = scope.ServiceProvider.GetRequiredService<IConfigStore>();
         _mediator = scope.ServiceProvider.GetRequiredService<ISender>();
         _gitRepoMapper = scope.ServiceProvider.GetRequiredService<GitRepoMapper>();
 
@@ -53,8 +54,8 @@ public class AzureDevOpsSkill(
         string? orgFromConfig = null;
         try
         {
-            patFromConfig = configStore.Get(ConfigKeys.AzureDevOpsPat);
-            orgFromConfig = configStore.Get(ConfigKeys.AzureDevOpsOrg);
+            patFromConfig = _configStore.Get(ConfigKeys.AzureDevOpsPat);
+            orgFromConfig = _configStore.Get(ConfigKeys.AzureDevOpsOrg);
         }
         catch (Exception ex)
         {
@@ -93,6 +94,16 @@ public class AzureDevOpsSkill(
             logger.LogDebug("QueryId: {QueryId}", _queryId ?? "null");
         }
 
+        if (string.IsNullOrWhiteSpace(args.Operation))
+            return SkillResult.Failure("Operation is required. Valid operations: run_query, my_work_items, list_tracked_repos, get_work_items_by_repo, update_work_item, list_repos, list_iterations, get_work_item, list_builds, list_pipelines, list_prs");
+
+        // list_tracked_repos doesn't require PAT, org, or project - it only reads local git repos
+        if (args.Operation.Equals("list_tracked_repos", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ListTrackedReposAsync(args.TrackedProjects);
+        }
+
+        // All other operations require PAT and org
         if (string.IsNullOrWhiteSpace(pat))
             return SkillResult.Failure("AZURE_DEVOPS_PAT is not set. Configure it in Settings > Configs with key 'AZURE_DEVOPS_PAT'.");
 
@@ -103,9 +114,6 @@ public class AzureDevOpsSkill(
             return SkillResult.Failure("Project is required. Set ado_project preference or provide 'project' parameter.");
 
         _client = CreateClient(pat);
-
-        if (string.IsNullOrWhiteSpace(args.Operation))
-            return SkillResult.Failure("Operation is required. Valid operations: run_query, my_work_items, list_tracked_repos, get_work_items_by_repo, update_work_item, list_repos, list_iterations, get_work_item, list_builds, list_pipelines, list_prs");
 
         try
         {
@@ -119,10 +127,10 @@ public class AzureDevOpsSkill(
                 "list_pipelines" => await ListPipelinesAsync(),
                 "list_prs" => await ListPullRequestsAsync(args.Repository),
                 "run_query" => await RunSavedQueryAsync(),
-                "list_tracked_repos" => await ListTrackedReposAsync(),
                 "update_work_item" => await UpdateWorkItemAsync(args.WorkItemId, args.Fields),
                 "get_work_items_by_repo" => await GetWorkItemsByRepoAsync(args.RepoName),
-                _ => SkillResult.Failure($"Unknown operation: {args.Operation}. Valid: my_work_items, list_repos, list_iterations, get_work_item, list_builds, list_pipelines, list_prs, run_query, list_tracked_repos, update_work_item, get_work_items_by_repo")
+                "batch_update" => await BatchUpdateWorkItemsAsync(args.Updates),
+                _ => SkillResult.Failure($"Unknown operation: {args.Operation}. Valid: my_work_items, list_repos, list_iterations, get_work_item, list_builds, list_pipelines, list_prs, run_query, list_tracked_repos, update_work_item, get_work_items_by_repo, batch_update")
             };
         }
         catch (HttpRequestException ex)
@@ -403,13 +411,108 @@ public class AzureDevOpsSkill(
         return SkillResult.Success(FormatJson(data));
     }
 
-    private async Task<SkillResult> ListTrackedReposAsync()
+    private async Task<SkillResult> BatchUpdateWorkItemsAsync(string? updatesJson)
     {
-        var trackedProjectsJson = await GetPreferenceAsync("ado_tracked_projects");
+        if (string.IsNullOrWhiteSpace(updatesJson))
+            return SkillResult.Failure("updates is required. Provide a JSON array like: [{\"id\": 123, \"fields\": {\"System.State\": \"Active\"}}]");
+
+        List<WorkItemUpdate>? updates;
+        try
+        {
+            updates = JsonSerializer.Deserialize<List<WorkItemUpdate>>(updatesJson, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            return SkillResult.Failure($"Invalid updates JSON: {ex.Message}");
+        }
+
+        if (updates == null || updates.Count == 0)
+            return SkillResult.Failure("No updates provided.");
+
+        var results = new List<object>();
+        var successCount = 0;
+        var failCount = 0;
+
+        foreach (var update in updates)
+        {
+            if (update.Id <= 0)
+            {
+                results.Add(new { id = update.Id, success = false, error = "Invalid work item ID" });
+                failCount++;
+                continue;
+            }
+
+            if (update.Fields == null || update.Fields.Count == 0)
+            {
+                results.Add(new { id = update.Id, success = false, error = "No fields to update" });
+                failCount++;
+                continue;
+            }
+
+            try
+            {
+                var patchOperations = update.Fields.Select(f => new
+                {
+                    op = "add",
+                    path = $"/fields/{f.Key}",
+                    value = f.Value
+                }).ToList();
+
+                var patchJson = JsonSerializer.Serialize(patchOperations);
+                var content = new StringContent(patchJson, Encoding.UTF8, "application/json-patch+json");
+
+                var url = $"{BaseUrl}/{_org}/{Uri.EscapeDataString(_project)}/_apis/wit/workitems/{update.Id}?api-version=7.1";
+                var request = new HttpRequestMessage(HttpMethod.Patch, url) { Content = content };
+                var response = await _client.SendAsync(request, _ct);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    results.Add(new { id = update.Id, success = true });
+                    successCount++;
+                }
+                else
+                {
+                    var errorData = await response.Content.ReadAsStringAsync(_ct);
+                    results.Add(new { id = update.Id, success = false, error = $"{response.StatusCode}: {errorData}" });
+                    failCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                results.Add(new { id = update.Id, success = false, error = ex.Message });
+                failCount++;
+            }
+        }
+
+        var summary = new { total = updates.Count, success = successCount, failed = failCount, results };
+        return SkillResult.Success(JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private async Task<SkillResult> ListTrackedReposAsync(string? trackedProjectsOverride = null)
+    {
+        string? trackedProjectsJson = trackedProjectsOverride;
+
+        // If not provided as parameter, try preference then config
         if (string.IsNullOrWhiteSpace(trackedProjectsJson))
         {
-            return SkillResult.Failure("ado_tracked_projects preference is not set. Set it to a JSON array of local repo paths.");
+            logger.LogInformation("ListTrackedReposAsync: Attempting to get ado_tracked_projects preference...");
+            trackedProjectsJson = await GetPreferenceAsync("ado_tracked_projects");
+            logger.LogInformation("ListTrackedReposAsync: Preference result: {Result}", trackedProjectsJson ?? "(null)");
         }
+
+        if (string.IsNullOrWhiteSpace(trackedProjectsJson))
+        {
+            logger.LogInformation("ListTrackedReposAsync: Preference empty, trying ADO_TRACKED_PROJECTS config...");
+            trackedProjectsJson = await GetConfigAsync("ADO_TRACKED_PROJECTS");
+            logger.LogInformation("ListTrackedReposAsync: Config result: {Result}", trackedProjectsJson ?? "(null)");
+        }
+
+        if (string.IsNullOrWhiteSpace(trackedProjectsJson))
+        {
+            return SkillResult.Failure("ado_tracked_projects preference or ADO_TRACKED_PROJECTS config is not set. Set it to a JSON array of local repo paths.");
+        }
+
+        logger.LogInformation("ListTrackedReposAsync: Using tracked projects: {Projects}", trackedProjectsJson);
 
         List<string>? paths;
         try
@@ -428,82 +531,108 @@ public class AzureDevOpsSkill(
 
         var localRepos = await _gitRepoMapper.GetTrackedReposAsync(paths, _ct);
 
-        // Group by project to minimize API calls
-        var reposByProject = localRepos
-            .Where(r => r.IsAdoRepo && r.Organization?.Equals(_org, StringComparison.OrdinalIgnoreCase) == true)
-            .GroupBy(r => r.Project!);
+        var results = new List<TrackedRepoResult>();
 
-        var results = new List<object>();
-
-        foreach (var projectGroup in reposByProject)
+        // If we have ADO connection (_client and _org), fetch additional info from ADO API
+        if (_client != null && !string.IsNullOrWhiteSpace(_org))
         {
-            var project = projectGroup.Key;
-            var url = $"{BaseUrl}/{_org}/{Uri.EscapeDataString(project)}/_apis/git/repositories?api-version=7.1";
+            // Group by project to minimize API calls
+            var reposByProject = localRepos
+                .Where(r => r.IsAdoRepo && r.Organization?.Equals(_org, StringComparison.OrdinalIgnoreCase) == true)
+                .GroupBy(r => r.Project!);
 
-            var response = await _client.GetAsync(url, _ct);
-            var data = await response.Content.ReadAsStringAsync(_ct);
-
-            Dictionary<string, JsonElement>? adoRepos = null;
-            if (response.IsSuccessStatusCode)
+            foreach (var projectGroup in reposByProject)
             {
+                var project = projectGroup.Key;
+                var url = $"{BaseUrl}/{_org}/{Uri.EscapeDataString(project)}/_apis/git/repositories?api-version=7.1";
+
+                Dictionary<string, JsonElement>? adoRepos = null;
                 try
                 {
-                    using var doc = JsonDocument.Parse(data);
-                    if (doc.RootElement.TryGetProperty("value", out var value))
+                    var response = await _client.GetAsync(url, _ct);
+                    var data = await response.Content.ReadAsStringAsync(_ct);
+
+                    if (response.IsSuccessStatusCode)
                     {
-                        adoRepos = value.EnumerateArray()
-                            .Where(r => r.TryGetProperty("name", out _))
-                            .ToDictionary(
-                                r => r.GetProperty("name").GetString()!,
-                                r => r.Clone());
+                        using var doc = JsonDocument.Parse(data);
+                        if (doc.RootElement.TryGetProperty("value", out var value))
+                        {
+                            adoRepos = value.EnumerateArray()
+                                .Where(r => r.TryGetProperty("name", out _))
+                                .ToDictionary(
+                                    r => r.GetProperty("name").GetString()!,
+                                    r => r.Clone());
+                        }
                     }
                 }
-                catch { /* ignore parse errors */ }
-            }
-
-            foreach (var localRepo in projectGroup)
-            {
-                var adoInfo = adoRepos?.GetValueOrDefault(localRepo.Repository!);
-                results.Add(new
+                catch (Exception ex)
                 {
-                    localRepo.LocalPath,
-                    localRepo.RemoteUrl,
-                    localRepo.Organization,
-                    localRepo.Project,
-                    localRepo.Repository,
-                    localRepo.IsAdoRepo,
-                    localRepo.AdoRepoPath,
-                    AdoRepoId = adoInfo?.GetProperty("id").GetString(),
-                    DefaultBranch = adoInfo?.GetProperty("defaultBranch").GetString()?.Replace("refs/heads/", ""),
-                    WebUrl = adoInfo?.GetProperty("webUrl").GetString()
-                });
+                    logger.LogDebug(ex, "Failed to fetch ADO repos for project {Project}", project);
+                }
+
+                foreach (var localRepo in projectGroup)
+                {
+                    var adoInfo = adoRepos?.GetValueOrDefault(localRepo.Repository!);
+                    results.Add(new TrackedRepoResult(
+                        localRepo.LocalPath,
+                        localRepo.Repository!,
+                        localRepo.RemoteUrl,
+                        localRepo.Organization,
+                        localRepo.Project,
+                        localRepo.IsAdoRepo,
+                        localRepo.AdoRepoPath,
+                        adoInfo?.GetProperty("id").GetString(),
+                        adoInfo?.GetProperty("defaultBranch").GetString()?.Replace("refs/heads/", ""),
+                        adoInfo?.GetProperty("webUrl").GetString()));
+                }
+            }
+
+            // Add repos not matching current org
+            foreach (var repo in localRepos.Where(r => !r.IsAdoRepo || r.Organization?.Equals(_org, StringComparison.OrdinalIgnoreCase) != true))
+            {
+                results.Add(new TrackedRepoResult(
+                    repo.LocalPath,
+                    repo.Repository!,
+                    repo.RemoteUrl,
+                    repo.Organization,
+                    repo.Project,
+                    repo.IsAdoRepo,
+                    repo.AdoRepoPath,
+                    null, null, null));
+            }
+        }
+        else
+        {
+            // No ADO connection - just return local git repo info
+            logger.LogDebug("No ADO connection available, returning local repo info only");
+            foreach (var repo in localRepos)
+            {
+                results.Add(new TrackedRepoResult(
+                    repo.LocalPath,
+                    repo.Repository ?? Path.GetFileName(repo.LocalPath),
+                    repo.RemoteUrl,
+                    repo.Organization,
+                    repo.Project,
+                    repo.IsAdoRepo,
+                    repo.AdoRepoPath,
+                    null, null, null));
             }
         }
 
-        // Add repos not matching current org
-        foreach (var repo in localRepos.Where(r => !r.IsAdoRepo || r.Organization?.Equals(_org, StringComparison.OrdinalIgnoreCase) != true))
-        {
-            results.Add(new
-            {
-                repo.LocalPath,
-                repo.RemoteUrl,
-                repo.Organization,
-                repo.Project,
-                repo.Repository,
-                repo.IsAdoRepo,
-                repo.AdoRepoPath,
-                AdoRepoId = (string?)null,
-                DefaultBranch = (string?)null,
-                WebUrl = (string?)null
-            });
-        }
-
-        return SkillResult.Success(JsonSerializer.Serialize(new { TrackedRepos = results }, new JsonSerializerOptions { WriteIndented = true }));
+        // Output structure matches AdoTaskSyncPipeline expectations:
+        // { trackedProjects: [{ localPath, repoName }, ...] }
+        return SkillResult.Success(JsonSerializer.Serialize(new { trackedProjects = results }, CamelCaseOptions));
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
+    };
+
+    private static readonly JsonSerializerOptions CamelCaseOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
     };
 
     private static string FormatJson(string json)
@@ -537,8 +666,25 @@ public class AzureDevOpsSkill(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Preference '{Key}' exception", key);
+            // This is expected when running in background without HttpContext
+            logger.LogDebug(ex, "Preference '{Key}' not available (may be running in background context)", key);
             return null;
+        }
+    }
+
+    private Task<string?> GetConfigAsync(string key)
+    {
+        try
+        {
+            logger.LogInformation("GetConfigAsync: Attempting to read key '{Key}' from config store (type: {Type})", key, _configStore.GetType().Name);
+            var value = _configStore.Get(key);
+            logger.LogInformation("GetConfigAsync: Key '{Key}' returned: {HasValue}", key, value != null ? "has value" : "null");
+            return Task.FromResult<string?>(value);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "GetConfigAsync: Exception reading key '{Key}'", key);
+            return Task.FromResult<string?>(null);
         }
     }
 }
@@ -555,6 +701,15 @@ internal class WorkItemRef
     public int Id { get; set; }
 }
 
+internal class WorkItemUpdate
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("fields")]
+    public Dictionary<string, object>? Fields { get; set; }
+}
+
 public record AzureDevOpsSkillArgs(
     [property: Description("""
         The operation to perform:
@@ -562,7 +717,8 @@ public record AzureDevOpsSkillArgs(
         - my_work_items: Get my work items in current iteration (no parameters needed)
         - list_tracked_repos: List locally tracked repos with their ADO remote info (no parameters needed)
         - get_work_items_by_repo: Get work items tagged with repo:xxx (requires repoName)
-        - update_work_item: Update work item fields (requires workItemId and fields)
+        - update_work_item: Update single work item fields (requires workItemId and fields)
+        - batch_update: Update multiple work items at once (requires updates JSON array)
         - list_repos: List all repositories
         - list_iterations: List iterations/sprints
         - get_work_item: Get work item details (requires workItemId)
@@ -605,5 +761,31 @@ public record AzureDevOpsSkillArgs(
     string? Fields = null,
 
     [property: Description("Repository name for get_work_items_by_repo. Filters work items by tag 'repo:xxx'")]
-    string? RepoName = null
+    string? RepoName = null,
+
+    [property: Description("""
+        JSON array of work item updates for batch_update operation.
+        Each item has: id (work item ID) and fields (object of field name to value).
+        Example: [{"id": 123, "fields": {"System.State": "Active"}}, {"id": 456, "fields": {"Microsoft.VSTS.Scheduling.RemainingWork": 4}}]
+        """)]
+    string? Updates = null,
+
+    [property: Description("""
+        JSON array of local repo paths for list_tracked_repos operation.
+        When provided, bypasses preference lookup.
+        Example: ["/path/to/repo1", "/path/to/repo2"]
+        """)]
+    string? TrackedProjects = null
 );
+
+internal record TrackedRepoResult(
+    string LocalPath,
+    string RepoName,
+    string? RemoteUrl,
+    string? Organization,
+    string? Project,
+    bool IsAdoRepo,
+    string? AdoRepoPath,
+    string? AdoRepoId,
+    string? DefaultBranch,
+    string? WebUrl);

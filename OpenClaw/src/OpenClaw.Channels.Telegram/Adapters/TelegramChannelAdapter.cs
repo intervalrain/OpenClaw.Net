@@ -9,6 +9,7 @@ using OpenClaw.Contracts.Security;
 using OpenClaw.Domain.Configuration.Repositories;
 
 using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -25,6 +26,9 @@ public class TelegramChannelAdapter(
 {
     private TelegramBotClient? _client;
     private TelegramBotOptions? _options;
+    private CancellationTokenSource? _pollingCts;
+    private int _conflictCount;
+    private const int MaxConflictRetries = 3;
 
     public string Name => "telegram";
     public string DisplayName => "Telegram Bot";
@@ -143,6 +147,9 @@ public class TelegramChannelAdapter(
         await client.DeleteWebhook(cancellationToken: stoppingToken);
         await client.DropPendingUpdates(cancellationToken: stoppingToken);
 
+        // Create a linked token source so we can cancel polling on conflict
+        _pollingCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+
         client.OnError += OnError;
         client.OnMessage += OnMessage;
         client.OnUpdate += OnUpdate;
@@ -152,11 +159,11 @@ public class TelegramChannelAdapter(
         // Keep alive until cancellation
         try
         {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            await Task.Delay(Timeout.Infinite, _pollingCts.Token);
         }
         catch (OperationCanceledException)
         {
-            // Normal shutdown
+            // Normal shutdown or conflict-triggered shutdown
         }
     }
 
@@ -207,6 +214,49 @@ public class TelegramChannelAdapter(
 
     private Task OnError(Exception ex, HandleErrorSource source)
     {
+        // Check for 409 Conflict - another bot instance is running
+        if (ex is ApiRequestException apiEx && apiEx.ErrorCode == 409)
+        {
+            _conflictCount++;
+
+            if (_conflictCount >= MaxConflictRetries)
+            {
+                // Only log and stop once
+                if (Status != ChannelAdapterStatus.Disabled)
+                {
+                    logger.LogWarning(
+                        "Telegram bot conflict detected {Count}/{Max} times (409). " +
+                        "Circuit breaker triggered: This instance will stop polling and yield to the other instance.",
+                        _conflictCount, MaxConflictRetries);
+
+                    Status = ChannelAdapterStatus.Disabled;
+
+                    // Unsubscribe from events to stop polling
+                    if (_client is not null)
+                    {
+                        _client.OnError -= OnError;
+                        _client.OnMessage -= OnMessage;
+                        _client.OnUpdate -= OnUpdate;
+                    }
+
+                    // Cancel the keep-alive task
+                    _pollingCts?.Cancel();
+                }
+            }
+            else
+            {
+                logger.LogWarning(
+                    "Telegram bot conflict detected {Count}/{Max} (409): Another instance may be polling. " +
+                    "Retrying... Will stop after {Max} consecutive conflicts.",
+                    _conflictCount, MaxConflictRetries, MaxConflictRetries);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        // Reset conflict count on other errors (not a persistent conflict)
+        _conflictCount = 0;
+
         logger.LogError(ex, "Telegram bot error from {Source}", source);
         return Task.CompletedTask;
     }

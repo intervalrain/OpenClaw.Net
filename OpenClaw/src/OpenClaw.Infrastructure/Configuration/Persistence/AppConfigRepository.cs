@@ -14,7 +14,8 @@ public class AppConfigRepository(AppDbContext context)
 {
     public async Task<AppConfig?> GetByKeyAsync(string key, CancellationToken ct = default)
     {
+        // Use case-insensitive comparison for config keys
         return await DbContext.Set<AppConfig>()
-            .FirstOrDefaultAsync(x => x.Key == key, ct);
+            .FirstOrDefaultAsync(x => x.Key.ToLower() == key.ToLower(), ct);
     }
 }

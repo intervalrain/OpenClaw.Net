@@ -130,9 +130,11 @@ public static class ServiceCollectionExtensions
         var allTypes = assemblies.SelectMany(a => a.GetTypes()).ToList();
 
         // Register skill dependencies (classes in skill assemblies that are not skills themselves)
+        // Exclude: records (Args, Result types), interfaces, abstract classes
         var skillDependencyTypes = allTypes
             .Where(t => !typeof(IAgentSkill).IsAssignableFrom(t)
                 && !t.IsInterface && !t.IsAbstract
+                && !IsRecordType(t)  // Exclude records (Args, Result, etc.)
                 && t.GetConstructors().Any(c => c.GetParameters().Length > 0));
 
         foreach (var depType in skillDependencyTypes)
@@ -165,6 +167,12 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<ISkillRegistry, SkillRegistry>();
 
-        return services;   
+        return services;
+    }
+
+    private static bool IsRecordType(Type type)
+    {
+        // Records have a compiler-generated <Clone>$ method
+        return type.GetMethod("<Clone>$") != null;
     }
 }
