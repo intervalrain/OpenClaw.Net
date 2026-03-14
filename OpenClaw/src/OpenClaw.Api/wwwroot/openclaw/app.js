@@ -13,6 +13,9 @@ let tempInput = ''; // Store current input when navigating history
 // Pending images for upload
 let pendingImages = []; // Array of { base64Data, mimeType, previewUrl }
 
+// AbortController for stopping inference
+let currentAbortController = null;
+
 // Configure marked.js
 marked.setOptions({
     highlight: function(code, lang) {
@@ -60,6 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 hideAutocomplete();
                 return;
             }
+        }
+
+        // ESC to stop inference (when not in autocomplete)
+        if (e.key === 'Escape' && currentAbortController) {
+            e.preventDefault();
+            stopInference();
+            return;
         }
 
         // Handle input history navigation (↑↓ keys)
@@ -268,6 +278,28 @@ function removeStatusIndicator(indicator) {
     }
 }
 
+// Stop inference function
+function stopInference() {
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
+}
+
+// Toggle button between send and stop modes
+function setButtonMode(mode) {
+    if (mode === 'stop') {
+        sendBtn.textContent = 'Stop';
+        sendBtn.classList.add('stop-mode');
+        sendBtn.disabled = false;
+        sendBtn.onclick = stopInference;
+    } else {
+        sendBtn.textContent = 'Send';
+        sendBtn.classList.remove('stop-mode');
+        sendBtn.disabled = false;
+        sendBtn.onclick = sendMessage;
+    }
+}
+
 // Chat Functions
 function addMessage(content, role) {
     const wasNearBottom = isNearBottom(150);
@@ -463,7 +495,9 @@ async function sendMessage() {
     // Add user message with image previews if any
     addMessageWithImages(message || '[Image]', 'user', pendingImages);
     userInputEl.value = '';
-    sendBtn.disabled = true;
+
+    // Switch to stop mode
+    setButtonMode('stop');
 
     // Prepare images for API
     const images = hasImages ? pendingImages.map(img => ({
@@ -478,6 +512,9 @@ async function sendMessage() {
     let streamingMessage = null;
     let accumulatedContent = '';
 
+    // Create AbortController for this request
+    currentAbortController = new AbortController();
+
     try {
         const settings = getSettings();
         const res = await authFetch('/api/v1/chat/stream', {
@@ -487,7 +524,8 @@ async function sendMessage() {
                 conversationId: currentConversationId,
                 language: settings.language,
                 images: images
-            })
+            }),
+            signal: currentAbortController.signal
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -592,9 +630,20 @@ async function sendMessage() {
         if (statusIndicator) {
             removeStatusIndicator(statusIndicator);
         }
-        addMessage(`Error: ${error.message}`, 'assistant');
+        // Only show error if not aborted by user
+        if (error.name !== 'AbortError') {
+            addMessage(`Error: ${error.message}`, 'assistant');
+        } else {
+            // User stopped the inference - show stopped message if there was partial content
+            if (streamingMessage && accumulatedContent) {
+                // Add a visual indicator that response was stopped
+                accumulatedContent += '\n\n*[Response stopped]*';
+                updateStreamingMessage(streamingMessage, accumulatedContent);
+            }
+        }
     } finally {
-        sendBtn.disabled = false;
+        currentAbortController = null;
+        setButtonMode('send');
         userInputEl.focus();
 
         // Refresh conversation title (may have been updated by backend on first message)

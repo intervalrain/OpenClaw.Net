@@ -699,6 +699,15 @@ body {
     cursor: not-allowed;
 }
 
+#send-btn.stop-mode {
+    background: #dc3545;
+    color: #fff;
+}
+
+#send-btn.stop-mode:hover {
+    background: #c82333;
+}
+
 /* Autocomplete Dropdown */
 .autocomplete-dropdown {
     position: absolute;
