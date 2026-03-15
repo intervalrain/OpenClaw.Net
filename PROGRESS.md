@@ -42,7 +42,7 @@
 
 ### 2. 現有 Skills
 
-目前已實作的 13 個 skills：
+目前已實作的 14 個 skills：
 
 | Skill | 描述 | 狀態 |
 |-------|------|------|
@@ -59,6 +59,7 @@
 | `image_generation` | OpenAI DALL-E 圖片生成 | ✅ 啟用 |
 | `pdf` | PDF 解析和處理（read, search, metadata） | ✅ 啟用 |
 | `tmux` | Tmux session 管理（list, new, kill, send_keys） | ✅ 啟用 |
+| `notion` | Notion 操作（search, pages, databases, comments） | ✅ 啟用 |
 
 ### 3. Telegram Channel 整合 ✅
 
@@ -112,7 +113,7 @@
 | ✅ ~~P0-5~~ | ~~**Image Generation**~~ | ~~OpenAI DALL-E 圖片生成~~ | ~~OpenAI API Key~~ | ~~4-5h~~ |
 | ✅ ~~P0-6~~ | ~~**PDF Processing**~~ | ~~PDF 解析和處理~~ | ~~PdfPig~~ | ~~6-8h~~ |
 | ✅ ~~P0-7~~ | ~~**Tmux Control**~~ | ~~Tmux session 管理~~ | ~~`tmux`~~ | ~~4-5h~~ |
-| 🔴 P0-8 | **Notion** | Notion API（頁面、資料庫管理） | API Key | 6-8h |
+| ✅ ~~P0-8~~ | ~~**Notion**~~ | ~~Notion API（頁面、資料庫管理）~~ | ~~API Key~~ | ~~6-8h~~ |
 
 ### 中優先級（待評估）
 
@@ -147,11 +148,11 @@
 5. ~~**Image Generation Skill** (P0-5)~~ ✅ - OpenAI DALL-E 整合
 6. ~~**PDF Processing Skill** (P0-6)~~ ✅ - 使用 PdfPig 庫
 
-### Phase 3: 開發環境和知識管理（進行中）
+### Phase 3: 開發環境和知識管理 ✅ 完成
 7. ~~**Tmux Control Skill** (P0-7)~~ ✅
-8. **Notion Skill** (P0-8) - 知識庫和資料庫整合 🔴 待實作
+8. ~~**Notion Skill** (P0-8)~~ ✅ - 知識庫和資料庫整合 (REST API)
 
-**Phase 1-2 完成，Phase 3 進行中（僅剩 Notion）**
+**Phase 1-3 全部完成！所有 P0 Skills 已實作。**
 
 ---
 
@@ -563,19 +564,20 @@ services.AddMediator(options =>
 | P0-5 Image Generation | ✅ 完成 | OpenAI DALL-E |
 | P0-6 PDF Processing | ✅ 完成 | PdfPig 庫 |
 | P0-7 Tmux Control | ✅ 完成 | tmux CLI wrapper |
-| P0-8 Notion | 🔴 待實作 | 需要 Notion API Key |
+| P0-8 Notion | ✅ 完成 | REST API，支援 search/pages/databases/comments |
 
 ### 技術決策記錄
 - ✅ **Azure DevOps**: 使用 REST API（更靈活，支援 `@Me` 和 `@currentIteration` 宏）
 - ✅ **PDF Processing**: 使用 `PdfPig`（輕量、免費、純 .NET）
-- **Notion**: 需要 Notion Integration API Key
+- ✅ **Notion**: 使用 REST API 直接呼叫（比 SDK 更穩定，無版本相容問題）
 
 ### 下一步
-1. 實作 **Notion Skill** (P0-8)
+1. ~~實作 **Notion Skill** (P0-8)~~ ✅ 已完成
 2. 開始 **CQRS + Mediator 重構** (Part 1)
 3. 考慮新增 P1 skills（Slack, Discord, Trello）
+4. 完善 US-5: ADO Task Automation（Pipeline Approval UI）
 
 ---
 
-**更新時間**: 2026-03-11
-**狀態**: P0-1 到 P0-7 完成，僅剩 Notion (P0-8) 待實作
+**更新時間**: 2026-03-15
+**狀態**: 所有 P0 Skills (P0-1 ~ P0-8) 全部完成！共 14 個 Skills 可用。

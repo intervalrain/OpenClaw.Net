@@ -11,4 +11,5 @@ public class ConfigKeys
     public const string GitHubToken = "GH_TOKEN";
     public const string AzureDevOpsPat = "AZURE_DEVOPS_PAT";
     public const string AzureDevOpsOrg = "AZURE_DEVOPS_ORG";
+    public const string NotionApiToken = "NOTION_API_TOKEN";
 }

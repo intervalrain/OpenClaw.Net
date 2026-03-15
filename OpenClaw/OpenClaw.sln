@@ -65,6 +65,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.Tmux", "ski
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.SkillPipeline.AdoTaskSync", "tests\OpenClaw.SkillPipeline.AdoTaskSync\OpenClaw.SkillPipeline.AdoTaskSync.csproj", "{054DDF8A-0BEC-4314-8234-D69BB53D3C4F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.Notion", "skills\OpenClaw.Skills.Notion\OpenClaw.Skills.Notion.csproj", "{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -399,6 +401,18 @@ Global
 		{054DDF8A-0BEC-4314-8234-D69BB53D3C4F}.Release|x64.Build.0 = Release|Any CPU
 		{054DDF8A-0BEC-4314-8234-D69BB53D3C4F}.Release|x86.ActiveCfg = Release|Any CPU
 		{054DDF8A-0BEC-4314-8234-D69BB53D3C4F}.Release|x86.Build.0 = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x64.Build.0 = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x86.Build.0 = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x64.ActiveCfg = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x64.Build.0 = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x86.ActiveCfg = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -431,5 +445,6 @@ Global
 		{D37E083D-F698-43EB-8630-F8248CCC5A96} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{6175CA82-8DFC-4061-8FC3-6768242AAB21} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{054DDF8A-0BEC-4314-8234-D69BB53D3C4F} = {1DD25606-DF8E-4B91-9335-F916B14BF596}
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 	EndGlobalSection
 EndGlobal
