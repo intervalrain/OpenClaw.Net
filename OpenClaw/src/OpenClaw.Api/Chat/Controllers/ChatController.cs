@@ -384,10 +384,23 @@ public class ChatController(
                 context,
                 async approvalRequest =>
                 {
+                    // Convert ProposedChange to ProposedChangeInfo
+                    var changeInfos = approvalRequest.ProposedChanges
+                        .Select(c => new ProposedChangeInfo(
+                            c.WorkItemId,
+                            c.Title,
+                            c.WorkItemType,
+                            c.CurrentState,
+                            c.ProposedState,
+                            c.Reason,
+                            c.RelatedCommits,
+                            c.WorkItemUrl))
+                        .ToList();
+
                     // Update execution status
                     await pipelineExecutionStore.SetPendingApprovalAsync(
                         execution.Id,
-                        new PipelineApprovalInfo(approvalRequest.StepName, approvalRequest.Description, approvalRequest.ProposedChanges),
+                        new PipelineApprovalInfo(approvalRequest.StepName, approvalRequest.Description, changeInfos),
                         ct);
                     await pipelineExecutionStore.UpdateStatusAsync(execution.Id, PipelineExecutionStatus.WaitingForApproval, ct);
 

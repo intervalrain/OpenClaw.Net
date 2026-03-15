@@ -21,11 +21,15 @@ public record PipelineExecutionResponse(
 
 public record PipelineApprovalInfo(
     string StepName,
-    string Message,
-    object? Details = null);
+    string Description,
+    IReadOnlyList<ProposedChangeInfo> ProposedChanges);
 
 public record ProposedChangeInfo(
     int WorkItemId,
+    string Title,
+    string WorkItemType,
     string CurrentState,
     string ProposedState,
-    string Reason);
+    string Reason,
+    IReadOnlyList<string>? RelatedCommits = null,
+    string? WorkItemUrl = null);

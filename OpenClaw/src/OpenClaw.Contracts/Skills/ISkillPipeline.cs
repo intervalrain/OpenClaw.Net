@@ -42,6 +42,10 @@ public record PipelineApprovalRequest(
 
 public record ProposedChange(
     int WorkItemId,
+    string Title,
+    string WorkItemType,
     string CurrentState,
     string ProposedState,
-    string Reason);
+    string Reason,
+    IReadOnlyList<string>? RelatedCommits = null,
+    string? WorkItemUrl = null);

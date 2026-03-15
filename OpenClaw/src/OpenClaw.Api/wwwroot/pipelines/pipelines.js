@@ -295,10 +295,15 @@ let currentApprovalExecutionId = null;
 
 function showApprovalModal(executionId, approvalInfo) {
     currentApprovalExecutionId = executionId;
-    document.getElementById('approvalMessage').textContent = approvalInfo.message || 'Approval required to continue';
+    document.getElementById('approvalMessage').textContent = approvalInfo.description || approvalInfo.message || 'Approval required to continue';
 
     const details = document.getElementById('approvalDetails');
-    if (approvalInfo.details) {
+
+    // Check if we have structured proposed changes
+    if (approvalInfo.proposedChanges && approvalInfo.proposedChanges.length > 0) {
+        details.innerHTML = renderProposedChanges(approvalInfo.proposedChanges);
+        details.style.display = 'block';
+    } else if (approvalInfo.details) {
         const detailsContent = typeof approvalInfo.details === 'string'
             ? approvalInfo.details
             : JSON.stringify(approvalInfo.details, null, 2);
@@ -309,6 +314,34 @@ function showApprovalModal(executionId, approvalInfo) {
     }
 
     approvalModal.classList.add('show');
+}
+
+function renderProposedChanges(changes) {
+    return changes.map(change => `
+        <div class="proposed-change">
+            <div class="change-header">
+                <span class="work-item-type ${change.workItemType?.toLowerCase() || 'task'}">${escapeHtml(change.workItemType || 'Task')}</span>
+                <a href="${escapeHtml(change.workItemUrl || '#')}" target="_blank" class="work-item-link">
+                    #${change.workItemId}
+                </a>
+                <span class="work-item-title">${escapeHtml(change.title || 'Unknown')}</span>
+            </div>
+            <div class="state-change">
+                <span class="state current">${escapeHtml(change.currentState)}</span>
+                <span class="arrow">→</span>
+                <span class="state proposed">${escapeHtml(change.proposedState)}</span>
+            </div>
+            <div class="change-reason">${escapeHtml(change.reason)}</div>
+            ${change.relatedCommits && change.relatedCommits.length > 0 ? `
+                <div class="related-commits">
+                    <div class="commits-header">Related Commits:</div>
+                    <ul class="commits-list">
+                        ${change.relatedCommits.map(commit => `<li><code>${escapeHtml(commit)}</code></li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
 }
 
 async function submitApproval(approved) {

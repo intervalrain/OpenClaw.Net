@@ -12,7 +12,6 @@ namespace OpenClaw.Application.Pipelines;
 
 public class AdoTaskSyncPipeline(
     IServiceProvider serviceProvider,
-    ILlmProviderFactory llmProviderFactory,
     ILogger<AdoTaskSyncPipeline> logger) : ISkillPipeline
 {
     public string Name => "ado_task_sync";
@@ -39,6 +38,12 @@ public class AdoTaskSyncPipeline(
                 type = "integer",
                 description = "Number of commits to include in diff analysis (default: 10)",
                 @default = 10
+            },
+            testApproval = new
+            {
+                type = "boolean",
+                description = "Test mode: force approval dialog with sample data (for UI testing)",
+                @default = false
             }
         }
     };
@@ -51,6 +56,48 @@ public class AdoTaskSyncPipeline(
         // Parse args
         var args = ParseArgs(context.ArgsJson);
         var steps = new List<SkillStepResult>();
+
+        // Test mode: skip all processing and directly trigger approval dialog
+        if (args.TestApproval)
+        {
+            logger.LogInformation("Test approval mode enabled - triggering sample approval dialog");
+            steps.Add(new SkillStepResult("test_mode", true, Output: "Test approval mode"));
+
+            var testChanges = new List<ProposedChange>
+            {
+                new ProposedChange(
+                    WorkItemId: 12345,
+                    Title: "Sample Task: Implement feature X",
+                    WorkItemType: "Task",
+                    CurrentState: "To Do",
+                    ProposedState: "Doing",
+                    Reason: "Found related commits implementing this feature",
+                    RelatedCommits: new[] { "abc1234: feat: add feature X implementation", "def5678: fix: resolve edge case in feature X" },
+                    WorkItemUrl: "https://dev.azure.com/org/project/_workitems/edit/12345"),
+                new ProposedChange(
+                    WorkItemId: 12346,
+                    Title: "Sample Bug: Fix login issue",
+                    WorkItemType: "Bug",
+                    CurrentState: "Active",
+                    ProposedState: "Resolved",
+                    Reason: "Bug fix committed and verified",
+                    RelatedCommits: new[] { "ghi9012: fix: resolve login timeout issue" },
+                    WorkItemUrl: "https://dev.azure.com/org/project/_workitems/edit/12346")
+            };
+
+            var approvalRequest = new PipelineApprovalRequest(
+                "test_batch_update",
+                $"[TEST] Update {testChanges.Count} work item(s) - this is a test of the approval UI",
+                testChanges);
+
+            var approved = onApprovalRequired != null
+                ? await onApprovalRequired(approvalRequest)
+                : false;
+
+            steps.Add(new SkillStepResult("test_approval", approved, Output: approved ? "Approved" : "Rejected"));
+            return new SkillPipelineResult(true, $"Test approval completed: {(approved ? "Approved" : "Rejected")}", steps);
+        }
+
         var skills = serviceProvider.GetServices<IAgentSkill>().ToList();
 
         var gitSkill = skills.FirstOrDefault(s => s.Name == "git");
@@ -68,6 +115,10 @@ public class AdoTaskSyncPipeline(
         logger.LogInformation("Step 1: Getting tracked repos from user preferences (userId: {UserId})...", context.UserId);
 
         List<TrackedProject> trackedProjects;
+        string? adoOrganization = null;
+        string? adoProject = null;
+        string? adoQueryId = null;
+
         if (context.UserId.HasValue)
         {
             // Create a new scope for database access in background task
@@ -77,6 +128,14 @@ public class AdoTaskSyncPipeline(
                 var preferenceRepo = scope.ServiceProvider.GetRequiredService<IUserPreferenceRepository>();
                 var pref = await preferenceRepo.GetByKeyAsync(context.UserId.Value, "ado_tracked_projects", ct);
                 trackedProjectsValue = pref?.Value;
+
+                // Also read ADO preferences for skill calls
+                var orgPref = await preferenceRepo.GetByKeyAsync(context.UserId.Value, "ado_organization", ct);
+                var projPref = await preferenceRepo.GetByKeyAsync(context.UserId.Value, "ado_project", ct);
+                var queryPref = await preferenceRepo.GetByKeyAsync(context.UserId.Value, "ado_query_id", ct);
+                adoOrganization = orgPref?.Value;
+                adoProject = projPref?.Value;
+                adoQueryId = queryPref?.Value;
             }
 
             if (string.IsNullOrWhiteSpace(trackedProjectsValue))
@@ -87,6 +146,7 @@ public class AdoTaskSyncPipeline(
             }
 
             logger.LogInformation("Found ado_tracked_projects preference: {Value}", trackedProjectsValue);
+            logger.LogInformation("ADO preferences - org: {Org}, project: {Project}", adoOrganization, adoProject);
 
             // Get tracked repos using skill (which reads from local git repos)
             var trackedResult = await ExecuteSkillAsync(adoSkill, new { operation = "list_tracked_repos", trackedProjects = trackedProjectsValue }, ct);
@@ -142,8 +202,15 @@ public class AdoTaskSyncPipeline(
             var gitLogResult = await ExecuteSkillAsync(gitSkill, new { command = $"log --oneline -{args.CommitCount}", workingDirectory = project.LocalPath }, ct);
             steps.Add(new SkillStepResult($"git_log:{project.RepoName}", gitLogResult.IsSuccess, gitLogResult.Output, gitLogResult.Error));
 
-            // Step 2b: Get work items for this repo
-            var workItemsResult = await ExecuteSkillAsync(adoSkill, new { operation = "get_work_items_by_repo", repoName = project.RepoName }, ct);
+            // Step 2b: Get work items for this repo (pass ADO preferences explicitly)
+            var workItemsResult = await ExecuteSkillAsync(adoSkill, new
+            {
+                operation = "get_work_items_by_repo",
+                repoName = project.RepoName,
+                organization = adoOrganization,
+                project = adoProject,
+                queryId = adoQueryId
+            }, ct);
             steps.Add(new SkillStepResult($"get_work_items:{project.RepoName}", workItemsResult.IsSuccess, workItemsResult.Output, workItemsResult.Error));
 
             if (!workItemsResult.IsSuccess)
@@ -198,7 +265,13 @@ public class AdoTaskSyncPipeline(
 
             var updatesJson = JsonSerializer.Serialize(updates);
 
-            var batchResult = await ExecuteSkillAsync(adoSkill, new { operation = "batch_update", updates = updatesJson }, ct);
+            var batchResult = await ExecuteSkillAsync(adoSkill, new
+            {
+                operation = "batch_update",
+                updates = updatesJson,
+                organization = adoOrganization,
+                project = adoProject
+            }, ct);
             steps.Add(new SkillStepResult("batch_update", batchResult.IsSuccess, batchResult.Output, batchResult.Error));
 
             if (!batchResult.IsSuccess)
@@ -279,7 +352,10 @@ public class AdoTaskSyncPipeline(
             if (!json.RootElement.TryGetProperty("value", out var workItems))
                 return changes;
 
-            var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
+            // Create new scope to avoid ObjectDisposedException in background task
+            using var scope = serviceProvider.CreateScope();
+            var scopedLlmFactory = scope.ServiceProvider.GetRequiredService<ILlmProviderFactory>();
+            var llmProvider = await scopedLlmFactory.GetProviderAsync(ct);
 
             foreach (var workItem in workItems.EnumerateArray())
             {
@@ -327,11 +403,20 @@ public class AdoTaskSyncPipeline(
                         "LLM analysis for work item {Id}: {CurrentState} -> {ProposedState}. Reason: {Reason}",
                         id, state, analysis.ProposedState, analysis.Reason);
 
+                    // Build ADO work item URL
+                    var workItemUrl = workItem.TryGetProperty("url", out var urlElem)
+                        ? urlElem.GetString()?.Replace("_apis/wit/workItems", "_workitems/edit")
+                        : null;
+
                     changes.Add(new ProposedChange(
-                        id,
-                        state ?? "Unknown",
-                        analysis.ProposedState,
-                        analysis.Reason));
+                        WorkItemId: id,
+                        Title: title ?? "Unknown",
+                        WorkItemType: workItemType ?? "Task",
+                        CurrentState: state ?? "Unknown",
+                        ProposedState: analysis.ProposedState,
+                        Reason: analysis.Reason,
+                        RelatedCommits: analysis.RelatedCommits,
+                        WorkItemUrl: workItemUrl));
                 }
             }
         }
@@ -388,11 +473,13 @@ public class AdoTaskSyncPipeline(
               "hasProgress": true/false,
               "proposedState": "To Do" | "Doing" | "Done",
               "confidence": "high" | "medium" | "low",
-              "reason": "Brief explanation of why you think there is/isn't progress"
+              "reason": "Brief explanation of why you think there is/isn't progress",
+              "relatedCommits": ["commit hash: message", ...]
             }
             ```
 
             Only propose "Done" if the work appears fully complete. Propose "Doing" if work has started but may not be complete.
+            In "relatedCommits", list the commit hashes and messages that are related to this work item (empty array if none).
             """;
 
         var messages = new List<ChatMessage>
@@ -422,13 +509,14 @@ public class AdoTaskSyncPipeline(
                 if (result != null)
                 {
                     logger.LogDebug(
-                        "Work item {Id} analysis result: HasProgress={HasProgress}, ProposedState={ProposedState}, Confidence={Confidence}",
-                        workItemId, result.HasProgress, result.ProposedState, result.Confidence);
+                        "Work item {Id} analysis result: HasProgress={HasProgress}, ProposedState={ProposedState}, Confidence={Confidence}, RelatedCommits={CommitCount}",
+                        workItemId, result.HasProgress, result.ProposedState, result.Confidence, result.RelatedCommits?.Count ?? 0);
 
                     return new WorkItemAnalysis(
                         result.HasProgress,
                         result.ProposedState ?? currentState,
-                        result.Reason ?? "LLM analysis");
+                        result.Reason ?? "LLM analysis",
+                        result.RelatedCommits);
                 }
             }
 
@@ -442,22 +530,27 @@ public class AdoTaskSyncPipeline(
         return new WorkItemAnalysis(false, currentState, "Analysis failed");
     }
 
-    private record WorkItemAnalysis(bool HasProgress, string ProposedState, string Reason);
+    private record WorkItemAnalysis(
+        bool HasProgress,
+        string ProposedState,
+        string Reason,
+        IReadOnlyList<string>? RelatedCommits = null);
 
     private record LlmAnalysisResult(
         bool HasProgress,
         string? ProposedState,
         string? Confidence,
-        string? Reason);
+        string? Reason,
+        IReadOnlyList<string>? RelatedCommits = null);
 
     private record TrackedProject(string LocalPath, string RepoName);
 
-    private record PipelineArgs(string? RepoFilter, int CommitCount, int DiffRange);
+    private record PipelineArgs(string? RepoFilter, int CommitCount, int DiffRange, bool TestApproval);
 
     private static PipelineArgs ParseArgs(string? argsJson)
     {
         if (string.IsNullOrWhiteSpace(argsJson))
-            return new PipelineArgs(null, 20, 10);
+            return new PipelineArgs(null, 20, 10, false);
 
         try
         {
@@ -467,6 +560,7 @@ public class AdoTaskSyncPipeline(
             string? repoFilter = null;
             int commitCount = 20;
             int diffRange = 10;
+            bool testApproval = false;
 
             if (root.TryGetProperty("repoFilter", out var rf) && rf.ValueKind == JsonValueKind.String)
                 repoFilter = rf.GetString();
@@ -474,12 +568,14 @@ public class AdoTaskSyncPipeline(
                 commitCount = cc.GetInt32();
             if (root.TryGetProperty("diffRange", out var dr) && dr.ValueKind == JsonValueKind.Number)
                 diffRange = dr.GetInt32();
+            if (root.TryGetProperty("testApproval", out var ta) && ta.ValueKind == JsonValueKind.True)
+                testApproval = true;
 
-            return new PipelineArgs(repoFilter, commitCount, diffRange);
+            return new PipelineArgs(repoFilter, commitCount, diffRange, testApproval);
         }
         catch
         {
-            return new PipelineArgs(null, 20, 10);
+            return new PipelineArgs(null, 20, 10, false);
         }
     }
 }

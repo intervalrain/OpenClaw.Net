@@ -75,6 +75,7 @@ public class PipelineController(
             return NotFound();
 
         // Return anonymous object to ensure Status is serialized as string
+        // Note: pendingApproval (camelCase) is expected by frontend JS
         return Ok(new
         {
             ExecutionId = execution.Id,
@@ -82,7 +83,7 @@ public class PipelineController(
             Status = execution.Status.ToString(),
             Summary = execution.Result?.Summary,
             Steps = execution.Result?.Steps,
-            ApprovalInfo = execution.PendingApproval
+            PendingApproval = execution.PendingApproval
         });
     }
 
