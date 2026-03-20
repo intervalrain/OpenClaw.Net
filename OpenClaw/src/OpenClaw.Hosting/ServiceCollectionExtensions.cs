@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using OpenClaw.Application.Agents;
 using OpenClaw.Application.Agents.Middlewares;
 using OpenClaw.Application.Llm;
+using OpenClaw.Application.Workflows;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
@@ -105,6 +106,10 @@ public static class ServiceCollectionExtensions
 
         // Channels
         services.AddTelegramChannel(configuration);
+
+        // Workflow execution
+        services.AddScoped<ArgResolver>();
+        services.AddSingleton<IWorkflowExecutor, WorkflowExecutor>();
 
         return services;
     }

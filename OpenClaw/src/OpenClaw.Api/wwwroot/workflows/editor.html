@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Editor - OpenClaw</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="css/editor.css">
+    <!-- Cytoscape.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <!-- Dagre layout for DAG -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+</head>
+<body>
+    <div class="editor-container">
+        <!-- Top Toolbar -->
+        <header class="editor-toolbar">
+            <div class="toolbar-left">
+                <a href="index.html" class="btn-back" title="Back to list">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <input type="text" id="workflowName" class="workflow-name-input" placeholder="Workflow Name">
+            </div>
+            <div class="toolbar-center">
+                <span class="save-status" id="saveStatus">Saved</span>
+            </div>
+            <div class="toolbar-right">
+                <button class="btn btn-secondary" id="scheduleBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                    Schedule
+                </button>
+                <button class="btn btn-secondary" id="autoLayoutBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    Auto Layout
+                </button>
+                <button class="btn btn-primary" id="saveBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <path d="M17 21v-8H7v8M7 3v5h8"/>
+                    </svg>
+                    Save
+                </button>
+                <button class="btn btn-success" id="runBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    Run
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="editor-main">
+            <!-- Left Panel - Node Palette -->
+            <aside class="node-palette">
+                <h3>Nodes</h3>
+                <div class="palette-nodes">
+                    <div class="palette-node" draggable="true" data-type="skill">
+                        <div class="palette-node-icon skill">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                            </svg>
+                        </div>
+                        <span>Skill</span>
+                    </div>
+                    <div class="palette-node" draggable="true" data-type="approval">
+                        <div class="palette-node-icon approval">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 11l3 3L22 4"/>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                            </svg>
+                        </div>
+                        <span>Approval</span>
+                    </div>
+                </div>
+
+                <h3>Skills</h3>
+                <div class="skill-list" id="skillList">
+                    <div class="loading">Loading skills...</div>
+                </div>
+            </aside>
+
+            <!-- Canvas -->
+            <div class="canvas-container">
+                <div id="cy"></div>
+                <div class="canvas-hint" id="canvasHint">
+                    Drag nodes from the left panel to add them to your workflow
+                </div>
+            </div>
+
+            <!-- Right Panel - Properties -->
+            <aside class="properties-panel" id="propertiesPanel">
+                <div class="panel-empty">
+                    <p>Select a node to edit its properties</p>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Schedule Modal -->
+    <div class="modal" id="scheduleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule Settings</h2>
+                <button class="close-btn" id="closeScheduleModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="scheduleEnabled">
+                        <span>Enable scheduled execution</span>
+                    </label>
+                </div>
+
+                <div id="scheduleOptions" class="schedule-options" style="display: none;">
+                    <div class="form-group">
+                        <label for="scheduleFrequency">Frequency</label>
+                        <select id="scheduleFrequency">
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="weeklyOptions" style="display: none;">
+                        <label>Days of Week</label>
+                        <div class="day-selector">
+                            <label><input type="checkbox" value="Sunday"> Sun</label>
+                            <label><input type="checkbox" value="Monday" checked> Mon</label>
+                            <label><input type="checkbox" value="Tuesday" checked> Tue</label>
+                            <label><input type="checkbox" value="Wednesday" checked> Wed</label>
+                            <label><input type="checkbox" value="Thursday" checked> Thu</label>
+                            <label><input type="checkbox" value="Friday" checked> Fri</label>
+                            <label><input type="checkbox" value="Saturday"> Sat</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="monthlyOptions" style="display: none;">
+                        <label for="dayOfMonth">Day of Month</label>
+                        <input type="number" id="dayOfMonth" min="1" max="31" value="1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="scheduleTime">Time</label>
+                        <input type="time" id="scheduleTime" value="09:00">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="scheduleTimezone">Timezone</label>
+                        <select id="scheduleTimezone">
+                            <option value="UTC">UTC</option>
+                            <option value="Asia/Taipei">Asia/Taipei</option>
+                            <option value="America/New_York">America/New York</option>
+                            <option value="America/Los_Angeles">America/Los Angeles</option>
+                            <option value="Europe/London">Europe/London</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSchedule">Cancel</button>
+                <button class="btn btn-primary" id="saveSchedule">Save Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Execution Viewer Modal -->
+    <div class="modal modal-lg" id="executionModal">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h2>Execution Progress</h2>
+                <button class="close-btn" id="closeExecutionModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="execution-status-bar" id="executionStatusBar">
+                    <span class="execution-status">Status: <strong id="execStatus">Running</strong></span>
+                    <span class="execution-time" id="execTime"></span>
+                </div>
+                <div class="execution-graph" id="executionGraph"></div>
+                <div class="execution-details" id="executionDetails">
+                    <div class="node-output" id="nodeOutput">
+                        <h4>Node Output</h4>
+                        <pre id="outputContent">Select a node to view its output</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="approvalFooter" style="display: none;">
+                <span id="approvalMessage">Waiting for approval...</span>
+                <button class="btn btn-danger" id="rejectExecBtn">Reject</button>
+                <button class="btn btn-success" id="approveExecBtn">Approve</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="js/editor.js"></script>
+</body>
+</html>
