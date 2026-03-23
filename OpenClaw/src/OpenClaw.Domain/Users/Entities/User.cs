@@ -18,6 +18,7 @@ public class User : AggregateRoot<Guid>
     public UserStatus Status { get; private set; }
     public string? RefreshToken { get; private set; }
     public DateTime? RefreshTokenExpiresAt { get; private set; }
+    public string? WorkspacePath { get; private set; }
 
     private readonly List<string> _roles = [];
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
@@ -34,7 +35,8 @@ public class User : AggregateRoot<Guid>
         string passwordHash,
         string name,
         List<string>? roles = null,
-        List<string>? permissions = null)
+        List<string>? permissions = null,
+        UserStatus? status = null)
     {
         var emailResult = UserEmail.Create(email);
         if (emailResult.IsError)
@@ -58,7 +60,7 @@ public class User : AggregateRoot<Guid>
             Email = emailResult.Value,
             PasswordHash = PasswordHash.Create(passwordHash),
             Name = name.Trim(),
-            Status = UserStatus.Active,
+            Status = status ?? UserStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -163,6 +165,12 @@ public class User : AggregateRoot<Guid>
         return RefreshToken == token
             && RefreshTokenExpiresAt.HasValue
             && RefreshTokenExpiresAt > DateTime.UtcNow;
+    }
+
+    public void SetWorkspacePath(string? path)
+    {
+        WorkspacePath = path?.Trim();
+        UpdatedAt = DateTime.UtcNow;
     }
 
     private User()

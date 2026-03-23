@@ -14,6 +14,14 @@
     --border-color: #e1e5e9;
     --error-color: #e74c3c;
     --success-color: #27ae60;
+    --danger-color: #e74c3c;
+
+    /* Top header variables */
+    --bg-secondary: #1a1a2e;
+    --bg-tertiary: #2a2a3e;
+    --border-subtle: #333;
+    --text-primary: #fff;
+    --text-secondary: #a0a0a0;
 }
 
 body {
@@ -51,6 +59,37 @@ body {
 .logo .subtitle {
     font-size: 0.9rem;
     color: var(--text-muted);
+}
+
+/* Page Header (used when top-header is present) */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    margin-bottom: 20px;
+}
+
+.page-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 4px;
+}
+
+.page-header .subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.page-header .page-title {
+    display: flex;
+    flex-direction: column;
+}
+
+.page-header .page-actions {
+    display: flex;
+    gap: 10px;
 }
 
 .user-area {

@@ -7,10 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 
 using Weda.Core.Presentation;
 
+using OpenClaw.Application.Auth.Commands;
 using OpenClaw.Contracts.Auth.Commands;
 using OpenClaw.Contracts.Auth.Requests;
 using OpenClaw.Contracts.Auth.Responses;
-using OpenClaw.Application.Auth.Commands;
 
 namespace OpenClaw.Api.Auth.Controllers;
 
@@ -48,6 +48,24 @@ public class AuthController(ISender _mediator) : ApiController
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
     {
         var command = new RefreshTokenCommand(request.RefreshToken);
+        var result = await _mediator.Send(command);
+
+        return result.Match(Ok, Problem);
+    }
+
+    /// <summary>
+    /// Register a new user account (requires admin approval).
+    /// </summary>
+    /// <param name="request">The registration details.</param>
+    /// <returns>Registration confirmation (user will be in pending status).</returns>
+    /// <response code="200">Registration submitted, pending admin approval.</response>
+    /// <response code="400">Invalid request data or email already exists.</response>
+    [HttpPost("register")]
+    [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    {
+        var command = new RegisterCommand(request.Email, request.Password, request.Name);
         var result = await _mediator.Send(command);
 
         return result.Match(Ok, Problem);

@@ -107,9 +107,14 @@ async function authFetch(url, options = {}) {
             options.headers = getAuthHeaders();
             response = await fetch(url, options);
         } else {
-            // Refresh failed, redirect to login
+            // Refresh failed, show login modal if available
             clearAuth();
-            window.location.href = '/login.html';
+            if (typeof showLoginModal === 'function') {
+                showLoginModal(() => window.location.reload());
+            } else {
+                // Fallback to main page (which will show login modal)
+                window.location.href = '/openclaw/index.html';
+            }
         }
     }
 

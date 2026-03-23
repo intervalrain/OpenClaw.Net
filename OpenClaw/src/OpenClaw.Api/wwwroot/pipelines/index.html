@@ -5,22 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pipelines - OpenClaw</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
     <link rel="stylesheet" href="pipelines.css">
 </head>
 <body>
+    <!-- Top header will be injected by top-header.js -->
+
     <div class="container">
-        <header class="header">
-            <div class="logo">
-                <a href="/" class="logo-link">
-                    <h1>OpenClaw Pipelines</h1>
-                    <span class="subtitle">Skill Pipeline Automation</span>
-                </a>
-            </div>
-            <div class="user-area" id="userArea">
-                <button class="btn btn-primary" id="loginBtn">Login</button>
-            </div>
-        </header>
+        <div class="page-header">
+            <h1>Pipelines</h1>
+            <p class="subtitle">Skill Pipeline Automation</p>
+        </div>
 
         <main class="main-content">
             <section class="pipeline-list" id="pipelineList">
@@ -80,6 +78,8 @@
     </div>
 
     <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
     <script src="pipelines.js"></script>
 </body>
 </html>

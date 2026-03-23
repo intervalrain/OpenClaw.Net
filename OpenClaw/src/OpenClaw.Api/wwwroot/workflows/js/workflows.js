@@ -13,39 +13,21 @@ const deleteModal = document.getElementById('deleteModal');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    setupAuth();
+    // Check authentication - show login modal if not authenticated
+    if (!isAuthenticated()) {
+        showLoginModal(() => window.location.reload());
+        return;
+    }
+
+    // Setup create button (now in page-header)
+    const createBtn = document.getElementById('createWorkflowBtn');
+    if (createBtn) {
+        createBtn.addEventListener('click', openCreateModal);
+    }
+
     await loadWorkflows();
     setupEventListeners();
 });
-
-// Auth Setup
-function setupAuth() {
-    const userArea = document.getElementById('userArea');
-    const user = getCurrentUser();
-    if (user) {
-        userArea.innerHTML = `
-            <button class="btn btn-primary" id="createWorkflowBtn">+ Create Workflow</button>
-            <div class="user-info-header">
-                <div class="user-avatar">${getInitials(user.name)}</div>
-                <div>
-                    <div class="user-name">${user.name}</div>
-                    <div class="user-role">${user.roles?.[0] || 'User'}</div>
-                </div>
-            </div>
-            <button class="btn btn-secondary" id="logoutBtn">Logout</button>
-        `;
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            clearAuth();
-            window.location.reload();
-        });
-        document.getElementById('createWorkflowBtn').addEventListener('click', openCreateModal);
-    }
-}
-
-function getInitials(name) {
-    if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
 
 // Load Workflows
 async function loadWorkflows() {

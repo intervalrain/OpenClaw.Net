@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenClaw.NET</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/top-header.css">
     <link rel="stylesheet" href="/openclaw/app.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
     <!-- Marked.js for Markdown -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- KaTeX for LaTeX -->
@@ -16,6 +18,7 @@
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
 </head>
 <body>
+    <!-- Top header will be injected by top-header.js -->
     <div id="app">
         <nav class="sidebar">
             <!-- Sidebar Header -->
@@ -423,6 +426,8 @@
     </button>
 
     <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
     <script src="/js/approval.js"></script>
     <script src="/openclaw/app.js"></script>
 </body>

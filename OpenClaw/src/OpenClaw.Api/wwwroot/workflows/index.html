@@ -5,23 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Workflows - OpenClaw</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
     <link rel="stylesheet" href="css/workflows.css">
 </head>
 <body>
+    <!-- Top header will be injected by top-header.js -->
+
     <div class="container">
-        <header class="header">
-            <div class="logo">
-                <a href="/" class="logo-link">
-                    <h1>OpenClaw Workflows</h1>
-                    <span class="subtitle">Visual DAG Pipeline Designer</span>
-                </a>
+        <div class="page-header">
+            <div class="page-title">
+                <h1>Workflows</h1>
+                <p class="subtitle">Visual DAG Pipeline Designer</p>
             </div>
-            <div class="user-area" id="userArea">
+            <div class="page-actions">
                 <button class="btn btn-primary" id="createWorkflowBtn">+ Create Workflow</button>
-                <button class="btn btn-secondary" id="loginBtn">Login</button>
             </div>
-        </header>
+        </div>
 
         <main class="main-content">
             <!-- Workflow List -->
@@ -134,6 +136,8 @@
     </div>
 
     <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
     <script src="js/workflows.js"></script>
 </body>
 </html>

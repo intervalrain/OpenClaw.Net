@@ -7,6 +7,7 @@ public record UserDto(
     string Status,
     List<string> Roles,
     List<string> Permissions,
+    string? WorkspacePath,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     DateTime? LastLoginAt);

@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize theme
     initTheme();
 
+    // Show admin-only nav items based on user role
+    initAdminNavItems();
+
     // Event Listeners
     sendBtn.addEventListener('click', sendMessage);
     themeToggle.addEventListener('click', toggleTheme);
@@ -123,12 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initialize conversations
+    // Initialize conversations button (but don't load yet)
     document.getElementById('new-chat-btn').addEventListener('click', createNewConversation);
-    loadConversations();
-
-    // Preload skills for autocomplete
-    loadSkills();
 
     // Logout button
     document.getElementById('logout-btn').addEventListener('click', logout);
@@ -136,11 +135,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Image upload handling
     initImageUpload();
 
-    // Check setup status - show onboarding if no provider configured
-    checkSetupStatus();
-
-    // Update user profile display
-    updateUserProfile();
+    // Check setup status first - this handles authentication and onboarding
+    // Only load data after authentication is confirmed
+    checkSetupStatus().then(() => {
+        // Only load if authenticated
+        if (isAuthenticated()) {
+            loadConversations();
+            loadSkills();
+            updateUserProfile();
+        }
+    });
 });
 
 // Update user profile display from localStorage
@@ -159,36 +163,49 @@ function updateUserProfile() {
     }
 }
 
-// Logout and redirect to login
+// Logout and show login modal
 function logout() {
     clearAuth();
-    window.location.href = '/login.html';
+    showLoginModal(() => {
+        window.location.reload();
+    });
 }
 
 // Setup check - onboarding flow
+// Returns a promise that resolves when authentication is confirmed
 async function checkSetupStatus() {
-    try {
-        const res = await fetch('/api/v1/setup/status');
-        if (!res.ok) return;
+    return new Promise(async (resolve) => {
+        try {
+            const res = await fetch('/api/v1/setup/status');
+            if (!res.ok) {
+                resolve();
+                return;
+            }
 
-        const status = await res.json();
-        
-        if (!status.hasUser) {
-            window.location.href = '/setup.html';
-            return;
-        }
+            const status = await res.json();
 
-        if (!isAuthenticated()) {
-            window.location.href = '/login.html'
-            return;
-        }
+            if (!status.hasUser) {
+                window.location.href = '/setup.html';
+                return; // Never resolves - page is redirecting
+            }
 
-        if (!status.hasModelProvider) {
-            showOnboardingModal();
+            if (!isAuthenticated()) {
+                showLoginModal(() => {
+                    window.location.reload();
+                });
+                return; // Never resolves - waiting for login then reload
+            }
+
+            if (!status.hasModelProvider) {
+                showOnboardingModal();
+            }
+
+            resolve(); // Authenticated, continue
+        } catch (e) {
+            console.error('Failed to check setup status:', e);
+            resolve(); // Resolve anyway to not block
         }
-    } catch (e) {
-        console.error('Failed to check setup status:', e);
-    }
+    });
 }
 
 function showOnboardingModal() {
@@ -1869,10 +1886,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('provider-type').addEventListener('change', updateProviderTypeUI);
     }
 
-    // Initialize model providers from backend
-    loadModelProviders();
+    // Note: Model providers are loaded when settings modal opens (openSettingsModal)
+    // Don't load them here to avoid triggering auth before checkSetupStatus
 
-    // Initialize Telegram channel
+    // Initialize Telegram channel event handlers (not data)
     initTelegramChannel();
 
     // Initialize Config Management
@@ -2162,8 +2179,8 @@ function initPipelineDrawer() {
         }
     });
 
-    // Load pipelines on init
-    loadPipelines();
+    // Note: Pipelines are loaded when drawer is opened (openPipelineDrawer)
+    // Don't load them here to avoid triggering auth before checkSetupStatus
 }
 
 function openPipelineDrawer() {
@@ -2173,7 +2190,8 @@ function openPipelineDrawer() {
     drawer.classList.add('open');
     toggleBtn.classList.add('hidden');
 
-    // Start polling executions
+    // Load pipelines and executions when drawer opens
+    loadPipelines();
     loadExecutions();
     startExecutionPolling();
 }
@@ -2508,3 +2526,19 @@ function stopExecutionPolling() {
 document.addEventListener('DOMContentLoaded', () => {
     initPipelineDrawer();
 });
+
+// Show admin-only navigation items based on user role
+function initAdminNavItems() {
+    const user = getCurrentUser();
+    if (!user || !user.roles) return;
+
+    const isAdmin = user.roles.some(role =>
+        role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin'
+    );
+
+    if (isAdmin) {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = '';
+        });
+    }
+}

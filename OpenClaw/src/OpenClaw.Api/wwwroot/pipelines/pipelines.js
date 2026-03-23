@@ -11,41 +11,19 @@ const pipelineList = document.getElementById('pipelineList');
 const executionList = document.getElementById('executionList');
 const executeModal = document.getElementById('executeModal');
 const approvalModal = document.getElementById('approvalModal');
-const userArea = document.getElementById('userArea');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    setupAuth();
+    // Check authentication - show login modal if not authenticated
+    if (!isAuthenticated()) {
+        showLoginModal(() => window.location.reload());
+        return;
+    }
+
     await loadPipelines();
     setupEventListeners();
     loadExecutionsFromStorage();
 });
-
-// Auth Setup
-function setupAuth() {
-    const user = getCurrentUser();
-    if (user) {
-        userArea.innerHTML = `
-            <div class="user-info-header">
-                <div class="user-avatar">${getInitials(user.name)}</div>
-                <div>
-                    <div class="user-name">${user.name}</div>
-                    <div class="user-role">${user.roles?.[0] || 'User'}</div>
-                </div>
-            </div>
-            <button class="btn btn-secondary" id="logoutBtn">Logout</button>
-        `;
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            clearAuth();
-            window.location.reload();
-        });
-    }
-}
-
-function getInitials(name) {
-    if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
 
 // Load Pipelines
 async function loadPipelines() {

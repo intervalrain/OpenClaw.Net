@@ -62,7 +62,11 @@ public static class UserErrors
 
     public static readonly Error AccountNotActive = Error.Unauthorized(
         code: "User.AccountNotActive",
-        description: "This account is not active.");
+        description: "This account is not active. Please wait for admin approval.");
+
+    public static readonly Error AccountPendingApproval = Error.Unauthorized(
+        code: "User.AccountPendingApproval",
+        description: "Your account is pending approval. Please wait for an administrator to approve your registration.");
 
     public static readonly Error DuplicateEmail = Error.Conflict(
         code: "User.DuplicateEmail",

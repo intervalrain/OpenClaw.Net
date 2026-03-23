@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - OpenClaw Admin</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <!-- Top header will be injected by top-header.js -->
+
+    <div class="container">
+        <div class="page-header">
+            <div class="page-title">
+                <h1>User Management</h1>
+                <p class="subtitle">Manage user registrations and permissions</p>
+            </div>
+        </div>
+
+        <main class="main-content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-tab="pending">
+                    Pending Approval
+                    <span class="badge" id="pendingCount">0</span>
+                </button>
+                <button class="tab" data-tab="all">All Users</button>
+            </div>
+
+            <!-- Pending Users Tab -->
+            <section class="tab-content active" id="pendingTab">
+                <div class="user-list" id="pendingUserList">
+                    <div class="loading">Loading pending users...</div>
+                </div>
+            </section>
+
+            <!-- All Users Tab -->
+            <section class="tab-content" id="allTab">
+                <div class="filters">
+                    <select id="statusFilter">
+                        <option value="">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Locked">Locked</option>
+                    </select>
+                </div>
+                <div class="user-list" id="allUserList">
+                    <div class="loading">Loading users...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2026 OpenClaw. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- User Details Modal -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">User Details</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- User details will be loaded here -->
+            </div>
+            <div class="modal-footer" id="modalFooter">
+                <!-- Action buttons will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>Delete User</h2>
+                <button class="close-btn" id="closeDeleteModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "<span id="deleteUserName"></span>"?</p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelDelete">Cancel</button>
+                <button class="btn btn-danger" id="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+/**
+ * Shared Theme System
+ * Dark/Light mode support for all pages
+ */
+
+/* Light theme (default) */
+:root {
+    --primary-color: #3498db;
+    --primary-hover: #2980b9;
+    --text-color: #333;
+    --text-muted: #666;
+    --bg-color: #f5f7fa;
+    --card-bg: #fff;
+    --border-color: #e1e5e9;
+    --error-color: #e74c3c;
+    --success-color: #27ae60;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+
+    /* Additional variables for consistency */
+    --bg-primary: #f5f7fa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f0f0f0;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --border-subtle: #e1e5e9;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+    --primary-color: #4a9eff;
+    --primary-hover: #3d8ce6;
+    --text-color: #ececec;
+    --text-muted: #8e8e8e;
+    --bg-color: #212121;
+    --card-bg: #2f2f2f;
+    --border-color: #424242;
+    --error-color: #ff6b6b;
+    --success-color: #4caf50;
+    --danger-color: #ff6b6b;
+    --warning-color: #ffb74d;
+
+    /* Additional variables for consistency */
+    --bg-primary: #212121;
+    --bg-secondary: #171717;
+    --bg-tertiary: #2f2f2f;
+    --text-primary: #ececec;
+    --text-secondary: #b4b4b4;
+    --border-subtle: #2f2f2f;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    color: var(--header-text, var(--text-secondary, #a0a0a0));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.theme-toggle:hover {
+    background: var(--header-bg-hover, var(--bg-tertiary, #2a2a3e));
+    color: var(--header-text-hover, var(--text-primary, #fff));
+}
+
+.theme-toggle .icon-sun,
+.theme-toggle .icon-moon {
+    width: 18px;
+    height: 18px;
+}
+
+/* Show/hide icons based on theme */
+[data-theme="dark"] .theme-toggle .icon-sun {
+    display: block;
+}
+
+[data-theme="dark"] .theme-toggle .icon-moon {
+    display: none;
+}
+
+.theme-toggle .icon-sun {
+    display: none;
+}
+
+.theme-toggle .icon-moon {
+    display: block;
+}
+
+/* Smooth transitions for theme changes */
+body,
+.container,
+.card,
+.modal-content,
+.drawer,
+.sidebar {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
