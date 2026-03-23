@@ -122,23 +122,23 @@
 }
 
 .execution-status-badge.completed {
-    background: #d4edda;
-    color: #155724;
+    background: var(--status-success-bg, #d4edda);
+    color: var(--status-success-text, #155724);
 }
 
 .execution-status-badge.running {
-    background: #fff3cd;
-    color: #856404;
+    background: var(--status-warning-bg, #fff3cd);
+    color: var(--status-warning-text, #856404);
 }
 
 .execution-status-badge.failed {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--status-error-bg, #f8d7da);
+    color: var(--status-error-text, #721c24);
 }
 
 .execution-status-badge.waitingforapproval {
-    background: #cce5ff;
-    color: #004085;
+    background: var(--status-info-bg, #cce5ff);
+    color: var(--status-info-text, #004085);
 }
 
 .btn-run {
@@ -149,7 +149,7 @@
 }
 
 .btn-run:hover {
-    background: #219a52;
+    background: var(--success-hover, #219a52);
 }
 
 /* Empty State */
@@ -341,7 +341,7 @@
 }
 
 .execution-item:hover {
-    background: #e9ecef;
+    background: var(--bg-tertiary, #e9ecef);
 }
 
 .execution-info {
@@ -395,6 +395,8 @@
     font-family: inherit;
     min-height: 80px;
     resize: vertical;
+    background: var(--card-bg);
+    color: var(--text-color);
 }
 
 .modal-body textarea:focus {
@@ -426,7 +428,7 @@
 }
 
 .btn-danger:hover {
-    background: #c0392b;
+    background: var(--error-hover, #c0392b);
 }
 
 /* Responsive */

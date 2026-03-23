@@ -70,7 +70,7 @@
 }
 
 .btn-execute:hover {
-    background: #219a52;
+    background: var(--success-hover, #219a52);
 }
 
 /* Execution Panel */
@@ -148,28 +148,28 @@
 }
 
 .status-running {
-    background: #fff3cd;
-    color: #856404;
+    background: var(--status-warning-bg, #fff3cd);
+    color: var(--status-warning-text, #856404);
 }
 
 .status-waiting {
-    background: #cce5ff;
-    color: #004085;
+    background: var(--status-info-bg, #cce5ff);
+    color: var(--status-info-text, #004085);
 }
 
 .status-completed {
-    background: #d4edda;
-    color: #155724;
+    background: var(--status-success-bg, #d4edda);
+    color: var(--status-success-text, #155724);
 }
 
 .status-failed {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--status-error-bg, #f8d7da);
+    color: var(--status-error-text, #721c24);
 }
 
 .status-rejected {
-    background: #f8d7da;
-    color: #721c24;
+    background: var(--status-error-bg, #f8d7da);
+    color: var(--status-error-text, #721c24);
 }
 
 /* Modal Extensions */
@@ -221,6 +221,8 @@
     border-radius: 6px;
     font-size: 0.95rem;
     font-family: inherit;
+    background: var(--card-bg);
+    color: var(--text-color);
 }
 
 .param-group input:focus,
@@ -267,7 +269,7 @@
 
 /* Proposed Changes */
 .proposed-change {
-    background: white;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 16px;
@@ -296,19 +298,19 @@
 }
 
 .work-item-type.task {
-    background: #e3f2fd;
-    color: #1565c0;
+    background: var(--type-task-bg, #e3f2fd);
+    color: var(--type-task-text, #1565c0);
 }
 
 .work-item-type.bug {
-    background: #ffebee;
-    color: #c62828;
+    background: var(--type-bug-bg, #ffebee);
+    color: var(--type-bug-text, #c62828);
 }
 
 .work-item-type.user\ story,
 .work-item-type.userstory {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: var(--type-story-bg, #e8f5e9);
+    color: var(--type-story-text, #2e7d32);
 }
 
 .work-item-link {
@@ -332,7 +334,7 @@
     gap: 12px;
     margin-bottom: 12px;
     padding: 10px 14px;
-    background: #f8f9fa;
+    background: var(--bg-color);
     border-radius: 6px;
 }
 
@@ -344,8 +346,8 @@
 }
 
 .state.current {
-    background: #e0e0e0;
-    color: #616161;
+    background: var(--bg-tertiary, #e0e0e0);
+    color: var(--text-muted);
 }
 
 .state.proposed {
@@ -388,11 +390,11 @@
 }
 
 .commits-list code {
-    background: #f1f3f4;
+    background: var(--bg-tertiary, #f1f3f4);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 0.8rem;
-    color: #333;
+    color: var(--text-color);
 }
 
 .btn-success {
@@ -401,7 +403,7 @@
 }
 
 .btn-success:hover {
-    background: #219a52;
+    background: var(--success-hover, #219a52);
 }
 
 .btn-danger {
@@ -410,7 +412,7 @@
 }
 
 .btn-danger:hover {
-    background: #c0392b;
+    background: var(--error-hover, #c0392b);
 }
 
 /* Execution Actions */

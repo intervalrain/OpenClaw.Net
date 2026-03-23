@@ -157,12 +157,18 @@ function handleNavLogin() {
 }
 
 // Theme management
+// NOTE: Default is dark (no data-theme attribute = dark theme in CSS)
 function getStoredTheme() {
-    return localStorage.getItem('theme') || 'light';
+    return localStorage.getItem('theme') || 'dark';
 }
 
 function setTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+        // Dark is default, remove attribute for cleaner DOM
+        document.documentElement.removeAttribute('data-theme');
+    } else {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
     localStorage.setItem('theme', theme);
 }
 
