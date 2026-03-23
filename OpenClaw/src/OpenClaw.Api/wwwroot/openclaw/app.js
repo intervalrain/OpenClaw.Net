@@ -34,15 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBtn = document.getElementById('send-btn');
     themeToggle = document.getElementById('theme-toggle');
 
-    // Initialize theme
-    initTheme();
+    // Initialize Chat-specific theme settings (hljs, button text)
+    initChatTheme();
+
+    // Listen for theme changes from top-header.js
+    window.addEventListener('themechange', (e) => {
+        updateHljsTheme(e.detail.theme);
+        updateThemeButtonText(e.detail.theme);
+    });
 
     // Show admin-only nav items based on user role
     initAdminNavItems();
 
     // Event Listeners
     sendBtn.addEventListener('click', sendMessage);
-    themeToggle.addEventListener('click', toggleTheme);
+    themeToggle.addEventListener('click', toggleChatTheme);
 
     userInputEl.addEventListener('keydown', (e) => {
         // Handle autocomplete navigation
@@ -226,19 +232,30 @@ function showOnboardingModal() {
     updateProviderTypeUI();
 }
 
-// Theme functions
-function initTheme() {
+// Theme functions for Chat page
+// Uses top-header.js for core theme management, adds Chat-specific updates
+function initChatTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', savedTheme);
     updateHljsTheme(savedTheme);
     updateThemeButtonText(savedTheme);
 }
 
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+function toggleChatTheme() {
+    // Use top-header.js toggleTheme if available, otherwise handle locally
+    if (typeof toggleTheme === 'function') {
+        toggleTheme();
+    } else {
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        if (newTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        localStorage.setItem('theme', newTheme);
+    }
+    // Update Chat-specific UI
+    const newTheme = localStorage.getItem('theme') || 'dark';
     updateHljsTheme(newTheme);
     updateThemeButtonText(newTheme);
 }
@@ -252,10 +269,12 @@ function updateThemeButtonText(theme) {
 
 function updateHljsTheme(theme) {
     const hljsLink = document.getElementById('hljs-theme');
-    if (theme === 'light') {
-        hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css';
-    } else {
-        hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css';
+    if (hljsLink) {
+        if (theme === 'light') {
+            hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css';
+        } else {
+            hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css';
+        }
     }
 }
 

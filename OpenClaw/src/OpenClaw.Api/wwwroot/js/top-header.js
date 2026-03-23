@@ -170,6 +170,27 @@ function setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
     }
     localStorage.setItem('theme', theme);
+
+    // Update theme toggle icons via JS (more reliable than CSS)
+    updateThemeIcons(theme);
+
+    // Dispatch custom event for pages that need to update additional UI
+    window.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));
+}
+
+function updateThemeIcons(theme) {
+    const sunIcon = document.querySelector('.top-nav .theme-toggle .icon-sun');
+    const moonIcon = document.querySelector('.top-nav .theme-toggle .icon-moon');
+
+    if (sunIcon && moonIcon) {
+        if (theme === 'dark') {
+            sunIcon.style.display = 'block';
+            moonIcon.style.display = 'none';
+        } else {
+            sunIcon.style.display = 'none';
+            moonIcon.style.display = 'block';
+        }
+    }
 }
 
 function toggleTheme() {

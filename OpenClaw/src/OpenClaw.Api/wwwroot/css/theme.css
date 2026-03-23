@@ -96,49 +96,6 @@
     --code-inline-color: #c7254e;
 }
 
-/* Theme toggle button */
-.theme-toggle {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 8px;
-    color: var(--header-text, var(--text-secondary, #a0a0a0));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
-}
-
-.theme-toggle:hover {
-    background: var(--header-bg-hover, var(--bg-tertiary, #2a2a3e));
-    color: var(--header-text-hover, var(--text-primary, #fff));
-}
-
-.theme-toggle .icon-sun,
-.theme-toggle .icon-moon {
-    width: 18px;
-    height: 18px;
-}
-
-/* Show/hide icons based on theme - dark mode shows sun (to switch to light) */
-.theme-toggle .icon-sun {
-    display: block;
-}
-
-.theme-toggle .icon-moon {
-    display: none;
-}
-
-/* Light mode shows moon (to switch to dark) */
-[data-theme="light"] .theme-toggle .icon-sun {
-    display: none;
-}
-
-[data-theme="light"] .theme-toggle .icon-moon {
-    display: block;
-}
-
 /* Smooth transitions for theme changes */
 body,
 .container,
