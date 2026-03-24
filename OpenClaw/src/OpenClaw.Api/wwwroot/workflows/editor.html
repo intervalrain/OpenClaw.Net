@@ -15,6 +15,8 @@
     <!-- Dagre layout for DAG -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="editor-container">
@@ -78,6 +80,15 @@
                         </div>
                         <span>Skill</span>
                     </div>
+                    <div class="palette-node" draggable="true" data-type="wait">
+                        <div class="palette-node-icon wait">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                        </div>
+                        <span>Wait</span>
+                    </div>
                     <div class="palette-node" draggable="true" data-type="approval">
                         <div class="palette-node-icon approval">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -92,6 +103,12 @@
                 <h3>Skills</h3>
                 <div class="skill-list" id="skillList">
                     <div class="loading">Loading skills...</div>
+                </div>
+
+                <div class="connection-help">
+                    <strong>Connecting Nodes</strong>
+                    <span>Shift+Click</span> on a node, then click another node to connect them.
+                    Press <span>ESC</span> to cancel. Use <span>Delete</span> to remove selected nodes/edges.
                 </div>
             </aside>
 

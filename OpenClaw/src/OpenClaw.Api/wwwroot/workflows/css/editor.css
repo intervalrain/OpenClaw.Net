@@ -157,6 +157,10 @@
     background: linear-gradient(135deg, #3498db, #2980b9);
 }
 
+.palette-node-icon.wait {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+}
+
 .palette-node-icon.approval {
     background: linear-gradient(135deg, #f39c12, #e67e22);
 }
@@ -174,18 +178,21 @@
 }
 
 .skill-item {
-    padding: 8px 12px;
+    padding: 6px 10px;
     background: var(--bg-color);
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: grab;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
+    font-size: 0.8rem;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .skill-item:hover {
     border-color: var(--primary-color);
-    background: white;
+    background: var(--card-bg);
 }
 
 .skill-item:active {
@@ -219,11 +226,21 @@
     border-radius: 8px;
     font-size: 0.9rem;
     pointer-events: none;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.3s ease, background 0.3s ease;
 }
 
 .canvas-hint.hidden {
     opacity: 0;
+}
+
+.canvas-hint.connection-mode {
+    background: var(--primary-color);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 /* Properties Panel (Right) */
@@ -333,26 +350,61 @@
     margin-bottom: 0;
 }
 
+.arg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
 .arg-name {
-    font-weight: 500;
+    font-weight: 600;
     font-size: 0.9rem;
-    margin-bottom: 8px;
+}
+
+.arg-name .required-mark {
+    color: var(--error-color);
+    margin-left: 2px;
+}
+
+.arg-type {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--card-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.arg-description {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    line-height: 1.4;
 }
 
 .arg-source-tabs {
     display: flex;
     gap: 4px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .arg-source-tab {
-    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
     font-size: 0.75rem;
     border: 1px solid var(--border-color);
-    background: white;
+    background: var(--card-bg);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+.arg-source-tab:hover {
+    border-color: var(--primary-color);
+    background: white;
 }
 
 .arg-source-tab.active {
@@ -361,12 +413,63 @@
     border-color: var(--primary-color);
 }
 
+.arg-source-tab svg {
+    flex-shrink: 0;
+}
+
+.arg-source-help {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    background: rgba(52, 152, 219, 0.08);
+    border-radius: 4px;
+    border-left: 2px solid var(--primary-color);
+}
+
 .arg-value-input {
     width: 100%;
-    padding: 8px;
+    padding: 8px 10px;
     font-size: 0.85rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
+    font-family: monospace;
+}
+
+.arg-value-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.15);
+}
+
+.arg-examples {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.examples-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.example-value {
+    font-size: 0.75rem;
+    background: var(--card-bg);
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+    font-family: monospace;
+}
+
+.example-value:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 
 /* Approval Behavior */
@@ -535,6 +638,99 @@
 
 .btn-danger:hover {
     background: #c0392b;
+}
+
+/* Skill Description in Properties */
+.skill-description {
+    background: var(--bg-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.skill-description p {
+    margin: 0 0 8px 0;
+}
+
+.skill-description p:last-child {
+    margin-bottom: 0;
+}
+
+/* Markdown content styles */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+    color: var(--text-color);
+    margin: 8px 0 4px 0;
+    font-size: 0.9rem;
+}
+
+.markdown-content h1 { font-size: 1rem; }
+.markdown-content h2 { font-size: 0.95rem; }
+
+.markdown-content ul,
+.markdown-content ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+
+.markdown-content li {
+    margin: 2px 0;
+}
+
+.markdown-content code {
+    background: var(--card-bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    color: var(--code-inline-color);
+}
+
+.markdown-content pre {
+    background: var(--card-bg);
+    padding: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.markdown-content pre code {
+    background: none;
+    padding: 0;
+}
+
+.markdown-content a {
+    color: var(--primary-color);
+}
+
+.markdown-content blockquote {
+    border-left: 3px solid var(--border-color);
+    margin: 8px 0;
+    padding-left: 12px;
+    color: var(--text-muted);
+}
+
+/* Connection Hint in Palette */
+.connection-help {
+    background: var(--bg-color);
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 16px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.connection-help strong {
+    color: var(--text-color);
+    display: block;
+    margin-bottom: 4px;
 }
 
 /* Responsive */

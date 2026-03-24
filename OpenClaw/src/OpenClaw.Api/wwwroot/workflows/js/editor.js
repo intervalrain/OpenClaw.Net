@@ -10,6 +10,11 @@ let skills = [];
 let currentExecution = null;
 let executionPollingInterval = null;
 
+// Undo/Redo history
+const undoStack = [];
+const redoStack = [];
+const MAX_HISTORY = 50;
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     initCytoscape();
@@ -76,6 +81,15 @@ function initCytoscape() {
                     'height': 50
                 }
             },
+            {
+                selector: 'node[type="wait"]',
+                style: {
+                    'background-color': '#9b59b6',
+                    'shape': 'ellipse',
+                    'width': 45,
+                    'height': 45
+                }
+            },
             // Execution status styles
             {
                 selector: 'node.running',
@@ -130,6 +144,15 @@ function initCytoscape() {
                     'line-color': '#9b59b6',
                     'target-arrow-color': '#9b59b6'
                 }
+            },
+            // Edge creation mode - highlight source node
+            {
+                selector: 'node.edge-source',
+                style: {
+                    'border-color': '#e74c3c',
+                    'border-width': 4,
+                    'border-style': 'dashed'
+                }
             }
         ],
         layout: { name: 'preset' },
@@ -143,6 +166,14 @@ function initCytoscape() {
         selectNode(evt.target);
     });
 
+    // Allow selecting edges too
+    cy.on('tap', 'edge', function(evt) {
+        cy.elements().unselect();
+        evt.target.select();
+        selectedNode = null;
+        renderProperties(null);
+    });
+
     cy.on('tap', function(evt) {
         if (evt.target === cy) {
             deselectNode();
@@ -153,10 +184,19 @@ function initCytoscape() {
         markDirty();
     });
 
-    // Edge creation by dragging from node
+    // Edge creation by right-click or Shift+click on node
     cy.on('cxttap', 'node', function(evt) {
         const sourceNode = evt.target;
         startEdgeCreation(sourceNode);
+    });
+
+    // Also support Shift+click for edge creation (more discoverable)
+    cy.on('tap', 'node', function(evt) {
+        if (evt.originalEvent.shiftKey) {
+            const sourceNode = evt.target;
+            startEdgeCreation(sourceNode);
+            evt.stopPropagation();
+        }
     });
 }
 
@@ -180,8 +220,9 @@ function renderSkillList() {
         return;
     }
 
+    // Simple, compact skill list - just name with tooltip for description
     container.innerHTML = skills.map(skill => `
-        <div class="skill-item" draggable="true" data-type="skill" data-skill="${escapeHtml(skill.name)}">
+        <div class="skill-item" draggable="true" data-type="skill" data-skill="${escapeHtml(skill.name)}" title="${escapeHtml(skill.description || '')}">
             ${escapeHtml(skill.name)}
         </div>
     `).join('');
@@ -190,6 +231,11 @@ function renderSkillList() {
     container.querySelectorAll('.skill-item').forEach(item => {
         item.addEventListener('dragstart', handleDragStart);
     });
+}
+
+function truncateText(text, maxLength) {
+    if (!text || text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + '...';
 }
 
 // Load workflow
@@ -246,7 +292,11 @@ function loadGraph(definition) {
                 approvalName: node.approvalName,
                 description: node.description,
                 scheduledBehavior: node.scheduledBehavior,
-                timeoutSeconds: node.timeoutSeconds
+                timeoutSeconds: node.timeoutSeconds,
+                // Wait node properties
+                waitType: node.waitType,
+                durationSeconds: node.durationSeconds,
+                waitUntil: node.waitUntil
             },
             position: node.position
         });
@@ -266,6 +316,11 @@ function loadGraph(definition) {
     });
 
     cy.fit(50);
+
+    // Save initial state for undo
+    undoStack.length = 0;
+    redoStack.length = 0;
+    saveState();
 }
 
 // Export graph to WorkflowGraph format
@@ -296,6 +351,15 @@ function exportGraph() {
                 approvalName: data.approvalName || data.label || 'Approval',
                 description: data.description || '',
                 scheduledBehavior: data.scheduledBehavior || 'WaitForApproval'
+            };
+        }
+
+        if (data.type === 'wait') {
+            return {
+                ...base,
+                waitType: data.waitType || 'duration',
+                durationSeconds: data.durationSeconds || 60,
+                waitUntil: data.waitUntil || null
             };
         }
 
@@ -369,6 +433,8 @@ function renderProperties(node) {
         content += renderSkillProperties(data);
     } else if (type === 'approval') {
         content += renderApprovalProperties(data);
+    } else if (type === 'wait') {
+        content += renderWaitProperties(data);
     }
 
     content += '</div>';
@@ -380,6 +446,8 @@ function renderSkillProperties(data) {
         `<option value="${escapeHtml(s.name)}" ${s.name === data.skillName ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
     ).join('');
 
+    const skill = skills.find(s => s.name === data.skillName);
+
     let html = `
         <div class="property-group">
             <label>Skill</label>
@@ -388,7 +456,18 @@ function renderSkillProperties(data) {
                 ${skillOptions}
             </select>
         </div>
+    `;
 
+    // Show skill description if available (supports markdown)
+    if (skill && skill.description) {
+        html += `
+            <div class="skill-description markdown-content">
+                ${renderMarkdown(skill.description)}
+            </div>
+        `;
+    }
+
+    html += `
         <div class="property-group">
             <label>Timeout (seconds)</label>
             <input type="number" id="propTimeout" value="${data.timeoutSeconds || 300}" min="1" max="3600" onchange="updateNodeProperty('timeoutSeconds', parseInt(this.value))">
@@ -396,12 +475,18 @@ function renderSkillProperties(data) {
     `;
 
     // Args section
-    const skill = skills.find(s => s.name === data.skillName);
-    if (skill && skill.parameters) {
+    if (skill && skill.parameters && Object.keys(skill.parameters).length > 0) {
         html += `
             <div class="args-section">
                 <h4>Arguments</h4>
                 ${renderArgsEditor(skill.parameters, data.args || {})}
+            </div>
+        `;
+    } else if (skill) {
+        html += `
+            <div class="args-section">
+                <h4>Arguments</h4>
+                <p class="text-muted">This skill has no parameters</p>
             </div>
         `;
     }
@@ -417,27 +502,134 @@ function renderArgsEditor(parameters, currentArgs) {
     return Object.entries(parameters).map(([name, param]) => {
         const argSource = currentArgs[name] || {};
         const activeSource = getActiveArgSource(argSource);
+        const sourceHelp = getArgSourceHelp(activeSource, name);
 
         return `
             <div class="arg-item">
-                <div class="arg-name">${escapeHtml(name)} ${param.required ? '<span style="color: var(--error-color)">*</span>' : ''}</div>
+                <div class="arg-header">
+                    <span class="arg-name">${escapeHtml(name)} ${param.required ? '<span class="required-mark">*</span>' : ''}</span>
+                    <span class="arg-type">${escapeHtml(param.type || 'string')}</span>
+                </div>
+                ${param.description ? `<div class="arg-description">${escapeHtml(param.description)}</div>` : ''}
                 <div class="arg-source-tabs">
                     <button class="arg-source-tab ${activeSource === 'filled' ? 'active' : ''}"
-                            onclick="setArgSource('${name}', 'filled')">Value</button>
+                            onclick="setArgSource('${name}', 'filled')"
+                            title="直接填入固定值">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        Value
+                    </button>
                     <button class="arg-source-tab ${activeSource === 'config' ? 'active' : ''}"
-                            onclick="setArgSource('${name}', 'config')">Config</button>
+                            onclick="setArgSource('${name}', 'config')"
+                            title="使用 Workflow 變數">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        Config
+                    </button>
                     <button class="arg-source-tab ${activeSource === 'input' ? 'active' : ''}"
-                            onclick="setArgSource('${name}', 'input')">Input</button>
+                            onclick="setArgSource('${name}', 'input')"
+                            title="從上游節點取值">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="5" r="3"/>
+                            <line x1="12" y1="8" x2="12" y2="21"/>
+                            <path d="M8 17l4 4 4-4"/>
+                        </svg>
+                        Input
+                    </button>
                 </div>
+                <div class="arg-source-help">${sourceHelp}</div>
                 <input type="text" class="arg-value-input"
                        id="arg-${name}"
                        value="${escapeHtml(getArgValue(argSource, activeSource))}"
                        placeholder="${getArgPlaceholder(activeSource, param)}"
                        onchange="updateArgValue('${name}', this.value)">
-                ${param.description ? `<div class="text-muted" style="font-size: 0.8rem; margin-top: 4px;">${escapeHtml(param.description)}</div>` : ''}
+                ${renderArgExamples(activeSource, param, name)}
             </div>
         `;
     }).join('');
+}
+
+function getArgSourceHelp(source, argName) {
+    switch (source) {
+        case 'filled':
+            return '直接輸入固定值，執行時使用此值';
+        case 'config':
+            return '引用 Workflow 變數，可在不同執行間共享';
+        case 'input':
+            return '從上游節點的輸出取值 (格式: nodeId.path)';
+        default:
+            return '';
+    }
+}
+
+function renderArgExamples(source, param, argName) {
+    let examples = [];
+
+    switch (source) {
+        case 'filled':
+            if (param.type === 'boolean') {
+                examples = ['true', 'false'];
+            } else if (param.type === 'number' || param.type === 'integer') {
+                examples = ['100', '0', '-1'];
+            } else if (param.enum && param.enum.length > 0) {
+                examples = param.enum.slice(0, 3);
+            } else if (param.default) {
+                examples = [param.default];
+            }
+            break;
+        case 'config':
+            examples = ['myVariable', `${argName}_config`];
+            break;
+        case 'input':
+            // Get upstream nodes dynamically
+            examples = getUpstreamNodeExamples();
+            if (examples.length === 0) {
+                examples = ['upstream_node.output'];
+            }
+            break;
+    }
+
+    if (examples.length === 0) return '';
+
+    return `
+        <div class="arg-examples">
+            <span class="examples-label">例:</span>
+            ${examples.map(ex => `<code class="example-value" onclick="setArgExample('${argName}', '${escapeHtml(ex)}')">${escapeHtml(ex)}</code>`).join('')}
+        </div>
+    `;
+}
+
+function getUpstreamNodeExamples() {
+    if (!selectedNode || !cy) return [];
+
+    const examples = [];
+    const currentId = selectedNode.id();
+
+    // Get all predecessors (upstream nodes)
+    const predecessors = selectedNode.predecessors('node');
+
+    predecessors.forEach(node => {
+        const nodeId = node.id();
+        const nodeType = node.data('type');
+
+        // Skip start node
+        if (nodeType === 'start') return;
+
+        // Add example based on node type
+        if (nodeType === 'skill') {
+            examples.push(`${nodeId}.output`);
+        } else if (nodeType === 'approval') {
+            examples.push(`${nodeId}.approved`);
+        } else {
+            examples.push(`${nodeId}.output`);
+        }
+    });
+
+    return examples.slice(0, 4); // Limit to 4 examples
 }
 
 function getActiveArgSource(argSource) {
@@ -518,6 +710,14 @@ function updateArgValue(argName, value) {
     markDirty();
 }
 
+function setArgExample(argName, value) {
+    const input = document.getElementById(`arg-${argName}`);
+    if (input) {
+        input.value = value;
+        updateArgValue(argName, value);
+    }
+}
+
 function updateArgsEditor() {
     if (!selectedNode) return;
     const skillName = document.getElementById('propSkillName').value;
@@ -562,6 +762,78 @@ function renderApprovalProperties(data) {
     `;
 }
 
+function renderWaitProperties(data) {
+    const waitType = data.waitType || 'duration';
+    const durationSeconds = data.durationSeconds || 60;
+
+    return `
+        <div class="property-group">
+            <label>Wait Type</label>
+            <select id="propWaitType" onchange="updateNodeProperty('waitType', this.value); renderProperties(selectedNode);">
+                <option value="duration" ${waitType === 'duration' ? 'selected' : ''}>Duration</option>
+                <option value="until" ${waitType === 'until' ? 'selected' : ''}>Until Time</option>
+            </select>
+        </div>
+
+        ${waitType === 'duration' ? `
+            <div class="property-group">
+                <label>Duration (seconds)</label>
+                <input type="number" id="propDurationSeconds" value="${durationSeconds}" min="1" max="86400"
+                       onchange="updateNodeProperty('durationSeconds', parseInt(this.value))">
+                <div class="text-muted" style="font-size: 0.8rem; margin-top: 4px;">
+                    ${formatDuration(durationSeconds)}
+                </div>
+            </div>
+            <div class="property-group">
+                <label>Quick Set</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="setWaitDuration(30)">30s</button>
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="setWaitDuration(60)">1m</button>
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="setWaitDuration(300)">5m</button>
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="setWaitDuration(900)">15m</button>
+                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="setWaitDuration(3600)">1h</button>
+                </div>
+            </div>
+        ` : `
+            <div class="property-group">
+                <label>Wait Until</label>
+                <input type="datetime-local" id="propWaitUntil" value="${data.waitUntil || ''}"
+                       onchange="updateNodeProperty('waitUntil', this.value)">
+                <div class="text-muted" style="font-size: 0.8rem; margin-top: 4px;">
+                    Execution will pause until this time
+                </div>
+            </div>
+        `}
+
+        <div class="property-group" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+            <div class="text-muted" style="font-size: 0.85rem;">
+                <strong>Wait Node</strong><br>
+                Pauses workflow execution for a specified duration or until a specific time.
+                Useful for rate limiting, scheduling delays, or waiting for external processes.
+            </div>
+        </div>
+    `;
+}
+
+function formatDuration(seconds) {
+    if (seconds < 60) return `${seconds} seconds`;
+    if (seconds < 3600) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return secs > 0 ? `${mins} minute${mins > 1 ? 's' : ''} ${secs} second${secs > 1 ? 's' : ''}` : `${mins} minute${mins > 1 ? 's' : ''}`;
+    }
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return mins > 0 ? `${hours} hour${hours > 1 ? 's' : ''} ${mins} minute${mins > 1 ? 's' : ''}` : `${hours} hour${hours > 1 ? 's' : ''}`;
+}
+
+function setWaitDuration(seconds) {
+    if (!selectedNode) return;
+    selectedNode.data('durationSeconds', seconds);
+    markDirty();
+    renderProperties(selectedNode);
+}
+
 function updateNodeProperty(prop, value) {
     if (!selectedNode) return;
     selectedNode.data(prop, value);
@@ -578,6 +850,24 @@ function deleteSelectedNode() {
     }
 
     selectedNode.remove();
+    deselectNode();
+    markDirty();
+}
+
+function deleteSelectedElements() {
+    const selected = cy.$(':selected');
+    if (selected.length === 0) return;
+
+    // Check if trying to delete start/end nodes
+    const protectedNodes = selected.filter('node[type="start"], node[type="end"]');
+    if (protectedNodes.length > 0) {
+        alert('Cannot delete start or end nodes');
+        // Remove only non-protected elements
+        selected.not(protectedNodes).remove();
+    } else {
+        selected.remove();
+    }
+
     deselectNode();
     markDirty();
 }
@@ -647,6 +937,12 @@ function addNode(type, position, skillName = null) {
         data.scheduledBehavior = 'WaitForApproval';
     }
 
+    if (type === 'wait') {
+        data.waitType = 'duration';
+        data.durationSeconds = 60;
+        data.waitUntil = null;
+    }
+
     cy.add({
         group: 'nodes',
         data,
@@ -661,15 +957,48 @@ let edgeCreationSource = null;
 
 function startEdgeCreation(sourceNode) {
     edgeCreationSource = sourceNode;
+    // Highlight the source node
+    sourceNode.addClass('edge-source');
+    showConnectionHint(`Click another node to connect from "${sourceNode.data('label')}"`);
+
+    // Setup listeners
     cy.once('tap', 'node', completeEdgeCreation);
+
+    // Cancel on ESC or click on canvas
+    const cancelHandler = (evt) => {
+        if (evt.target === cy) {
+            cancelEdgeCreation();
+        }
+    };
+    cy.once('tap', cancelHandler);
+
+    document.addEventListener('keydown', function escHandler(e) {
+        if (e.key === 'Escape') {
+            cancelEdgeCreation();
+            document.removeEventListener('keydown', escHandler);
+        }
+    });
+}
+
+function cancelEdgeCreation() {
+    if (edgeCreationSource) {
+        edgeCreationSource.removeClass('edge-source');
+        edgeCreationSource = null;
+    }
+    hideConnectionHint();
 }
 
 function completeEdgeCreation(evt) {
     if (!edgeCreationSource) return;
 
     const targetNode = evt.target;
+
+    // Clean up source highlight
+    edgeCreationSource.removeClass('edge-source');
+
     if (targetNode.id() === edgeCreationSource.id()) {
         edgeCreationSource = null;
+        hideConnectionHint();
         return;
     }
 
@@ -692,6 +1021,25 @@ function completeEdgeCreation(evt) {
     }
 
     edgeCreationSource = null;
+    hideConnectionHint();
+}
+
+function showConnectionHint(message) {
+    const hint = document.getElementById('canvasHint');
+    hint.textContent = message;
+    hint.classList.remove('hidden');
+    hint.classList.add('connection-mode');
+}
+
+function hideConnectionHint() {
+    const hint = document.getElementById('canvasHint');
+    hint.classList.remove('connection-mode');
+    // Only hide if there are nodes (otherwise show default hint)
+    if (cy.nodes().length > 2) {
+        hint.classList.add('hidden');
+    } else {
+        hint.textContent = 'Drag nodes from the left panel to add them to your workflow';
+    }
 }
 
 // Auto layout
@@ -760,13 +1108,55 @@ async function saveWorkflow() {
     }
 }
 
-function markDirty() {
+function markDirty(skipHistory = false) {
     isDirty = true;
     showSaveStatus('Unsaved changes');
+    if (!skipHistory) {
+        saveState();
+    }
 }
 
 function markClean() {
     isDirty = false;
+}
+
+// Undo/Redo functionality
+function saveState() {
+    const state = cy.json().elements;
+    undoStack.push(JSON.stringify(state));
+    if (undoStack.length > MAX_HISTORY) {
+        undoStack.shift();
+    }
+    // Clear redo stack when new action is performed
+    redoStack.length = 0;
+}
+
+function undo() {
+    if (undoStack.length <= 1) return; // Keep at least initial state
+
+    const currentState = undoStack.pop();
+    redoStack.push(currentState);
+
+    const previousState = undoStack[undoStack.length - 1];
+    if (previousState) {
+        restoreState(previousState);
+        markDirty();
+    }
+}
+
+function redo() {
+    if (redoStack.length === 0) return;
+
+    const nextState = redoStack.pop();
+    undoStack.push(nextState);
+    restoreState(nextState);
+    markDirty();
+}
+
+function restoreState(stateJson) {
+    const elements = JSON.parse(stateJson);
+    cy.elements().remove();
+    cy.add(elements);
 }
 
 function showSaveStatus(text) {
@@ -1102,10 +1492,26 @@ function setupEventListeners() {
             saveWorkflow();
         }
 
-        // Delete key to delete selected node
+        // Ctrl/Cmd + Z to undo, Ctrl/Cmd + Shift + Z to redo
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                redo();
+            } else {
+                undo();
+            }
+        }
+
+        // Ctrl/Cmd + Y to redo (alternative)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+            e.preventDefault();
+            redo();
+        }
+
+        // Delete key to delete selected node or edge
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (selectedNode && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                deleteSelectedNode();
+            if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                deleteSelectedElements();
             }
         }
     });
@@ -1125,4 +1531,18 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function renderMarkdown(text) {
+    if (!text) return '';
+    // Use marked.js if available, otherwise just escape HTML
+    if (typeof marked !== 'undefined') {
+        // Configure marked for safe rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+        return marked.parse(text);
+    }
+    return `<p>${escapeHtml(text)}</p>`;
 }

@@ -362,8 +362,16 @@ async function createWorkflow() {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.title || 'Failed to create workflow');
+            const contentType = response.headers.get('content-type');
+            let errorMessage = 'Failed to create workflow';
+            if (contentType && contentType.includes('application/json')) {
+                const error = await response.json();
+                errorMessage = error.title || error.detail || error.message || JSON.stringify(error);
+            } else {
+                const text = await response.text();
+                if (text) errorMessage = text;
+            }
+            throw new Error(`${response.status}: ${errorMessage}`);
         }
 
         const workflow = await response.json();
