@@ -25,13 +25,7 @@ using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
 using OpenClaw.Infrastructure.Skills.Persistence;
 using OpenClaw.Contracts.Configuration;
-using OpenClaw.Contracts.Pipelines;
-using OpenClaw.Contracts.Workflows;
-using OpenClaw.Domain.Workflows;
 using OpenClaw.Infrastructure.Configuration;
-using OpenClaw.Infrastructure.Pipelines;
-using OpenClaw.Infrastructure.Workflows;
-using OpenClaw.Infrastructure.Workflows.Persistence;
 
 namespace OpenClaw.Infrastructure;
 
@@ -65,8 +59,6 @@ public static class WedaTemplateInfrastructureModule
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
-        services.AddSingleton<IPipelineExecutionStore, InMemoryPipelineExecutionStore>();
-        services.AddSingleton<IWorkflowExecutionStore, InMemoryWorkflowApprovalStore>();
 
         return services;
     }
@@ -88,8 +80,6 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
         services.AddScoped<IAppConfigRepository, AppConfigRepository>();
         services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
-        services.AddScoped<IWorkflowDefinitionRepository, WorkflowDefinitionRepository>();
-        services.AddScoped<IWorkflowExecutionRepository, WorkflowExecutionRepository>();
 
         // configuration (chain: Database -> Environment)
         // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)
