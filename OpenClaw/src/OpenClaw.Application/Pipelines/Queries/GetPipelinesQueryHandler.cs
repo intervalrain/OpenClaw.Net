@@ -7,7 +7,7 @@ using OpenClaw.Contracts.Skills;
 namespace OpenClaw.Application.Pipelines.Queries;
 
 public class GetPipelinesQueryHandler(
-    IEnumerable<ISkillPipeline> pipelines) : IRequestHandler<GetPipelinesQuery, PipelineListResponse>
+    IEnumerable<IToolPipeline> pipelines) : IRequestHandler<GetPipelinesQuery, PipelineListResponse>
 {
     public ValueTask<PipelineListResponse> Handle(GetPipelinesQuery query, CancellationToken ct)
     {

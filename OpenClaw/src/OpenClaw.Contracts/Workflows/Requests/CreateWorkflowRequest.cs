@@ -57,3 +57,14 @@ public record UpdateScheduleRequest
 {
     public required ScheduleConfig Schedule { get; init; }
 }
+
+/// <summary>
+/// Request to approve a node with optional edited output for downstream nodes.
+/// </summary>
+public record ApproveNodeRequest
+{
+    /// <summary>
+    /// Edited output JSON to pass to downstream nodes. If null, uses "approved".
+    /// </summary>
+    public string? EditedOutput { get; init; }
+}

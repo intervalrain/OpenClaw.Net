@@ -24,7 +24,7 @@ public class AgentPipelineBuilder(IServiceProvider _serviceProvider)
 
     public IAgentPipeline Build(
         ILlmProviderFactory llmProviderFactory,
-        IEnumerable<IAgentSkill> skills,
+        IEnumerable<IAgentTool> skills,
         AgentPipelineOptions options)
     {
         return new AgentPipeline(llmProviderFactory, skills, options, _middlewares);

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace OpenClaw.Contracts.Workflows;
@@ -11,6 +12,7 @@ namespace OpenClaw.Contracts.Workflows;
 [JsonDerivedType(typeof(EndNode), "end")]
 [JsonDerivedType(typeof(SkillNode), "skill")]
 [JsonDerivedType(typeof(ApprovalNode), "approval")]
+[JsonDerivedType(typeof(WaitNode), "wait")]
 public abstract record WorkflowNode
 {
     public required string Id { get; init; }
@@ -47,6 +49,12 @@ public record SkillNode : WorkflowNode
 }
 
 /// <summary>
+/// Wait (sync barrier) node - waits for ALL upstream nodes to complete before continuing.
+/// Without a Wait node, downstream nodes fire when ANY upstream node completes.
+/// </summary>
+public record WaitNode : WorkflowNode;
+
+/// <summary>
 /// Approval gate node - pauses workflow execution until approved or rejected.
 /// </summary>
 public record ApprovalNode : WorkflowNode
@@ -70,6 +78,7 @@ public record ApprovalNode : WorkflowNode
 /// <summary>
 /// Behavior for approval nodes when workflow is executed by scheduler.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<ApprovalBehavior>))]
 public enum ApprovalBehavior
 {
     /// <summary>

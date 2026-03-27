@@ -2,15 +2,15 @@ using OpenClaw.Contracts.Skills;
 
 namespace OpenClaw.Application.Skills;
 
-public class SkillRegistry(IEnumerable<IAgentSkill> skills) : ISkillRegistry
+public class ToolRegistry(IEnumerable<IAgentTool> skills) : IToolRegistry
 {
-    private readonly Dictionary<string, IAgentSkill> _skills = skills.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IAgentTool> _skills = skills.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyList<IAgentSkill> GetAllSkills() => _skills.Values.ToList();
+    public IReadOnlyList<IAgentTool> GetAllSkills() => _skills.Values.ToList();
 
-    public IAgentSkill? GetSkill(string name) => _skills.GetValueOrDefault(name);
+    public IAgentTool? GetSkill(string name) => _skills.GetValueOrDefault(name);
 
-    public bool TryGetSkill(string name, out IAgentSkill? skill) => _skills.TryGetValue(name, out skill);
+    public bool TryGetSkill(string name, out IAgentTool? skill) => _skills.TryGetValue(name, out skill);
 
     public TSkill? GetSkill<TSkill>() => (TSkill)_skills.FirstOrDefault(kvp => kvp.Value is TSkill).Value;
 

@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadWorkflow();
     setupEventListeners();
     setupDragAndDrop();
+    setupOnboarding();
 });
 
 // Initialize Cytoscape
@@ -90,7 +91,42 @@ function initCytoscape() {
                     'height': 45
                 }
             },
-            // Execution status styles
+            // Execution status styles (from canvas polling)
+            {
+                selector: 'node.cy-node-running',
+                style: {
+                    'border-color': '#3498db',
+                    'border-width': 4,
+                    'shadow-blur': 10,
+                    'shadow-color': '#3498db',
+                    'shadow-opacity': 0.5,
+                    'shadow-offset-x': 0,
+                    'shadow-offset-y': 0
+                }
+            },
+            {
+                selector: 'node.cy-node-completed',
+                style: {
+                    'border-color': '#27ae60',
+                    'border-width': 3
+                }
+            },
+            {
+                selector: 'node.cy-node-failed',
+                style: {
+                    'border-color': '#e74c3c',
+                    'border-width': 3
+                }
+            },
+            {
+                selector: 'node.cy-node-waiting',
+                style: {
+                    'border-color': '#f39c12',
+                    'border-width': 4,
+                    'border-style': 'dashed'
+                }
+            },
+            // Legacy styles (for modal execution view)
             {
                 selector: 'node.running',
                 style: {
@@ -203,9 +239,20 @@ function initCytoscape() {
 // Load skills from API
 async function loadSkills() {
     try {
-        const response = await authFetch('/api/v1/workflow/skills');
-        if (!response.ok) throw new Error('Failed to load skills');
-        skills = await response.json();
+        // Load both Skills (markdown-defined) and Tools (C# function calling)
+        const [skillsRes, toolsRes] = await Promise.all([
+            authFetch('/api/v1/workflow/skills'),
+            authFetch('/api/v1/workflow/tools')
+        ]);
+
+        const mdSkills = skillsRes.ok ? await skillsRes.json() : [];
+        const tools = toolsRes.ok ? await toolsRes.json() : [];
+
+        // Skills come first, then Tools as fallback
+        skills = [
+            ...mdSkills.map(s => ({ ...s, _type: 'skill' })),
+            ...tools.map(t => ({ ...t, _type: 'tool' }))
+        ];
         renderSkillList();
     } catch (error) {
         console.error('Error loading skills:', error);
@@ -220,12 +267,27 @@ function renderSkillList() {
         return;
     }
 
-    // Simple, compact skill list - just name with tooltip for description
-    container.innerHTML = skills.map(skill => `
-        <div class="skill-item" draggable="true" data-type="skill" data-skill="${escapeHtml(skill.name)}" title="${escapeHtml(skill.description || '')}">
-            ${escapeHtml(skill.name)}
-        </div>
-    `).join('');
+    const mdSkills = skills.filter(s => s._type === 'skill');
+    const tools = skills.filter(s => s._type === 'tool');
+
+    let html = '';
+    if (mdSkills.length > 0) {
+        html += mdSkills.map(s => `
+            <div class="skill-item skill-md" draggable="true" data-type="skill" data-skill="${escapeHtml(s.name)}" title="${escapeHtml(s.description || '')}">
+                <span class="skill-badge">Skill</span> ${escapeHtml(s.name)}
+            </div>
+        `).join('');
+    }
+    if (tools.length > 0) {
+        if (mdSkills.length > 0) html += '<div class="skill-list-divider">Tools</div>';
+        html += tools.map(t => `
+            <div class="skill-item skill-tool" draggable="true" data-type="skill" data-skill="${escapeHtml(t.name)}" title="${escapeHtml(t.description || '')}">
+                <span class="tool-badge">Tool</span> ${escapeHtml(t.name)}
+            </div>
+        `).join('');
+    }
+
+    container.innerHTML = html;
 
     // Add drag handlers
     container.querySelectorAll('.skill-item').forEach(item => {
@@ -329,25 +391,44 @@ function exportGraph() {
         const data = node.data();
         const pos = node.position();
 
+        // IMPORTANT: 'type' MUST be the FIRST property for .NET polymorphic JSON deserialization
         const base = {
-            id: data.id,
             type: data.type,
+            id: data.id,
             position: { x: Math.round(pos.x), y: Math.round(pos.y) },
             label: data.label
         };
 
         if (data.type === 'skill') {
+            // Clean internal fields from args before saving
+            const cleanArgs = {};
+            if (data.args) {
+                for (const [key, val] of Object.entries(data.args)) {
+                    const clean = {};
+                    if (val.filledValue !== undefined && val.filledValue !== null) clean.filledValue = val.filledValue;
+                    if (val.configKey) clean.configKey = val.configKey;
+                    if (val.inputMapping) clean.inputMapping = val.inputMapping;
+                    if (val.userPreferenceKey) clean.userPreferenceKey = val.userPreferenceKey;
+                    cleanArgs[key] = clean;
+                }
+            }
             return {
-                ...base,
+                type: data.type,
+                id: data.id,
+                position: { x: Math.round(pos.x), y: Math.round(pos.y) },
+                label: data.label,
                 skillName: data.skillName || '',
-                args: data.args || {},
+                args: cleanArgs,
                 timeoutSeconds: data.timeoutSeconds || 300
             };
         }
 
         if (data.type === 'approval') {
             return {
-                ...base,
+                type: data.type,
+                id: data.id,
+                position: { x: Math.round(pos.x), y: Math.round(pos.y) },
+                label: data.label,
                 approvalName: data.approvalName || data.label || 'Approval',
                 description: data.description || '',
                 scheduledBehavior: data.scheduledBehavior || 'WaitForApproval'
@@ -356,7 +437,10 @@ function exportGraph() {
 
         if (data.type === 'wait') {
             return {
-                ...base,
+                type: data.type,
+                id: data.id,
+                position: { x: Math.round(pos.x), y: Math.round(pos.y) },
+                label: data.label,
                 waitType: data.waitType || 'duration',
                 durationSeconds: data.durationSeconds || 60,
                 waitUntil: data.waitUntil || null
@@ -375,8 +459,7 @@ function exportGraph() {
 
     return {
         nodes,
-        edges,
-        variables: workflow?.definition?.variables || {}
+        edges
     };
 }
 
@@ -443,23 +526,25 @@ function renderProperties(node) {
 
 function renderSkillProperties(data) {
     const skillOptions = skills.map(s =>
-        `<option value="${escapeHtml(s.name)}" ${s.name === data.skillName ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+        `<option value="${escapeHtml(s.name)}" ${s.name === data.skillName ? 'selected' : ''}>${escapeHtml(s.name)} (${s._type})</option>`
     ).join('');
 
     const skill = skills.find(s => s.name === data.skillName);
 
     let html = `
         <div class="property-group">
-            <label>Skill</label>
+            <label>Skill / Tool</label>
             <select id="propSkillName" onchange="updateNodeProperty('skillName', this.value); updateArgsEditor()">
-                <option value="">Select a skill...</option>
+                <option value="">Select...</option>
                 ${skillOptions}
             </select>
         </div>
     `;
 
-    // Show skill description if available (supports markdown)
-    if (skill && skill.description) {
+    if (!skill) return html;
+
+    // Show description
+    if (skill.description) {
         html += `
             <div class="skill-description markdown-content">
                 ${renderMarkdown(skill.description)}
@@ -474,96 +559,201 @@ function renderSkillProperties(data) {
         </div>
     `;
 
-    // Args section
-    if (skill && skill.parameters && Object.keys(skill.parameters).length > 0) {
+    if (skill._type === 'skill') {
+        // Markdown Skill — show tools list and instructions preview
+        if (skill.tools && skill.tools.length > 0) {
+            html += `
+                <div class="property-group">
+                    <label>Uses Tools</label>
+                    <div class="skill-tools-list">${skill.tools.map(t => `<span class="tool-tag">${escapeHtml(t)}</span>`).join(' ')}</div>
+                </div>
+            `;
+        }
+        if (skill.instructions) {
+            html += `
+                <div class="property-group">
+                    <label>Instructions <small class="text-muted">(click to expand)</small></label>
+                    <div class="skill-instructions collapsed markdown-content" onclick="this.classList.toggle('collapsed')">
+                        ${renderMarkdown(skill.instructions)}
+                    </div>
+                </div>
+            `;
+        }
+        // Skill nodes can have a free-form input context
         html += `
-            <div class="args-section">
-                <h4>Arguments</h4>
-                ${renderArgsEditor(skill.parameters, data.args || {})}
+            <div class="property-group">
+                <label>Additional Context (optional)</label>
+                <textarea id="propSkillContext" rows="3" placeholder="Extra instructions or context for this skill execution..."
+                    oninput="updateNodeProperty('skillContext', this.value)">${escapeHtml(data.skillContext || '')}</textarea>
             </div>
         `;
-    } else if (skill) {
-        html += `
-            <div class="args-section">
-                <h4>Arguments</h4>
-                <p class="text-muted">This skill has no parameters</p>
-            </div>
-        `;
+    } else {
+        // Direct Tool — show parameter args editor
+        const hasArgs = skill.parameters && skill.parameters.properties && Object.keys(skill.parameters.properties).length > 0;
+        if (hasArgs) {
+            html += `
+                <div class="args-section">
+                    <h4>Arguments</h4>
+                    ${renderArgsEditor(skill.parameters.properties, skill.parameters.required || [], data.args || {})}
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="args-section">
+                    <h4>Arguments</h4>
+                    <p class="text-muted">This tool has no parameters</p>
+                </div>
+            `;
+        }
     }
 
     return html;
 }
 
-function renderArgsEditor(parameters, currentArgs) {
-    if (!parameters || Object.keys(parameters).length === 0) {
+function renderArgsEditor(properties, requiredList, currentArgs) {
+    if (!properties || Object.keys(properties).length === 0) {
         return '<p class="text-muted">This skill has no parameters</p>';
     }
 
-    return Object.entries(parameters).map(([name, param]) => {
+    // Ensure all skill params exist in node args (so they get saved even if empty)
+    if (selectedNode) {
+        const args = selectedNode.data('args') || {};
+        let changed = false;
+        for (const name of Object.keys(properties)) {
+            if (!(name in args)) {
+                args[name] = {};
+                changed = true;
+            }
+        }
+        if (changed) {
+            selectedNode.data('args', args);
+            Object.assign(currentArgs, args);
+        }
+    }
+
+    // Trigger auto-fill from ConfigStore/UserPreference for empty args
+    autoFillArgs(properties, currentArgs);
+
+    return Object.entries(properties).map(([name, param]) => {
         const argSource = currentArgs[name] || {};
         const activeSource = getActiveArgSource(argSource);
-        const sourceHelp = getArgSourceHelp(activeSource, name);
+        const isRequired = Array.isArray(requiredList) && requiredList.includes(name);
+        const autoFilled = argSource._autoFilled;
+        const currentValue = getArgValue(argSource, activeSource);
+        const hasValue = currentValue !== '';
+
+        // Color class: required+empty=red, required+filled=green, optional=blue, ai=purple
+        let colorClass = 'arg-optional';
+        if (activeSource === 'ai') colorClass = 'arg-ai';
+        else if (isRequired && !hasValue) colorClass = 'arg-required-empty';
+        else if (isRequired && hasValue) colorClass = 'arg-required-filled';
 
         return `
-            <div class="arg-item">
-                <div class="arg-header">
-                    <span class="arg-name">${escapeHtml(name)} ${param.required ? '<span class="required-mark">*</span>' : ''}</span>
+            <div class="arg-item ${colorClass}" data-arg="${escapeHtml(name)}">
+                <div class="arg-header" onclick="toggleArgExpand(this)">
+                    <span class="arg-name">
+                        ${escapeHtml(name)} ${isRequired ? '<span class="required-mark">*</span>' : ''}
+                        ${activeSource === 'ai' ? '<span class="ai-badge">AI</span>' : ''}
+                        <span class="arg-expand-icon">&#9654;</span>
+                    </span>
                     <span class="arg-type">${escapeHtml(param.type || 'string')}</span>
                 </div>
-                ${param.description ? `<div class="arg-description">${escapeHtml(param.description)}</div>` : ''}
-                <div class="arg-source-tabs">
-                    <button class="arg-source-tab ${activeSource === 'filled' ? 'active' : ''}"
-                            onclick="setArgSource('${name}', 'filled')"
-                            title="直接填入固定值">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                        Value
-                    </button>
-                    <button class="arg-source-tab ${activeSource === 'config' ? 'active' : ''}"
-                            onclick="setArgSource('${name}', 'config')"
-                            title="使用 Workflow 變數">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
-                        Config
-                    </button>
-                    <button class="arg-source-tab ${activeSource === 'input' ? 'active' : ''}"
-                            onclick="setArgSource('${name}', 'input')"
-                            title="從上游節點取值">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="5" r="3"/>
-                            <line x1="12" y1="8" x2="12" y2="21"/>
-                            <path d="M8 17l4 4 4-4"/>
-                        </svg>
-                        Input
-                    </button>
+                ${param.description ? `<div class="arg-description markdown-content">${renderMarkdown(param.description)}</div>` : ''}
+                <div class="arg-body">
+                    <div class="arg-source-tabs">
+                        <button class="arg-source-tab ${activeSource === 'filled' ? 'active' : ''}"
+                                onclick="event.stopPropagation(); setArgSource('${name}', 'filled')"
+                                title="直接填入固定值">
+                            Value
+                        </button>
+                        <button class="arg-source-tab ${activeSource === 'input' ? 'active' : ''}"
+                                onclick="event.stopPropagation(); setArgSource('${name}', 'input')"
+                                title="從上游節點取值">
+                            Input
+                        </button>
+                        <button class="arg-source-tab ${activeSource === 'ai' ? 'active' : ''}"
+                                onclick="event.stopPropagation(); setArgSource('${name}', 'ai')"
+                                title="由 AI 根據上游結果自動填入">
+                            AI Fill
+                        </button>
+                    </div>
+                    ${activeSource === 'ai' ? '<div class="arg-source-help"><span class="ai-fill-hint">AI will fill this based on upstream node outputs at runtime</span></div>' : ''}
+                    ${autoFilled ? `<div class="arg-source-help"><span class="auto-filled-hint">auto-filled from ${escapeHtml(autoFilled)}</span></div>` : ''}
+                    ${activeSource !== 'ai' ? `
+                    <input type="text" class="arg-value-input"
+                           id="arg-${name}"
+                           value="${escapeHtml(currentValue)}"
+                           placeholder="${getArgPlaceholder(activeSource, param)}"
+                           oninput="updateArgValue('${name}', this.value)">
+                    ${renderArgExamples(activeSource, param, name)}
+                    ` : '<input type="hidden" id="arg-' + name + '" value="">'}
                 </div>
-                <div class="arg-source-help">${sourceHelp}</div>
-                <input type="text" class="arg-value-input"
-                       id="arg-${name}"
-                       value="${escapeHtml(getArgValue(argSource, activeSource))}"
-                       placeholder="${getArgPlaceholder(activeSource, param)}"
-                       onchange="updateArgValue('${name}', this.value)">
-                ${renderArgExamples(activeSource, param, name)}
             </div>
         `;
     }).join('');
 }
 
-function getArgSourceHelp(source, argName) {
-    switch (source) {
-        case 'filled':
-            return '直接輸入固定值，執行時使用此值';
-        case 'config':
-            return '引用 Workflow 變數，可在不同執行間共享';
-        case 'input':
-            return '從上游節點的輸出取值 (格式: nodeId.path)';
-        default:
-            return '';
+// Auto-fill empty args from ConfigStore → UserPreference
+// Updates node data and DOM inputs in-place — does NOT re-render the panel
+async function autoFillArgs(properties, currentArgs) {
+    if (!selectedNode || autoFillArgs._running) return;
+
+    // Build a map of defaultKey → paramName for params that have a defaultKey and no value yet
+    const keyToParam = {};
+    for (const [name, param] of Object.entries(properties)) {
+        if (!param.defaultKey) continue;
+        const arg = currentArgs[name];
+        if (arg && (arg.filledValue || arg.inputMapping || arg._aiFill)) continue;
+        keyToParam[param.defaultKey] = name;
     }
+
+    const keysToLookup = Object.keys(keyToParam);
+    if (keysToLookup.length === 0) return;
+
+    autoFillArgs._running = true;
+    try {
+        const response = await authFetch('/api/v1/workflow/args/suggest', {
+            method: 'POST',
+            body: JSON.stringify(keysToLookup)
+        });
+        if (!response.ok) return;
+
+        const suggestions = await response.json();
+        if (!suggestions || Object.keys(suggestions).length === 0) return;
+
+        const args = selectedNode.data('args') || {};
+
+        for (const [lookupKey, value] of Object.entries(suggestions)) {
+            const paramName = keyToParam[lookupKey];
+            if (!paramName || value === null || value === undefined) continue;
+
+            // Only fill if user hasn't typed something in the meantime
+            const currentVal = args[paramName];
+            if (currentVal && currentVal.filledValue) continue;
+
+            args[paramName] = {
+                filledValue: value,
+                _autoFilled: lookupKey
+            };
+
+            // Update DOM input in-place (no re-render)
+            const inputEl = document.getElementById(`arg-${paramName}`);
+            if (inputEl && !inputEl.value) {
+                inputEl.value = value;
+            }
+        }
+
+        selectedNode.data('args', args);
+    } catch (error) {
+        console.error('Auto-fill args error:', error);
+    } finally {
+        autoFillArgs._running = false;
+    }
+}
+
+function toggleArgExpand(headerEl) {
+    const argItem = headerEl.closest('.arg-item');
+    argItem.classList.toggle('arg-expanded');
 }
 
 function renderArgExamples(source, param, argName) {
@@ -581,9 +771,6 @@ function renderArgExamples(source, param, argName) {
                 examples = [param.default];
             }
             break;
-        case 'config':
-            examples = ['myVariable', `${argName}_config`];
-            break;
         case 'input':
             // Get upstream nodes dynamically
             examples = getUpstreamNodeExamples();
@@ -597,7 +784,7 @@ function renderArgExamples(source, param, argName) {
 
     return `
         <div class="arg-examples">
-            <span class="examples-label">例:</span>
+            <span class="examples-label">e.g.</span>
             ${examples.map(ex => `<code class="example-value" onclick="setArgExample('${argName}', '${escapeHtml(ex)}')">${escapeHtml(ex)}</code>`).join('')}
         </div>
     `;
@@ -607,7 +794,6 @@ function getUpstreamNodeExamples() {
     if (!selectedNode || !cy) return [];
 
     const examples = [];
-    const currentId = selectedNode.id();
 
     // Get all predecessors (upstream nodes)
     const predecessors = selectedNode.predecessors('node');
@@ -633,8 +819,8 @@ function getUpstreamNodeExamples() {
 }
 
 function getActiveArgSource(argSource) {
+    if (argSource._aiFill) return 'ai';
     if (argSource.filledValue !== undefined && argSource.filledValue !== null) return 'filled';
-    if (argSource.configKey) return 'config';
     if (argSource.inputMapping) return 'input';
     return 'filled';
 }
@@ -642,7 +828,6 @@ function getActiveArgSource(argSource) {
 function getArgValue(argSource, activeSource) {
     switch (activeSource) {
         case 'filled': return argSource.filledValue || '';
-        case 'config': return argSource.configKey || '';
         case 'input': return argSource.inputMapping || '';
         default: return '';
     }
@@ -651,7 +836,6 @@ function getArgValue(argSource, activeSource) {
 function getArgPlaceholder(activeSource, param) {
     switch (activeSource) {
         case 'filled': return param.default || 'Enter value...';
-        case 'config': return 'Variable name (e.g., myVar)';
         case 'input': return 'Node output (e.g., nodeId.output)';
         default: return '';
     }
@@ -661,29 +845,37 @@ function setArgSource(argName, source) {
     if (!selectedNode) return;
 
     const args = selectedNode.data('args') || {};
-    const currentArg = args[argName] || {};
-    const value = document.getElementById(`arg-${argName}`).value;
+    const oldArg = args[argName] || {};
+    const oldSource = getActiveArgSource(oldArg);
 
-    // Clear all sources and set the new one
+    // Don't switch if already on this source
+    if (oldSource === source) return;
+
+    // When switching source, start fresh (don't carry value across)
     const newArg = {};
     switch (source) {
         case 'filled':
-            newArg.filledValue = value;
-            break;
-        case 'config':
-            newArg.configKey = value;
+            newArg.filledValue = oldArg._prevFilled || '';
             break;
         case 'input':
-            newArg.inputMapping = value;
+            newArg.inputMapping = oldArg._prevInput || '';
+            break;
+        case 'ai':
+            newArg._aiFill = true;
             break;
     }
+    // Preserve previous values for switching back
+    if (oldSource === 'filled') newArg._prevFilled = oldArg.filledValue || '';
+    if (oldSource === 'input') newArg._prevInput = oldArg.inputMapping || '';
 
     args[argName] = newArg;
     selectedNode.data('args', args);
     markDirty();
 
-    // Re-render to update tabs
+    // Re-render but skip auto-fill (user is manually switching)
+    autoFillArgs._rendering = true;
     renderProperties(selectedNode);
+    autoFillArgs._rendering = false;
 }
 
 function updateArgValue(argName, value) {
@@ -696,9 +888,8 @@ function updateArgValue(argName, value) {
     switch (activeSource) {
         case 'filled':
             currentArg.filledValue = value;
-            break;
-        case 'config':
-            currentArg.configKey = value;
+            // Clear auto-filled hint when user manually edits
+            delete currentArg._autoFilled;
             break;
         case 'input':
             currentArg.inputMapping = value;
@@ -1087,8 +1278,24 @@ async function saveWorkflow() {
         }
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.title || 'Failed to save workflow');
+            const contentType = response.headers.get('content-type');
+            let errorMessage = `HTTP ${response.status}`;
+            if (contentType && contentType.includes('application/json')) {
+                const error = await response.json();
+                // Show full validation details if available
+                if (error.errors) {
+                    const details = Object.entries(error.errors)
+                        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+                        .join('\n');
+                    errorMessage = `${error.title || 'Validation error'}\n${details}`;
+                } else {
+                    errorMessage = error.title || error.detail || error.message || JSON.stringify(error);
+                }
+            } else {
+                const text = await response.text();
+                if (text) errorMessage = text;
+            }
+            throw new Error(errorMessage);
         }
 
         const saved = await response.json();
@@ -1177,6 +1384,15 @@ async function runWorkflow() {
         return;
     }
 
+    const runBtn = document.getElementById('runBtn');
+    runBtn.classList.add('running');
+    runBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+        </svg>
+        Running...
+    `;
+
     try {
         const response = await authFetch(`/api/v1/workflow/${workflowId}/execute`, {
             method: 'POST',
@@ -1189,48 +1405,195 @@ async function runWorkflow() {
         }
 
         const data = await response.json();
-        showExecutionModal(data.executionId);
+        showExecutionBanner(data.executionId);
+        startCanvasExecutionPolling(data.executionId);
     } catch (error) {
         console.error('Error executing workflow:', error);
         alert('Failed to execute: ' + error.message);
+        resetRunButton();
     }
 }
 
-// Execution viewer
+function resetRunButton() {
+    const runBtn = document.getElementById('runBtn');
+    runBtn.classList.remove('running');
+    runBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+        </svg>
+        Run
+    `;
+}
+
+// Execution Banner (shown on canvas)
+function showExecutionBanner(executionId) {
+    currentExecution = executionId;
+    const banner = document.getElementById('executionBanner');
+    banner.classList.remove('hidden', 'success', 'failed', 'waiting');
+    banner.classList.add('running');
+    document.getElementById('bannerStatusText').textContent = 'Executing...';
+    document.getElementById('execProgress').style.width = '10%';
+    updateExecutionBanner('Running', 10);
+}
+
+function hideExecutionBanner() {
+    document.getElementById('executionBanner').classList.add('hidden');
+}
+
+function updateExecutionBanner(status, progress) {
+    const banner = document.getElementById('executionBanner');
+    const statusText = document.getElementById('bannerStatusText');
+    const progressBar = document.getElementById('execProgress');
+    const actions = document.getElementById('bannerActions');
+
+    progressBar.style.width = `${progress}%`;
+    banner.classList.remove('running', 'success', 'failed', 'waiting');
+
+    const stopHtml = '<button class="btn btn-sm" onclick="stopCanvasExecutionPolling(); stopExecutionPolling(); hideExecutionBanner(); resetRunButton();">Stop</button>';
+    const dismissHtml = '<button class="btn btn-sm" onclick="hideExecutionBanner(); resetRunButton();">Dismiss</button>';
+    const detailsHtml = `<button class="btn btn-sm" onclick="if(currentExecution) showExecutionModal(currentExecution)">Details</button>`;
+
+    if (status === 'Completed') {
+        banner.classList.add('success');
+        statusText.textContent = 'Completed';
+        actions.innerHTML = `${detailsHtml} ${dismissHtml}`;
+    } else if (status === 'Failed' || status === 'Rejected') {
+        banner.classList.add('failed');
+        statusText.textContent = status;
+        actions.innerHTML = `${detailsHtml} ${dismissHtml}`;
+    } else if (status === 'WaitingForApproval') {
+        banner.classList.add('waiting');
+        statusText.textContent = 'Waiting for Approval';
+        actions.innerHTML = `<button class="btn btn-sm btn-success" onclick="approveExecution()">Approve</button>
+            <button class="btn btn-sm btn-danger" onclick="rejectExecution()">Reject</button>
+            ${stopHtml}`;
+    } else {
+        banner.classList.add('running');
+        statusText.textContent = 'Executing...';
+        actions.innerHTML = `${detailsHtml} ${stopHtml}`;
+    }
+}
+
+// Canvas-based execution polling (updates nodes directly on canvas)
+function startCanvasExecutionPolling(executionId) {
+    const poll = async () => {
+        try {
+            const response = await authFetch(`/api/v1/workflow/executions/${executionId}/nodes`);
+            if (!response.ok) return;
+
+            const data = await response.json();
+            updateCanvasNodeStates(data);
+
+            // Calculate progress
+            const totalNodes = data.nodes?.length || 0;
+            const completedNodes = data.nodes?.filter(n =>
+                ['Completed', 'Skipped', 'Failed'].includes(n.status)
+            ).length || 0;
+            const progress = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
+
+            updateExecutionBanner(data.status, progress);
+
+            if (['Completed', 'Failed', 'Rejected'].includes(data.status)) {
+                stopCanvasExecutionPolling();
+                resetRunButton();
+                hideExecutionBanner();
+
+                // Auto-open execution report only if modal isn't already open
+                if (!document.getElementById('executionModal').classList.contains('show')) {
+                    showExecutionModal(executionId);
+                }
+            }
+
+            // Handle approval waiting - open modal only once
+            if (data.status === 'WaitingForApproval') {
+                document.getElementById('bannerStatusText').textContent = 'Waiting for Approval...';
+                if (!document.getElementById('executionModal').classList.contains('show')) {
+                    showExecutionModal(executionId);
+                }
+            }
+        } catch (error) {
+            console.error('Execution polling error:', error);
+        }
+    };
+
+    poll();
+    executionPollingInterval = setInterval(poll, 1500);
+}
+
+function stopCanvasExecutionPolling() {
+    if (executionPollingInterval) {
+        clearInterval(executionPollingInterval);
+        executionPollingInterval = null;
+    }
+}
+
+function updateCanvasNodeStates(data) {
+    if (!cy || !data.nodes) return;
+
+    // Reset all node styles first
+    cy.nodes().removeClass('cy-node-running cy-node-completed cy-node-failed cy-node-waiting');
+
+    data.nodes.forEach(nodeState => {
+        const node = cy.getElementById(nodeState.nodeId);
+        if (!node || node.empty()) return;
+
+        switch (nodeState.status) {
+            case 'Running':
+                node.addClass('cy-node-running');
+                break;
+            case 'Completed':
+                node.addClass('cy-node-completed');
+                break;
+            case 'Failed':
+                node.addClass('cy-node-failed');
+                break;
+            case 'WaitingForApproval':
+                node.addClass('cy-node-waiting');
+                break;
+        }
+    });
+}
+
+// Execution viewer modal (pipeline style)
 async function showExecutionModal(executionId) {
+    // Stop any existing modal polling to prevent duplicates
+    stopExecutionPolling();
+    _lastStepStatuses = {};
+
     currentExecution = executionId;
     document.getElementById('executionModal').classList.add('show');
+    document.getElementById('pipelineSteps').innerHTML = '<div class="pipeline-loading">Loading...</div>';
 
-    // Initialize execution graph (copy of main graph)
-    initExecutionGraph();
+    // Load current state first
+    try {
+        const response = await authFetch(`/api/v1/workflow/executions/${executionId}/nodes`);
+        if (response.ok) {
+            const data = await response.json();
+            updateExecutionStatus(data);
 
-    // Start polling
+            // If execution is finished, auto-expand all steps and stop
+            if (['Completed', 'Failed', 'Rejected'].includes(data.status)) {
+                autoExpandAllSteps();
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading execution:', error);
+    }
+
+    // Still running — start polling
     startExecutionPolling(executionId);
 }
 
-function initExecutionGraph() {
-    const container = document.getElementById('executionGraph');
-
-    // Create a mini cytoscape instance for execution visualization
-    const execCy = cytoscape({
-        container,
-        elements: cy.elements().clone(),
-        style: cy.style().json(),
-        layout: { name: 'preset' },
-        userZoomingEnabled: false,
-        userPanningEnabled: false,
-        boxSelectionEnabled: false
-    });
-
-    execCy.fit(30);
-
-    // Store reference
-    container._cy = execCy;
-
-    // Click handler for nodes
-    execCy.on('tap', 'node', async function(evt) {
-        const nodeId = evt.target.id();
-        await loadNodeOutput(currentExecution, nodeId);
+function autoExpandAllSteps() {
+    document.querySelectorAll('.pipeline-step').forEach(step => {
+        const nodeId = step.dataset.stepId;
+        const outputEl = document.getElementById(`step-output-${nodeId}`);
+        if (outputEl && !outputEl.classList.contains('expanded')) {
+            outputEl.classList.add('expanded');
+            step.classList.add('step-expanded');
+            loadStepOutput(nodeId);
+        }
     });
 }
 
@@ -1243,7 +1606,7 @@ async function startExecutionPolling(executionId) {
             const data = await response.json();
             updateExecutionStatus(data);
 
-            if (['Completed', 'Failed', 'Rejected'].includes(data.Status)) {
+            if (['Completed', 'Failed', 'Rejected'].includes(data.status)) {
                 stopExecutionPolling();
             }
         } catch (error) {
@@ -1264,85 +1627,363 @@ function stopExecutionPolling() {
 
 function updateExecutionStatus(data) {
     // Update status bar
-    document.getElementById('execStatus').textContent = data.Status;
-
-    // Update node statuses in execution graph
-    const execCy = document.getElementById('executionGraph')._cy;
-    if (!execCy) return;
-
-    data.Nodes.forEach(node => {
-        const cyNode = execCy.$(`#${node.NodeId}`);
-        cyNode.removeClass('pending running completed failed waiting');
-
-        switch (node.Status) {
-            case 'Running':
-                cyNode.addClass('running');
-                break;
-            case 'Completed':
-                cyNode.addClass('completed');
-                break;
-            case 'Failed':
-                cyNode.addClass('failed');
-                break;
-            case 'WaitingForApproval':
-                cyNode.addClass('waiting');
-                break;
-        }
-    });
+    document.getElementById('execStatus').textContent = data.status;
 
     // Show approval controls if needed
     const approvalFooter = document.getElementById('approvalFooter');
-    if (data.PendingApproval) {
+    if (data.pendingApproval) {
         approvalFooter.style.display = 'flex';
         document.getElementById('approvalMessage').textContent =
-            `Waiting for approval: ${data.PendingApproval.approvalName || 'Approval'}`;
+            `Waiting for approval: ${data.pendingApproval.approvalName || 'Approval'}`;
     } else {
         approvalFooter.style.display = 'none';
     }
+
+    // Render pipeline steps
+    renderPipelineSteps(data.nodes || []);
 }
 
-async function loadNodeOutput(executionId, nodeId) {
+// Track last known status per step to avoid unnecessary re-renders
+let _lastStepStatuses = {};
+
+function renderPipelineSteps(nodes) {
+    const container = document.getElementById('pipelineSteps');
+
+    // Skip start/end nodes for cleaner view
+    const steps = nodes.filter(n => n.nodeType !== 'Start' && n.nodeType !== 'End'
+        && n.nodeType !== 'start' && n.nodeType !== 'end');
+
+    if (steps.length === 0) {
+        container.innerHTML = '<div class="pipeline-empty">No steps to display</div>';
+        _lastStepStatuses = {};
+        return;
+    }
+
+    // Check if we need a full render (first time or step count changed)
+    const existingSteps = container.querySelectorAll('.pipeline-step');
+    const needsFullRender = existingSteps.length === 0 || existingSteps.length !== steps.length;
+
+    if (needsFullRender) {
+        _lastStepStatuses = {};
+        container.innerHTML = steps.map((step, index) => buildStepHtml(step, index, steps.length)).join('');
+
+        // Initial loads
+        steps.forEach(step => {
+            if (['Completed', 'Failed'].includes(step.status)) {
+                loadStepOutput(step.nodeId);
+            }
+            if (step.status === 'WaitingForApproval') {
+                loadApprovalContext(step.nodeId);
+            }
+        });
+
+        // Save statuses
+        steps.forEach(s => _lastStepStatuses[s.nodeId] = s.status);
+        return;
+    }
+
+    // Incremental update: only update steps whose status changed
+    steps.forEach(step => {
+        const prev = _lastStepStatuses[step.nodeId];
+        if (prev === step.status) return; // No change
+
+        _lastStepStatuses[step.nodeId] = step.status;
+
+        const stepEl = container.querySelector(`[data-step-id="${step.nodeId}"]`);
+        if (!stepEl) return;
+
+        // Update status class
+        stepEl.className = `pipeline-step ${(step.status || 'pending').toLowerCase()}`;
+        if (stepEl.classList.contains('step-expanded')) stepEl.classList.add('step-expanded');
+
+        // Update status icon
+        const iconEl = stepEl.querySelector('.step-status-icon');
+        if (iconEl) iconEl.innerHTML = getPipelineStatusIcon(step.status);
+
+        // Update duration/time
+        const metaEl = stepEl.querySelector('.step-meta');
+        if (metaEl) {
+            const duration = step.duration ? formatStepDuration(step.duration) : '';
+            const startTime = step.startedAt ? new Date(step.startedAt).toLocaleTimeString() : '';
+            metaEl.innerHTML = `
+                ${duration ? `<span class="step-duration">${duration}</span>` : ''}
+                ${startTime ? `<span class="step-time">${startTime}</span>` : ''}
+            `;
+        }
+
+        // Add approval panel if newly waiting
+        if (step.status === 'WaitingForApproval' && !stepEl.querySelector('.step-approval-panel')) {
+            const stepContent = stepEl.querySelector('.step-content');
+            const outputDiv = stepEl.querySelector('.step-output');
+            const panel = document.createElement('div');
+            panel.className = 'step-approval-panel';
+            panel.id = `approval-panel-${step.nodeId}`;
+            panel.innerHTML = `
+                <div class="approval-context" id="approval-context-${step.nodeId}">
+                    <div class="approval-context-loading">Loading upstream results...</div>
+                </div>
+                <div class="approval-editor">
+                    <div class="approval-editor-label">Output for downstream nodes (editable)</div>
+                    <textarea class="approval-output-editor" id="approval-output-${step.nodeId}" rows="8" placeholder="Edit the output that will be passed to downstream nodes..."></textarea>
+                </div>
+                <div class="step-approval-actions">
+                    <span class="approval-hint">Review and decide</span>
+                    <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); rejectExecution()">Reject</button>
+                    <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); approveWithOutput('${step.nodeId}')">Approve</button>
+                </div>
+            `;
+            stepContent.insertBefore(panel, outputDiv);
+            loadApprovalContext(step.nodeId);
+        }
+
+        // Remove approval panel if no longer waiting
+        if (step.status !== 'WaitingForApproval') {
+            const panel = stepEl.querySelector('.step-approval-panel');
+            if (panel) panel.remove();
+        }
+
+        // Load output for newly completed/failed steps
+        if (['Completed', 'Failed'].includes(step.status)) {
+            loadStepOutput(step.nodeId);
+        }
+    });
+}
+
+function buildStepHtml(step, index, totalSteps) {
+    const statusIcon = getPipelineStatusIcon(step.status);
+    const statusClass = step.status ? step.status.toLowerCase() : 'pending';
+    const duration = step.duration ? formatStepDuration(step.duration) : '';
+    const startTime = step.startedAt ? new Date(step.startedAt).toLocaleTimeString() : '';
+    const label = step.nodeLabel || step.nodeId;
+
+    return `
+        <div class="pipeline-step ${statusClass}" data-step-id="${step.nodeId}">
+            <div class="step-connector">${index < totalSteps - 1 ? '<div class="connector-line"></div>' : ''}</div>
+            <div class="step-content">
+                <div class="step-header" onclick="toggleStepOutput('${step.nodeId}')">
+                    <div class="step-status-icon">${statusIcon}</div>
+                    <div class="step-info">
+                        <span class="step-label">${escapeHtml(label)}</span>
+                        <span class="step-type">${escapeHtml(step.nodeType)}</span>
+                    </div>
+                    <div class="step-meta">
+                        ${duration ? `<span class="step-duration">${duration}</span>` : ''}
+                        ${startTime ? `<span class="step-time">${startTime}</span>` : ''}
+                    </div>
+                    <span class="step-chevron">&#9654;</span>
+                </div>
+                ${step.status === 'WaitingForApproval' ? `
+                <div class="step-approval-panel" id="approval-panel-${step.nodeId}">
+                    <div class="approval-context" id="approval-context-${step.nodeId}">
+                        <div class="approval-context-loading">Loading upstream results...</div>
+                    </div>
+                    <div class="approval-editor">
+                        <div class="approval-editor-label">Output for downstream nodes (editable)</div>
+                        <textarea class="approval-output-editor" id="approval-output-${step.nodeId}" rows="8" placeholder="Edit the output that will be passed to downstream nodes..."></textarea>
+                    </div>
+                    <div class="step-approval-actions">
+                        <span class="approval-hint">Review and decide</span>
+                        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); rejectExecution()">Reject</button>
+                        <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); approveWithOutput('${step.nodeId}')">Approve</button>
+                    </div>
+                </div>
+                ` : ''}
+                <div class="step-output" id="step-output-${step.nodeId}">
+                    <div class="step-output-content">Loading...</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function loadApprovalContext(nodeId) {
+    const contextEl = document.getElementById(`approval-context-${nodeId}`);
+    const editorEl = document.getElementById(`approval-output-${nodeId}`);
+    if (!contextEl || !currentExecution) return;
+
     try {
-        const response = await authFetch(`/api/v1/workflow/executions/${executionId}/nodes/${nodeId}`);
+        const response = await authFetch(`/api/v1/workflow/executions/${currentExecution}`);
         if (!response.ok) return;
 
+        const data = await response.json();
+
+        if (data.pendingApproval && data.pendingApproval.context && data.pendingApproval.context.length > 0) {
+            // Show upstream outputs
+            contextEl.innerHTML = data.pendingApproval.context.map(item => {
+                let outputHtml = '';
+                if (item.outputSummary) {
+                    try {
+                        const parsed = JSON.parse(item.outputSummary);
+                        outputHtml = escapeHtml(JSON.stringify(parsed, null, 2));
+                    } catch {
+                        outputHtml = escapeHtml(item.outputSummary);
+                    }
+                }
+                return `
+                    <div class="context-item">
+                        <div class="context-item-label">${escapeHtml(item.nodeLabel)}</div>
+                        <pre class="context-item-output">${outputHtml || 'No output'}</pre>
+                    </div>
+                `;
+            }).join('');
+
+            // Pre-fill editor with merged upstream outputs
+            if (editorEl && !editorEl.value) {
+                const merged = {};
+                data.pendingApproval.context.forEach(item => {
+                    if (item.outputSummary) {
+                        try {
+                            merged[item.nodeId] = JSON.parse(item.outputSummary);
+                        } catch {
+                            merged[item.nodeId] = item.outputSummary;
+                        }
+                    }
+                });
+                editorEl.value = JSON.stringify(merged, null, 2);
+            }
+        } else {
+            contextEl.innerHTML = '<div class="context-empty">No upstream outputs available</div>';
+        }
+    } catch (error) {
+        console.error('Error loading approval context:', error);
+        contextEl.innerHTML = '<div class="context-empty">Failed to load context</div>';
+    }
+}
+
+async function loadStepOutput(nodeId) {
+    const outputEl = document.querySelector(`[data-step-id="${nodeId}"] .step-output-content`);
+    if (!outputEl || outputEl.dataset.loaded) return;
+
+    try {
+        const response = await authFetch(`/api/v1/workflow/executions/${currentExecution}/nodes/${nodeId}`);
+        if (!response.ok) {
+            outputEl.textContent = 'Failed to load output';
+            return;
+        }
+
         const node = await response.json();
-        const content = document.getElementById('outputContent');
+        outputEl.dataset.loaded = 'true';
+
+        let content = '';
+        if (node.inputJson) {
+            try {
+                const input = JSON.parse(node.inputJson);
+                content += `<div class="output-section"><div class="output-section-label">Input</div><pre>${escapeHtml(JSON.stringify(input, null, 2))}</pre></div>`;
+            } catch {
+                content += `<div class="output-section"><div class="output-section-label">Input</div><pre>${escapeHtml(node.inputJson)}</pre></div>`;
+            }
+        }
 
         if (node.outputJson) {
             try {
                 const output = JSON.parse(node.outputJson);
-                content.textContent = JSON.stringify(output, null, 2);
+                content += `<div class="output-section"><div class="output-section-label">Output</div><pre>${escapeHtml(JSON.stringify(output, null, 2))}</pre></div>`;
             } catch {
-                content.textContent = node.outputJson;
+                content += `<div class="output-section"><div class="output-section-label">Output</div><pre>${escapeHtml(node.outputJson)}</pre></div>`;
             }
-        } else if (node.errorMessage) {
-            content.textContent = `Error: ${node.errorMessage}`;
-        } else {
-            content.textContent = 'No output available';
         }
+
+        if (node.errorMessage) {
+            content += `<div class="output-section output-error"><div class="output-section-label">Error</div><pre>${escapeHtml(node.errorMessage)}</pre></div>`;
+        }
+
+        if (!content) {
+            content = '<div class="output-section"><pre>No output</pre></div>';
+        }
+
+        outputEl.innerHTML = content;
     } catch (error) {
-        console.error('Error loading node output:', error);
+        outputEl.textContent = 'Error loading output: ' + error.message;
     }
+}
+
+function toggleStepOutput(nodeId) {
+    const outputEl = document.getElementById(`step-output-${nodeId}`);
+    if (!outputEl) return;
+
+    const isExpanding = !outputEl.classList.contains('expanded');
+    outputEl.classList.toggle('expanded');
+
+    // Load output on first expand
+    if (isExpanding) {
+        loadStepOutput(nodeId);
+    }
+
+    // Toggle chevron
+    const step = outputEl.closest('.pipeline-step');
+    step.classList.toggle('step-expanded');
+}
+
+function getPipelineStatusIcon(status) {
+    switch (status) {
+        case 'Completed':
+            return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#27ae60" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
+        case 'Failed':
+            return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+        case 'Running':
+            return '<div class="step-spinner"></div>';
+        case 'WaitingForApproval':
+            return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f39c12" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+        case 'Skipped':
+            return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#95a5a6" stroke-width="2"><path d="M5 12h14"/></svg>';
+        default:
+            return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#95a5a6" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
+    }
+}
+
+function formatStepDuration(duration) {
+    // duration comes as "HH:MM:SS.xxx" or milliseconds string
+    if (typeof duration === 'string' && duration.includes(':')) {
+        const parts = duration.split(':');
+        const hours = parseInt(parts[0]);
+        const mins = parseInt(parts[1]);
+        const secs = parseFloat(parts[2]);
+        if (hours > 0) return `${hours}h ${mins}m`;
+        if (mins > 0) return `${mins}m ${Math.floor(secs)}s`;
+        return `${secs.toFixed(1)}s`;
+    }
+    const ms = typeof duration === 'number' ? duration : parseFloat(duration);
+    if (isNaN(ms)) return '';
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
 }
 
 async function approveExecution() {
     if (!currentExecution) return;
 
-    // Get the pending approval node from the current execution data
     try {
         const response = await authFetch(`/api/v1/workflow/executions/${currentExecution}/nodes`);
         if (!response.ok) return;
 
         const data = await response.json();
-        if (!data.PendingApproval) return;
+        if (!data.pendingApproval) return;
 
-        // Find the waiting node
-        const waitingNode = data.Nodes.find(n => n.Status === 'WaitingForApproval');
+        const waitingNode = data.nodes.find(n => n.status === 'WaitingForApproval');
         if (!waitingNode) return;
 
-        await authFetch(`/api/v1/workflow/executions/${currentExecution}/nodes/${waitingNode.NodeId}/approve`, {
-            method: 'POST'
+        await authFetch(`/api/v1/workflow/executions/${currentExecution}/nodes/${waitingNode.nodeId}/approve`, {
+            method: 'POST',
+            body: JSON.stringify({})
+        });
+    } catch (error) {
+        console.error('Error approving:', error);
+        alert('Failed to approve: ' + error.message);
+    }
+}
+
+async function approveWithOutput(nodeId) {
+    if (!currentExecution) return;
+
+    const editor = document.getElementById(`approval-output-${nodeId}`);
+    const editedOutput = editor ? editor.value.trim() : null;
+
+    try {
+        await authFetch(`/api/v1/workflow/executions/${currentExecution}/nodes/${nodeId}/approve`, {
+            method: 'POST',
+            body: JSON.stringify({
+                editedOutput: editedOutput || null
+            })
         });
     } catch (error) {
         console.error('Error approving:', error);
@@ -1358,10 +1999,10 @@ async function rejectExecution() {
         if (!response.ok) return;
 
         const data = await response.json();
-        const waitingNode = data.Nodes.find(n => n.Status === 'WaitingForApproval');
+        const waitingNode = data.nodes.find(n => n.status === 'WaitingForApproval');
         if (!waitingNode) return;
 
-        await authFetch(`/api/v1/workflow/executions/${currentExecution}/nodes/${waitingNode.NodeId}/reject`, {
+        await authFetch(`/api/v1/workflow/executions/${currentExecution}/nodes/${waitingNode.nodeId}/reject`, {
             method: 'POST'
         });
     } catch (error) {
@@ -1374,6 +2015,7 @@ function closeExecutionModal() {
     stopExecutionPolling();
     document.getElementById('executionModal').classList.remove('show');
     currentExecution = null;
+    _lastStepStatuses = {};
 }
 
 // Load execution (when opened from list)
@@ -1466,6 +2108,7 @@ function setupEventListeners() {
     document.getElementById('runBtn').addEventListener('click', runWorkflow);
     document.getElementById('autoLayoutBtn').addEventListener('click', autoLayout);
     document.getElementById('scheduleBtn').addEventListener('click', openScheduleModal);
+    document.getElementById('helpBtn').addEventListener('click', showHelp);
 
     // Schedule modal
     document.getElementById('closeScheduleModal').addEventListener('click', closeScheduleModal);
@@ -1545,4 +2188,41 @@ function renderMarkdown(text) {
         return marked.parse(text);
     }
     return `<p>${escapeHtml(text)}</p>`;
+}
+
+// ========================================
+// Onboarding
+// ========================================
+function setupOnboarding() {
+    const overlay = document.getElementById('onboardingOverlay');
+    const closeBtn = document.getElementById('closeOnboarding');
+    const startBtn = document.getElementById('startEditing');
+    const dontShowAgain = document.getElementById('dontShowAgain');
+    // Check if user has dismissed onboarding before
+    const hasSeenOnboarding = localStorage.getItem('workflow-editor-onboarding-seen');
+
+    // Show onboarding for new workflows only (not when editing existing)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isNewWorkflow = !urlParams.get('id');
+
+    if (!hasSeenOnboarding && isNewWorkflow) {
+        overlay.classList.remove('hidden');
+    }
+
+    closeBtn?.addEventListener('click', closeOnboarding);
+    startBtn?.addEventListener('click', closeOnboarding);
+
+    function closeOnboarding() {
+        overlay.classList.add('hidden');
+        if (dontShowAgain?.checked) {
+            localStorage.setItem('workflow-editor-onboarding-seen', 'true');
+        }
+    }
+
+    // Banner buttons are now inline onclick handlers (set by updateExecutionBanner)
+}
+
+// Show help overlay manually
+function showHelp() {
+    document.getElementById('onboardingOverlay').classList.remove('hidden');
 }

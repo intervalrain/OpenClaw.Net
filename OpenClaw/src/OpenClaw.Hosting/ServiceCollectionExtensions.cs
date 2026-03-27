@@ -78,20 +78,20 @@ public static class ServiceCollectionExtensions
 
         // skills
         services.AddSkillsFromAssemblies();
-        services.AddScoped<ISkillSettingsService, SkillSettingsService>();
+        services.AddScoped<IToolSettingsService, ToolSettingsService>();
         services.AddSingleton<ISlashCommandParser, SlashCommandParser>();
-        // services.AddSingleton<IAgentSkill>(ReadFileSkill.Default);
-        // services.AddSingleton<IAgentSkill>(WriteFileSkill.Default);
-        // services.AddSingleton<IAgentSkill>(ListDirectorySkill.Default);
-        // services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
-        // services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
-        // services.AddSingleton<IAgentSkill>(WebSearchSkill.Default);
+        // services.AddSingleton<IAgentTool>(ReadFileSkill.Default);
+        // services.AddSingleton<IAgentTool>(WriteFileSkill.Default);
+        // services.AddSingleton<IAgentTool>(ListDirectorySkill.Default);
+        // services.AddSingleton<IAgentTool>(ExecuteCommandSkill.Default);
+        // services.AddSingleton<IAgentTool>(HttpRequestSkill.Default);
+        // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
 
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>
         {
             var llmProviderFactory = sp.GetRequiredService<ILlmProviderFactory>();
-            var skills = sp.GetServices<IAgentSkill>();
+            var skills = sp.GetServices<IAgentTool>();
             var options = sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value;
 
             var pipeline = new AgentPipelineBuilder(sp)
@@ -117,11 +117,11 @@ public static class ServiceCollectionExtensions
     private static IServiceCollection AddSkillsFromAssemblies(this IServiceCollection services)
     {
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => a.FullName?.StartsWith("OpenClaw.Skills") == true)
+            .Where(a => a.FullName?.StartsWith("OpenClaw.Tools") == true)
             .ToList();
 
         var basePath = AppDomain.CurrentDomain.BaseDirectory;
-        var skillDlls = Directory.GetFiles(basePath, "OpenClaw.Skills.*.dll");
+        var skillDlls = Directory.GetFiles(basePath, "OpenClaw.Tools.*.dll");
         
         foreach (var dll in skillDlls)
         {
@@ -137,7 +137,7 @@ public static class ServiceCollectionExtensions
         // Register skill dependencies (classes in skill assemblies that are not skills themselves)
         // Exclude: records (Args, Result types), interfaces, abstract classes
         var skillDependencyTypes = allTypes
-            .Where(t => !typeof(IAgentSkill).IsAssignableFrom(t)
+            .Where(t => !typeof(IAgentTool).IsAssignableFrom(t)
                 && !t.IsInterface && !t.IsAbstract
                 && !IsRecordType(t)  // Exclude records (Args, Result, etc.)
                 && t.GetConstructors().Any(c => c.GetParameters().Length > 0));
@@ -152,25 +152,39 @@ public static class ServiceCollectionExtensions
 
         // Register skills
         var skillTypes = allTypes
-            .Where(t => typeof(IAgentSkill).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+            .Where(t => typeof(IAgentTool).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
 
         foreach (var skillType in skillTypes)
         {
             var defaultProperty = skillType.GetProperty("Default", BindingFlags.Public | BindingFlags.Static);
 
-            if (defaultProperty != null && typeof(IAgentSkill).IsAssignableFrom(defaultProperty.PropertyType))
+            if (defaultProperty != null && typeof(IAgentTool).IsAssignableFrom(defaultProperty.PropertyType))
             {
-                if (defaultProperty.GetValue(null) is IAgentSkill skillInstance)
+                if (defaultProperty.GetValue(null) is IAgentTool skillInstance)
                 {
-                    services.AddSingleton<IAgentSkill>(skillInstance);
+                    services.AddSingleton<IAgentTool>(skillInstance);
                     continue;
                 }
             }
 
-            services.AddSingleton(typeof(IAgentSkill), skillType);
+            services.AddSingleton(typeof(IAgentTool), skillType);
         }
 
-        services.AddSingleton<ISkillRegistry, SkillRegistry>();
+        services.AddSingleton<IToolRegistry, ToolRegistry>();
+
+        // Register Markdown Skill store (skills/ directory at project root)
+        var skillsDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "skills");
+        if (!Directory.Exists(skillsDir))
+        {
+            skillsDir = Path.Combine(Directory.GetCurrentDirectory(), "skills");
+        }
+        services.AddSingleton<ISkillStore>(sp =>
+        {
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FileSkillStore>>();
+            var store = new FileSkillStore(skillsDir, logger);
+            store.ReloadAsync().GetAwaiter().GetResult();
+            return store;
+        });
 
         return services;
     }

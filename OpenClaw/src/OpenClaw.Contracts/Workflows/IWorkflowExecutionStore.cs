@@ -17,20 +17,21 @@ public interface IWorkflowExecutionStore
 
     /// <summary>
     /// Waits for approval decision on a specific node.
-    /// Returns true if approved, false if rejected.
+    /// Returns (approved, editedOutput).
     /// </summary>
-    Task<bool> WaitForApprovalAsync(
+    Task<(bool Approved, string? EditedOutput)> WaitForApprovalAsync(
         Guid executionId,
         string nodeId,
         CancellationToken ct);
 
     /// <summary>
-    /// Submits an approval decision for a node.
+    /// Submits an approval decision for a node, optionally with edited output.
     /// </summary>
     Task SubmitApprovalAsync(
         Guid executionId,
         string nodeId,
         bool approved,
+        string? editedOutput,
         CancellationToken ct);
 
     /// <summary>

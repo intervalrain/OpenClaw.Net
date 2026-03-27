@@ -27,18 +27,18 @@
     <ProjectReference Include="..\OpenClaw.Infrastructure\OpenClaw.Infrastructure.csproj" />
     <ProjectReference Include="..\OpenClaw.Infrastructure.Llm.Ollama\OpenClaw.Infrastructure.Llm.Ollama.csproj" />
     <ProjectReference Include="..\OpenClaw.Infrastructure.Llm.OpenAI\OpenClaw.Infrastructure.Llm.OpenAI.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.FileSystem\OpenClaw.Skills.FileSystem.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Http\OpenClaw.Skills.Http.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Shell\OpenClaw.Skills.Shell.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.WebSearch\OpenClaw.Skills.WebSearch.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.GitHub\OpenClaw.Skills.GitHub.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Git\OpenClaw.Skills.Git.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.AzureDevOps\OpenClaw.Skills.AzureDevOps.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.ImageGen\OpenClaw.Skills.ImageGen.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Pdf\OpenClaw.Skills.Pdf.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Tmux\OpenClaw.Skills.Tmux.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Preference\OpenClaw.Skills.Preference.csproj" />
-    <ProjectReference Include="..\..\skills\OpenClaw.Skills.Notion\OpenClaw.Skills.Notion.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.FileSystem\OpenClaw.Tools.FileSystem.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.Http\OpenClaw.Tools.Http.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.Shell\OpenClaw.Tools.Shell.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.WebSearch\OpenClaw.Tools.WebSearch.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.GitHub\OpenClaw.Tools.GitHub.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.Git\OpenClaw.Tools.Git.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.AzureDevOps\OpenClaw.Tools.AzureDevOps.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.ImageGen\OpenClaw.Tools.ImageGen.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.Pdf\OpenClaw.Tools.Pdf.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.Tmux\OpenClaw.Tools.Tmux.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.Preference\OpenClaw.Tools.Preference.csproj" />
+    <ProjectReference Include="..\tools\OpenClaw.Tools.Notion\OpenClaw.Tools.Notion.csproj" />
   </ItemGroup>
 
 </Project>

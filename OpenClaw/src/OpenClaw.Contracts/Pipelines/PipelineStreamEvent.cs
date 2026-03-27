@@ -14,7 +14,7 @@ public enum PipelineStreamEventType
 public record PipelineStreamEvent(
     PipelineStreamEventType Type,
     string? StepName = null,
-    SkillStepResult? StepResult = null,
+    ToolStepResult? StepResult = null,
     PipelineApprovalRequest? ApprovalRequest = null,
-    SkillPipelineResult? FinalResult = null,
+    ToolPipelineResult? FinalResult = null,
     string? Error = null);

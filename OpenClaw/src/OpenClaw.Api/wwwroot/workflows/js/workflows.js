@@ -153,21 +153,58 @@ async function openDrawer(workflowId) {
     // Update schedule info
     renderScheduleInfo(currentWorkflow.schedule);
 
-    // Load and render executions
-    await loadExecutionHistory(workflowId);
-
-    // Render mini graph (placeholder for now)
-    renderMiniGraph(currentWorkflow);
-
-    // Show drawer
+    // Show drawer immediately with loading state
     drawer.classList.add('open');
     drawerOverlay.classList.add('show');
+    document.getElementById('miniGraph').innerHTML = '<div class="mini-graph-loading">Loading preview...</div>';
+
+    // Load full definition, execution history, and last execution status in parallel
+    const [definition, _] = await Promise.all([
+        loadWorkflowDefinition(workflowId),
+        loadExecutionHistory(workflowId)
+    ]);
+
+    // Render real graph with execution status
+    if (definition) {
+        const lastExec = currentWorkflow.lastExecution;
+        let nodeStates = null;
+        if (lastExec) {
+            nodeStates = await loadExecutionNodeStates(lastExec.id);
+        }
+        renderMiniGraph(definition, nodeStates);
+    } else {
+        document.getElementById('miniGraph').innerHTML = '<div class="mini-graph-placeholder">Failed to load preview</div>';
+    }
+}
+
+async function loadWorkflowDefinition(workflowId) {
+    try {
+        const response = await authFetch(`/api/v1/workflow/${workflowId}`);
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+async function loadExecutionNodeStates(executionId) {
+    try {
+        const response = await authFetch(`/api/v1/workflow/executions/${executionId}/nodes`);
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
 }
 
 function closeDrawer() {
     drawer.classList.remove('open');
     drawerOverlay.classList.remove('show');
     currentWorkflow = null;
+    if (miniCy) {
+        miniCy.destroy();
+        miniCy = null;
+    }
 }
 
 function renderScheduleInfo(schedule) {
@@ -253,26 +290,128 @@ function formatDuration(ms) {
     return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
 }
 
-function renderMiniGraph(workflow) {
+let miniCy = null;
+
+function renderMiniGraph(workflow, executionData) {
     const container = document.getElementById('miniGraph');
-    // For now, show a placeholder. Cytoscape will be added in editor.
-    container.innerHTML = `
-        <div class="mini-graph-placeholder">
-            <svg width="200" height="100" viewBox="0 0 200 100">
-                <circle cx="20" cy="50" r="10" fill="#3498db"/>
-                <line x1="30" y1="50" x2="60" y2="30" stroke="#ccc" stroke-width="2"/>
-                <line x1="30" y1="50" x2="60" y2="70" stroke="#ccc" stroke-width="2"/>
-                <circle cx="70" cy="30" r="10" fill="#27ae60"/>
-                <circle cx="70" cy="70" r="10" fill="#27ae60"/>
-                <line x1="80" y1="30" x2="110" y2="50" stroke="#ccc" stroke-width="2"/>
-                <line x1="80" y1="70" x2="110" y2="50" stroke="#ccc" stroke-width="2"/>
-                <circle cx="120" cy="50" r="10" fill="#f1c40f"/>
-                <line x1="130" y1="50" x2="160" y2="50" stroke="#ccc" stroke-width="2"/>
-                <circle cx="170" cy="50" r="10" fill="#e74c3c"/>
-            </svg>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px;">${workflow.nodeCount} nodes</div>
-        </div>
-    `;
+    container.innerHTML = '';
+
+    const definition = workflow.definition;
+    if (!definition || !definition.nodes || definition.nodes.length === 0) {
+        container.innerHTML = '<div class="mini-graph-placeholder">No nodes</div>';
+        return;
+    }
+
+    // Create a container div for cytoscape
+    const cyDiv = document.createElement('div');
+    cyDiv.style.width = '100%';
+    cyDiv.style.height = '200px';
+    container.appendChild(cyDiv);
+
+    // Build elements
+    const elements = [];
+    definition.nodes.forEach(node => {
+        elements.push({
+            group: 'nodes',
+            data: {
+                id: node.id,
+                type: node.type,
+                label: node.label || node.type
+            },
+            position: node.position
+        });
+    });
+    definition.edges.forEach(edge => {
+        elements.push({
+            group: 'edges',
+            data: {
+                id: edge.id,
+                source: edge.source,
+                target: edge.target
+            }
+        });
+    });
+
+    // Destroy previous instance
+    if (miniCy) {
+        miniCy.destroy();
+        miniCy = null;
+    }
+
+    miniCy = cytoscape({
+        container: cyDiv,
+        elements: elements,
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'font-size': '8px',
+                    'color': '#fff',
+                    'text-outline-color': '#555',
+                    'text-outline-width': 1,
+                    'width': 30,
+                    'height': 30,
+                    'border-width': 0
+                }
+            },
+            { selector: 'node[type="start"]', style: { 'background-color': '#27ae60', 'shape': 'ellipse', 'width': 25, 'height': 25, 'label': '' } },
+            { selector: 'node[type="end"]', style: { 'background-color': '#e74c3c', 'shape': 'ellipse', 'width': 25, 'height': 25, 'label': '' } },
+            { selector: 'node[type="skill"]', style: { 'background-color': '#3498db', 'shape': 'roundrectangle', 'width': 45, 'height': 28 } },
+            { selector: 'node[type="approval"]', style: { 'background-color': '#f39c12', 'shape': 'diamond', 'width': 35, 'height': 35 } },
+            { selector: 'node[type="wait"]', style: { 'background-color': '#9b59b6', 'shape': 'ellipse', 'width': 30, 'height': 30 } },
+            // Execution status styles
+            { selector: 'node.exec-completed', style: { 'border-color': '#27ae60', 'border-width': 3 } },
+            { selector: 'node.exec-failed', style: { 'border-color': '#e74c3c', 'border-width': 3 } },
+            { selector: 'node.exec-running', style: { 'border-color': '#3498db', 'border-width': 3, 'border-style': 'dashed' } },
+            { selector: 'node.exec-waiting', style: { 'border-color': '#f39c12', 'border-width': 3, 'border-style': 'dashed' } },
+            { selector: 'node.exec-skipped', style: { 'opacity': 0.4 } },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 1.5,
+                    'line-color': '#95a5a6',
+                    'target-arrow-color': '#95a5a6',
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier',
+                    'arrow-scale': 0.8
+                }
+            }
+        ],
+        layout: { name: 'dagre', rankDir: 'LR', nodeSep: 20, rankSep: 40, fit: true, padding: 15 },
+        userZoomingEnabled: false,
+        userPanningEnabled: false,
+        boxSelectionEnabled: false,
+        autoungrabify: true
+    });
+
+    // Apply execution status if available
+    if (executionData && executionData.nodeStates) {
+        executionData.nodeStates.forEach(ns => {
+            const node = miniCy.getElementById(ns.nodeId);
+            if (node && !node.empty()) {
+                const statusClass = {
+                    'Completed': 'exec-completed',
+                    'Failed': 'exec-failed',
+                    'Running': 'exec-running',
+                    'WaitingForApproval': 'exec-waiting',
+                    'Skipped': 'exec-skipped'
+                }[ns.status];
+                if (statusClass) node.addClass(statusClass);
+            }
+        });
+    }
+
+    // Add execution status legend if there's execution data
+    if (executionData && executionData.status) {
+        const legend = document.createElement('div');
+        legend.className = 'mini-graph-legend';
+        const statusClass = executionData.status.toLowerCase();
+        legend.innerHTML = `<span class="execution-status-badge ${statusClass}">${escapeHtml(executionData.status)}</span>`;
+        container.appendChild(legend);
+    }
 }
 
 // Run Workflow
@@ -340,15 +479,15 @@ async function createWorkflow() {
 
     try {
         // Create with a minimal workflow definition
+        // IMPORTANT: 'type' must be the FIRST property for .NET polymorphic JSON deserialization
         const defaultDefinition = {
             nodes: [
-                { id: 'start', type: 'start', position: { x: 100, y: 200 } },
-                { id: 'end', type: 'end', position: { x: 500, y: 200 } }
+                { type: 'start', id: 'start', position: { x: 100, y: 200 } },
+                { type: 'end', id: 'end', position: { x: 500, y: 200 } }
             ],
             edges: [
                 { id: 'e1', source: 'start', target: 'end' }
             ],
-            variables: {}
         };
 
         const response = await authFetch('/api/v1/workflow', {
@@ -457,6 +596,7 @@ function setupEventListeners() {
     document.getElementById('runWorkflowBtn').addEventListener('click', () => {
         if (currentWorkflow) runWorkflow(currentWorkflow.id);
     });
+    document.getElementById('editWorkflowBtn').addEventListener('click', expandToEditor);
     document.getElementById('cloneWorkflowBtn').addEventListener('click', cloneWorkflow);
     document.getElementById('deleteWorkflowBtn').addEventListener('click', openDeleteModal);
 

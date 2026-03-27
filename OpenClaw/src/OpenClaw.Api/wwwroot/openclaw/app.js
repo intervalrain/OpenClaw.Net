@@ -988,7 +988,7 @@ function initSettingsTabs() {
     }
 }
 
-// Skills Functions
+// Tools Settings Functions
 async function loadSkills() {
     try {
         const res = await authFetch('/api/v1/skill-settings');
@@ -1006,7 +1006,7 @@ function renderSkillsList() {
     const listEl = document.getElementById('skills-list');
 
     if (skills.length === 0) {
-        listEl.innerHTML = '<p class="setting-hint">No skills available.</p>';
+        listEl.innerHTML = '<p class="setting-hint">No tools available.</p>';
         return;
     }
 
@@ -1017,7 +1017,7 @@ function renderSkillsList() {
                     ${escapeHtml(s.name)}
                     <code>/${escapeHtml(s.name)}</code>
                 </div>
-                <div class="skill-item-description">${escapeHtml(s.description)}</div>
+                <div class="skill-item-description collapsed" onclick="this.classList.toggle('collapsed')">${escapeHtml(s.description)}</div>
             </div>
             <label class="toggle-switch">
                 <input type="checkbox" ${s.isEnabled ? 'checked' : ''} data-skill="${escapeHtml(s.name)}">
@@ -1041,7 +1041,7 @@ function renderSkillsList() {
 async function toggleSkill(skillName, enabled) {
     try {
         const action = enabled ? 'enable' : 'disable';
-        const res = await fetch(`/api/v1/skill-settings/${encodeURIComponent(skillName)}/${action}`, {
+        const res = await authFetch(`/api/v1/skill-settings/${encodeURIComponent(skillName)}/${action}`, {
             method: 'POST'
         });
         if (!res.ok) throw new Error('Failed to update skill');

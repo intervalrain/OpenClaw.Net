@@ -29,7 +29,7 @@ var sp = services.BuildServiceProvider();
 
 var config = sp.GetRequiredService<IConfigStore>();
 var llmProvider = sp.GetRequiredKeyedService<ILlmProvider>(config.Get(ConfigKeys.LlmProvider) ?? "ollama");
-var skills = sp.GetServices<IAgentSkill>();
+var skills = sp.GetServices<IAgentTool>();
 var options = sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value;
 
 var pipeline = new AgentPipelineBuilder(sp)

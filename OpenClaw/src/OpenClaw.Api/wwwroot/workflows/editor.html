@@ -34,6 +34,13 @@
                 <span class="save-status" id="saveStatus">Saved</span>
             </div>
             <div class="toolbar-right">
+                <button class="btn btn-icon" id="helpBtn" title="How to use">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </button>
                 <button class="btn btn-secondary" id="scheduleBtn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
@@ -100,9 +107,9 @@
                     </div>
                 </div>
 
-                <h3>Skills</h3>
+                <h3>Skills & Tools</h3>
                 <div class="skill-list" id="skillList">
-                    <div class="loading">Loading skills...</div>
+                    <div class="loading">Loading...</div>
                 </div>
 
                 <div class="connection-help">
@@ -117,6 +124,82 @@
                 <div id="cy"></div>
                 <div class="canvas-hint" id="canvasHint">
                     Drag nodes from the left panel to add them to your workflow
+                </div>
+
+                <!-- Execution Status Banner (shown during execution) -->
+                <div class="execution-banner hidden" id="executionBanner">
+                    <div class="exec-banner-content">
+                        <div class="exec-banner-status">
+                            <span class="exec-spinner"></span>
+                            <span class="exec-status-text" id="bannerStatusText">Executing...</span>
+                        </div>
+                        <div class="exec-banner-actions" id="bannerActions">
+                            <!-- Populated dynamically by updateExecutionBanner -->
+                        </div>
+                    </div>
+                    <div class="exec-progress-bar">
+                        <div class="exec-progress" id="execProgress"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onboarding Overlay -->
+            <div class="onboarding-overlay hidden" id="onboardingOverlay">
+                <div class="onboarding-card">
+                    <div class="onboarding-header">
+                        <h2>Welcome to Workflow Editor</h2>
+                        <button class="close-btn" id="closeOnboarding">&times;</button>
+                    </div>
+                    <div class="onboarding-body">
+                        <div class="onboarding-steps">
+                            <div class="onboarding-step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>Add Nodes</h4>
+                                    <p>Drag <strong>Skill</strong>, <strong>Wait</strong>, or <strong>Approval</strong> nodes from the left panel onto the canvas.</p>
+                                </div>
+                            </div>
+                            <div class="onboarding-step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>Connect Nodes</h4>
+                                    <p><kbd>Shift+Click</kbd> on a source node, then click on a target node to create a connection.</p>
+                                </div>
+                            </div>
+                            <div class="onboarding-step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>Configure Properties</h4>
+                                    <p>Click any node to configure its settings in the right panel.</p>
+                                </div>
+                            </div>
+                            <div class="onboarding-step">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <h4>Run Workflow</h4>
+                                    <p>Save your workflow and click <strong>Run</strong> to execute it. Watch the progress in real-time!</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="onboarding-shortcuts">
+                            <h4>Keyboard Shortcuts</h4>
+                            <div class="shortcut-grid">
+                                <div class="shortcut"><kbd>Ctrl+S</kbd> Save</div>
+                                <div class="shortcut"><kbd>Ctrl+Z</kbd> Undo</div>
+                                <div class="shortcut"><kbd>Ctrl+Shift+Z</kbd> Redo</div>
+                                <div class="shortcut"><kbd>Delete</kbd> Remove selected</div>
+                                <div class="shortcut"><kbd>Shift+Click</kbd> Connect nodes</div>
+                                <div class="shortcut"><kbd>ESC</kbd> Cancel connection</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="onboarding-footer">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="dontShowAgain">
+                            <span>Don't show this again</span>
+                        </label>
+                        <button class="btn btn-primary" id="startEditing">Start Editing</button>
+                    </div>
                 </div>
             </div>
 
@@ -196,11 +279,11 @@
         </div>
     </div>
 
-    <!-- Execution Viewer Modal -->
+    <!-- Execution Viewer Modal (Pipeline Style) -->
     <div class="modal modal-lg" id="executionModal">
         <div class="modal-content modal-wide">
             <div class="modal-header">
-                <h2>Execution Progress</h2>
+                <h2>Execution Log</h2>
                 <button class="close-btn" id="closeExecutionModal">&times;</button>
             </div>
             <div class="modal-body">
@@ -208,12 +291,8 @@
                     <span class="execution-status">Status: <strong id="execStatus">Running</strong></span>
                     <span class="execution-time" id="execTime"></span>
                 </div>
-                <div class="execution-graph" id="executionGraph"></div>
-                <div class="execution-details" id="executionDetails">
-                    <div class="node-output" id="nodeOutput">
-                        <h4>Node Output</h4>
-                        <pre id="outputContent">Select a node to view its output</pre>
-                    </div>
+                <div class="pipeline-steps" id="pipelineSteps">
+                    <!-- Steps rendered by JS -->
                 </div>
             </div>
             <div class="modal-footer" id="approvalFooter" style="display: none;">

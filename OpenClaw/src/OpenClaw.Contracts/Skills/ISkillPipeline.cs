@@ -1,6 +1,6 @@
 namespace OpenClaw.Contracts.Skills;
 
-public interface ISkillPipeline
+public interface IToolPipeline
 {
     string Name { get; }
     string Description { get; }
@@ -11,7 +11,7 @@ public interface ISkillPipeline
     /// </summary>
     object? Parameters => null;
 
-    Task<SkillPipelineResult> RunAsync(
+    Task<ToolPipelineResult> RunAsync(
         PipelineExecutionContext context,
         Func<PipelineApprovalRequest, Task<bool>>? onApprovalRequired = null,
         CancellationToken ct = default);
@@ -24,12 +24,12 @@ public record PipelineExecutionContext(
     Guid? UserId,
     string? ArgsJson = null);
 
-public record SkillPipelineResult(
+public record ToolPipelineResult(
     bool IsSuccess,
     string Summary,
-    IReadOnlyList<SkillStepResult> Steps);
+    IReadOnlyList<ToolStepResult> Steps);
 
-public record SkillStepResult(
+public record ToolStepResult(
     string StepName,
     bool IsSuccess,
     string? Output = null,

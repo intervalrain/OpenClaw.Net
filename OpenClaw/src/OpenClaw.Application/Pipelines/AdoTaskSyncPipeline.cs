@@ -12,7 +12,7 @@ namespace OpenClaw.Application.Pipelines;
 
 public class AdoTaskSyncPipeline(
     IServiceProvider serviceProvider,
-    ILogger<AdoTaskSyncPipeline> logger) : ISkillPipeline
+    ILogger<AdoTaskSyncPipeline> logger) : IToolPipeline
 {
     public string Name => "ado_task_sync";
     public string Description => "Sync Azure DevOps tasks based on git history and code analysis";
@@ -48,20 +48,20 @@ public class AdoTaskSyncPipeline(
         }
     };
 
-    public async Task<SkillPipelineResult> RunAsync(
+    public async Task<ToolPipelineResult> RunAsync(
         PipelineExecutionContext context,
         Func<PipelineApprovalRequest, Task<bool>>? onApprovalRequired = null,
         CancellationToken ct = default)
     {
         // Parse args
         var args = ParseArgs(context.ArgsJson);
-        var steps = new List<SkillStepResult>();
+        var steps = new List<ToolStepResult>();
 
         // Test mode: skip all processing and directly trigger approval dialog
         if (args.TestApproval)
         {
             logger.LogInformation("Test approval mode enabled - triggering sample approval dialog");
-            steps.Add(new SkillStepResult("test_mode", true, Output: "Test approval mode"));
+            steps.Add(new ToolStepResult("test_mode", true, Output: "Test approval mode"));
 
             var testChanges = new List<ProposedChange>
             {
@@ -94,21 +94,21 @@ public class AdoTaskSyncPipeline(
                 ? await onApprovalRequired(approvalRequest)
                 : false;
 
-            steps.Add(new SkillStepResult("test_approval", approved, Output: approved ? "Approved" : "Rejected"));
-            return new SkillPipelineResult(true, $"Test approval completed: {(approved ? "Approved" : "Rejected")}", steps);
+            steps.Add(new ToolStepResult("test_approval", approved, Output: approved ? "Approved" : "Rejected"));
+            return new ToolPipelineResult(true, $"Test approval completed: {(approved ? "Approved" : "Rejected")}", steps);
         }
 
-        var skills = serviceProvider.GetServices<IAgentSkill>().ToList();
+        var skills = serviceProvider.GetServices<IAgentTool>().ToList();
 
         var gitSkill = skills.FirstOrDefault(s => s.Name == "git");
         var adoSkill = skills.FirstOrDefault(s => s.Name == "azure_devops");
 
         if (gitSkill == null || adoSkill == null)
         {
-            return new SkillPipelineResult(
+            return new ToolPipelineResult(
                 false,
                 "Required skills not found",
-                [new SkillStepResult("init", false, Error: $"Git: {gitSkill != null}, ADO: {adoSkill != null}")]);
+                [new ToolStepResult("init", false, Error: $"Git: {gitSkill != null}, ADO: {adoSkill != null}")]);
         }
 
         // Step 1: Get tracked repos from user preferences
@@ -141,8 +141,8 @@ public class AdoTaskSyncPipeline(
             if (string.IsNullOrWhiteSpace(trackedProjectsValue))
             {
                 var error = "ado_tracked_projects preference is not set. Set it to a JSON array of local repo paths in User Preferences.";
-                steps.Add(new SkillStepResult("get_tracked_projects", false, Error: error));
-                return new SkillPipelineResult(false, error, steps);
+                steps.Add(new ToolStepResult("get_tracked_projects", false, Error: error));
+                return new ToolPipelineResult(false, error, steps);
             }
 
             logger.LogInformation("Found ado_tracked_projects preference: {Value}", trackedProjectsValue);
@@ -154,12 +154,12 @@ public class AdoTaskSyncPipeline(
                 trackedResult.IsSuccess,
                 trackedResult.Output?.Substring(0, Math.Min(200, trackedResult.Output?.Length ?? 0)),
                 trackedResult.Error);
-            steps.Add(new SkillStepResult("list_tracked_repos", trackedResult.IsSuccess, trackedResult.Output, trackedResult.Error));
+            steps.Add(new ToolStepResult("list_tracked_repos", trackedResult.IsSuccess, trackedResult.Output, trackedResult.Error));
 
             if (!trackedResult.IsSuccess)
             {
                 logger.LogError("Step 1 failed: {Error}", trackedResult.Error);
-                return new SkillPipelineResult(false, $"Failed to get tracked repos: {trackedResult.Error}", steps);
+                return new ToolPipelineResult(false, $"Failed to get tracked repos: {trackedResult.Error}", steps);
             }
 
             trackedProjects = ParseTrackedProjects(trackedResult.Output);
@@ -167,13 +167,13 @@ public class AdoTaskSyncPipeline(
         else
         {
             var error = "No user context available. Pipeline must be executed with a valid user.";
-            steps.Add(new SkillStepResult("get_tracked_projects", false, Error: error));
-            return new SkillPipelineResult(false, error, steps);
+            steps.Add(new ToolStepResult("get_tracked_projects", false, Error: error));
+            return new ToolPipelineResult(false, error, steps);
         }
 
         if (trackedProjects.Count == 0)
         {
-            return new SkillPipelineResult(false, "No tracked repos configured", steps);
+            return new ToolPipelineResult(false, "No tracked repos configured", steps);
         }
 
         // Apply repo filter if specified
@@ -185,7 +185,7 @@ public class AdoTaskSyncPipeline(
 
             if (trackedProjects.Count == 0)
             {
-                return new SkillPipelineResult(false, $"No repos match filter: {args.RepoFilter}", steps);
+                return new ToolPipelineResult(false, $"No repos match filter: {args.RepoFilter}", steps);
             }
 
             logger.LogInformation("Filtered to {Count} repos matching '{Filter}'", trackedProjects.Count, args.RepoFilter);
@@ -200,7 +200,7 @@ public class AdoTaskSyncPipeline(
 
             // Step 2a: Get git log for recent commits (use args.CommitCount)
             var gitLogResult = await ExecuteSkillAsync(gitSkill, new { command = $"log --oneline -{args.CommitCount}", workingDirectory = project.LocalPath }, ct);
-            steps.Add(new SkillStepResult($"git_log:{project.RepoName}", gitLogResult.IsSuccess, gitLogResult.Output, gitLogResult.Error));
+            steps.Add(new ToolStepResult($"git_log:{project.RepoName}", gitLogResult.IsSuccess, gitLogResult.Output, gitLogResult.Error));
 
             // Step 2b: Get work items for this repo (pass ADO preferences explicitly)
             var workItemsResult = await ExecuteSkillAsync(adoSkill, new
@@ -211,14 +211,14 @@ public class AdoTaskSyncPipeline(
                 project = adoProject,
                 queryId = adoQueryId
             }, ct);
-            steps.Add(new SkillStepResult($"get_work_items:{project.RepoName}", workItemsResult.IsSuccess, workItemsResult.Output, workItemsResult.Error));
+            steps.Add(new ToolStepResult($"get_work_items:{project.RepoName}", workItemsResult.IsSuccess, workItemsResult.Output, workItemsResult.Error));
 
             if (!workItemsResult.IsSuccess)
                 continue;
 
             // Step 2c: Get git diff for detailed analysis (use args.DiffRange)
             var gitDiffResult = await ExecuteSkillAsync(gitSkill, new { command = $"diff HEAD~{args.DiffRange} --stat", workingDirectory = project.LocalPath }, ct);
-            steps.Add(new SkillStepResult($"git_diff:{project.RepoName}", gitDiffResult.IsSuccess, gitDiffResult.Output, gitDiffResult.Error));
+            steps.Add(new ToolStepResult($"git_diff:{project.RepoName}", gitDiffResult.IsSuccess, gitDiffResult.Output, gitDiffResult.Error));
 
             // Step 2d: Analyze with LLM and prepare changes
             var changes = await AnalyzeWithLlmAsync(
@@ -246,8 +246,8 @@ public class AdoTaskSyncPipeline(
 
             if (!approved)
             {
-                steps.Add(new SkillStepResult("batch_update", false, Error: "User rejected the changes"));
-                return new SkillPipelineResult(false, "Changes rejected by user", steps);
+                steps.Add(new ToolStepResult("batch_update", false, Error: "User rejected the changes"));
+                return new ToolPipelineResult(false, "Changes rejected by user", steps);
             }
 
             // Step 4: Execute approved updates
@@ -272,29 +272,29 @@ public class AdoTaskSyncPipeline(
                 organization = adoOrganization,
                 project = adoProject
             }, ct);
-            steps.Add(new SkillStepResult("batch_update", batchResult.IsSuccess, batchResult.Output, batchResult.Error));
+            steps.Add(new ToolStepResult("batch_update", batchResult.IsSuccess, batchResult.Output, batchResult.Error));
 
             if (!batchResult.IsSuccess)
             {
-                return new SkillPipelineResult(false, $"Batch update failed: {batchResult.Error}", steps);
+                return new ToolPipelineResult(false, $"Batch update failed: {batchResult.Error}", steps);
             }
         }
         else
         {
-            steps.Add(new SkillStepResult("batch_update", true, Output: "No updates needed"));
+            steps.Add(new ToolStepResult("batch_update", true, Output: "No updates needed"));
         }
 
         var summary = $"Processed {trackedProjects.Count} repos, updated {proposedChanges.Count} work items";
         logger.LogInformation("Pipeline complete: {Summary}", summary);
 
-        return new SkillPipelineResult(true, summary, steps);
+        return new ToolPipelineResult(true, summary, steps);
     }
 
-    private async Task<SkillResult> ExecuteSkillAsync(IAgentSkill skill, object args, CancellationToken ct)
+    private async Task<ToolResult> ExecuteSkillAsync(IAgentTool skill, object args, CancellationToken ct)
     {
         var json = JsonSerializer.Serialize(args);
         logger.LogDebug("Executing skill {SkillName} with args: {Args}", skill.Name, json);
-        var context = new SkillContext(json);
+        var context = new ToolContext(json);
         var result = await skill.ExecuteAsync(context, ct);
         logger.LogDebug("Skill {SkillName} result: IsSuccess={IsSuccess}", skill.Name, result.IsSuccess);
         return result;

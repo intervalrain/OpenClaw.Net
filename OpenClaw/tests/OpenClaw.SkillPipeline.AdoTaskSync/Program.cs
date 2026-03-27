@@ -93,7 +93,7 @@ logger.LogInformation("Running ADO Task Sync Pipeline\n");
 
 // Get the pipeline
 using var scope = sp.CreateScope();
-var pipeline = scope.ServiceProvider.GetServices<ISkillPipeline>()
+var pipeline = scope.ServiceProvider.GetServices<IToolPipeline>()
     .OfType<AdoTaskSyncPipeline>()
     .FirstOrDefault();
 

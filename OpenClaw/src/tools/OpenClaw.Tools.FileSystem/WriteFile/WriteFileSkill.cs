@@ -1,0 +1,36 @@
+using System.ComponentModel;
+using OpenClaw.Contracts.Skills;
+
+namespace OpenClaw.Tools.FileSystem.WriteFile;
+
+public class WriteFileSkill : AgentToolBase<WriteFileArgs>
+{
+    public static WriteFileSkill Default => new();
+
+    public override string Name => "write_file";
+    public override string Description => "Write content to a file at the specified path. Creates the file if it doesn't exist.";
+
+    public override async Task<ToolResult> ExecuteAsync(WriteFileArgs args, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(args.Path))
+        {
+            return ToolResult.Failure("Path is required.");
+        }
+
+        var directory = Path.GetDirectoryName(args.Path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await File.WriteAllTextAsync(args.Path, args.Content ?? "", ct);
+        return ToolResult.Success($"File written successfully: {args.Path}");
+    }
+}
+
+public record WriteFileArgs(
+    [property: Description("The file path to write to")]
+    string? Path,
+    [property: Description("The content to write to the file")]
+    string? Content
+);

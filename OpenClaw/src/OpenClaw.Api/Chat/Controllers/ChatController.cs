@@ -28,14 +28,14 @@ public class ChatController(
     IConversationRepository repository,
     ILlmProviderFactory llmProviderFactory,
     ISlashCommandParser slashCommandParser,
-    ISkillRegistry skillRegistry,
-    ISkillSettingsService skillSettingsService,
-    IEnumerable<ISkillPipeline> skillPipelines,
+    IToolRegistry skillRegistry,
+    IToolSettingsService skillSettingsService,
+    IEnumerable<IToolPipeline> skillPipelines,
     IPipelineExecutionStore pipelineExecutionStore,
     ICurrentUserProvider currentUserProvider,
     IUnitOfWork uow) : ApiController
 {
-    private readonly Dictionary<string, ISkillPipeline> _pipelines = skillPipelines
+    private readonly Dictionary<string, IToolPipeline> _pipelines = skillPipelines
         .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -116,7 +116,7 @@ public class ChatController(
 
                 // Execute skill first
                 var jsonArgs = slashCommandParser.ConvertToJson(command, skill);
-                var skillContext = new SkillContext(jsonArgs);
+                var skillContext = new ToolContext(jsonArgs);
                 var skillResult = await skill.ExecuteAsync(skillContext, ct);
 
                 if (!skillResult.IsSuccess)
@@ -450,7 +450,7 @@ public class ChatController(
         }
     }
 
-    private static string FormatPipelineResult(SkillPipelineResult result)
+    private static string FormatPipelineResult(ToolPipelineResult result)
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"## Pipeline Result: {(result.IsSuccess ? "Success" : "Failed")}");

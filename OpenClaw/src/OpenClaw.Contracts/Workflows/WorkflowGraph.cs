@@ -9,11 +9,6 @@ public record WorkflowGraph
 {
     public required List<WorkflowNode> Nodes { get; init; }
     public required List<WorkflowEdge> Edges { get; init; }
-
-    /// <summary>
-    /// Workflow-level variables that can be referenced by nodes.
-    /// </summary>
-    public Dictionary<string, object>? Variables { get; init; }
 }
 
 /// <summary>

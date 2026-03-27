@@ -1,9 +1,9 @@
 namespace OpenClaw.Contracts.Skills;
 
-public interface IAgentSkill
+public interface IAgentTool
 {
     string Name { get; }
     string Description { get; }
     object? Parameters { get; }
-    Task<SkillResult> ExecuteAsync(SkillContext context, CancellationToken ct = default);
+    Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default);
 }

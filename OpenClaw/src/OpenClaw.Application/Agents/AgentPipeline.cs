@@ -8,11 +8,11 @@ namespace OpenClaw.Application.Agents;
 
 public class AgentPipeline(
     ILlmProviderFactory llmProviderFactory,
-    IEnumerable<IAgentSkill> skills,
+    IEnumerable<IAgentTool> skills,
     AgentPipelineOptions options,
     IReadOnlyList<IAgentMiddleware>? middlewares = null) : IAgentPipeline
 {
-    private readonly Dictionary<string, IAgentSkill> _skillMap = skills.ToDictionary(s => s.Name);
+    private readonly Dictionary<string, IAgentTool> _skillMap = skills.ToDictionary(s => s.Name);
     private readonly IReadOnlyList<IAgentMiddleware> _middlewares = middlewares ?? [];
 
     public async Task<string> ExecuteAsync(
@@ -208,7 +208,7 @@ public class AgentPipeline(
             return $"Error: skill '{toolCall.Name}' not found.";
         }
 
-        var skillContext = new SkillContext(toolCall.Arguments);
+        var skillContext = new ToolContext(toolCall.Arguments);
         var result = await skill.ExecuteAsync(skillContext, ct);
         return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";
     }

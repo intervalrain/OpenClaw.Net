@@ -9,10 +9,12 @@ namespace OpenClaw.Infrastructure.Workflows;
 /// </summary>
 public class InMemoryWorkflowApprovalStore : IWorkflowExecutionStore
 {
+    private record ApprovalResult(bool Approved, string? EditedOutput);
+
     private record ApprovalWaiter(
         string ApprovalName,
         string? Description,
-        TaskCompletionSource<bool> Tcs);
+        TaskCompletionSource<ApprovalResult> Tcs);
 
     private readonly ConcurrentDictionary<(Guid ExecutionId, string NodeId), ApprovalWaiter> _waiters = new();
 
@@ -24,12 +26,12 @@ public class InMemoryWorkflowApprovalStore : IWorkflowExecutionStore
         CancellationToken ct)
     {
         var key = (executionId, nodeId);
-        var waiter = new ApprovalWaiter(approvalName, description, new TaskCompletionSource<bool>());
+        var waiter = new ApprovalWaiter(approvalName, description, new TaskCompletionSource<ApprovalResult>());
         _waiters[key] = waiter;
         return Task.CompletedTask;
     }
 
-    public async Task<bool> WaitForApprovalAsync(
+    public async Task<(bool Approved, string? EditedOutput)> WaitForApprovalAsync(
         Guid executionId,
         string nodeId,
         CancellationToken ct)
@@ -47,7 +49,8 @@ public class InMemoryWorkflowApprovalStore : IWorkflowExecutionStore
 
         try
         {
-            return await waiter.Tcs.Task;
+            var result = await waiter.Tcs.Task;
+            return (result.Approved, result.EditedOutput);
         }
         finally
         {
@@ -59,13 +62,14 @@ public class InMemoryWorkflowApprovalStore : IWorkflowExecutionStore
         Guid executionId,
         string nodeId,
         bool approved,
+        string? editedOutput,
         CancellationToken ct)
     {
         var key = (executionId, nodeId);
 
         if (_waiters.TryGetValue(key, out var waiter))
         {
-            waiter.Tcs.TrySetResult(approved);
+            waiter.Tcs.TrySetResult(new ApprovalResult(approved, editedOutput));
         }
 
         return Task.CompletedTask;

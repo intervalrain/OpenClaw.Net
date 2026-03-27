@@ -71,11 +71,32 @@ public class GetWorkflowExecutionQueryHandler(
             var approval = await approvalStore.GetPendingApprovalAsync(execution.Id, ct);
             if (approval.HasValue)
             {
+                // Build context from completed upstream node outputs
+                var contextItems = execution.NodeExecutions
+                    .Where(ne => ne.Status == NodeExecutionStatus.Completed
+                        && ne.NodeId != approval.Value.NodeId
+                        && ne.OutputJson is not null)
+                    .Select(ne =>
+                    {
+                        nodeMap.TryGetValue(ne.NodeId, out var contextNode);
+                        // Skip start/end nodes
+                        if (contextNode is StartNode or EndNode) return null;
+                        return new ApprovalContextItem
+                        {
+                            NodeId = ne.NodeId,
+                            NodeLabel = contextNode?.Label ?? ne.NodeId,
+                            OutputSummary = ne.OutputJson
+                        };
+                    })
+                    .Where(c => c is not null)
+                    .ToList();
+
                 pendingApproval = new WorkflowApprovalInfo
                 {
                     NodeId = approval.Value.NodeId,
                     ApprovalName = approval.Value.ApprovalName,
-                    Description = approval.Value.Description
+                    Description = approval.Value.Description,
+                    Context = contextItems!
                 };
             }
         }
@@ -106,6 +127,7 @@ public class GetWorkflowExecutionQueryHandler(
                         EndNode => "end",
                         SkillNode => "skill",
                         ApprovalNode => "approval",
+                        WaitNode => "wait",
                         _ => "unknown"
                     },
                     Status = ne.Status,

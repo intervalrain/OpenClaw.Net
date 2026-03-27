@@ -5,14 +5,14 @@ using OpenClaw.Contracts.Llm;
 
 namespace OpenClaw.Contracts.Skills;
 
-public abstract class AgentSkillBase<TArgs> : IAgentSkill where TArgs : class
+public abstract class AgentToolBase<TArgs> : IAgentTool where TArgs : class
 {
     public abstract string Name { get; }
     public abstract string Description { get; }
 
     public object? Parameters => GenerateToolParameters();
 
-    public async Task<SkillResult> ExecuteAsync(SkillContext context, CancellationToken ct = default)
+    public async Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default)
     {
         try
         {
@@ -23,39 +23,41 @@ public abstract class AgentSkillBase<TArgs> : IAgentSkill where TArgs : class
 
             if (args is null)
             {
-                return SkillResult.Failure("Failed to parse arguments.");
+                return ToolResult.Failure("Failed to parse arguments.");
             }
 
             return await ExecuteAsync(args, ct);
         }
         catch (JsonException ex)
         {
-            return SkillResult.Failure($"Invalid arguments: {ex.Message}");
+            return ToolResult.Failure($"Invalid arguments: {ex.Message}");
         }
         catch (Exception ex)
         {
-            return SkillResult.Failure(ex.Message);
+            return ToolResult.Failure(ex.Message);
         }
     }
 
-    public abstract Task<SkillResult> ExecuteAsync(TArgs args, CancellationToken ct);
+    public abstract Task<ToolResult> ExecuteAsync(TArgs args, CancellationToken ct);
 
     private static ToolParameters GenerateToolParameters()
     {
         var properties = new Dictionary<string, ToolProperty>();
         var required = new List<string>();
+        var nullabilityContext = new NullabilityInfoContext();
 
         foreach (var prop in typeof(TArgs).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             var toolProperty = new ToolProperty
             {
                 Type = GetJsonType(prop.PropertyType),
-                Description = prop.GetCustomAttribute<DescriptionAttribute>()?.Description
+                Description = prop.GetCustomAttribute<DescriptionAttribute>()?.Description,
+                DefaultKey = prop.GetCustomAttribute<DefaultFromAttribute>()?.Key
             };
 
             properties[ToCamelCase(prop.Name)] = toolProperty;
 
-            if (!IsNullable(prop.PropertyType))
+            if (!IsNullable(prop, nullabilityContext))
             {
                 required.Add(ToCamelCase(prop.Name));
             }
@@ -85,10 +87,15 @@ public abstract class AgentSkillBase<TArgs> : IAgentSkill where TArgs : class
         };
     }
 
-    private static bool IsNullable(Type type)
+    private static bool IsNullable(PropertyInfo prop, NullabilityInfoContext context)
     {
-        if (!type.IsValueType) return true;
-        return Nullable.GetUnderlyingType(type) != null;
+        // For value types, check Nullable<T>
+        if (prop.PropertyType.IsValueType)
+            return Nullable.GetUnderlyingType(prop.PropertyType) != null;
+
+        // For reference types, use NullabilityInfoContext to respect C# nullable annotations
+        var nullabilityInfo = context.Create(prop);
+        return nullabilityInfo.WriteState == NullabilityState.Nullable;
     }
 
     private static string ToCamelCase(string name)

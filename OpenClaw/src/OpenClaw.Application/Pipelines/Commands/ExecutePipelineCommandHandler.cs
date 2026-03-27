@@ -16,7 +16,7 @@ namespace OpenClaw.Application.Pipelines.Commands;
 
 public class ExecutePipelineCommandHandler(
     IServiceProvider serviceProvider,
-    IEnumerable<ISkillPipeline> pipelines,
+    IEnumerable<IToolPipeline> pipelines,
     IPipelineExecutionStore executionStore,
     ICurrentUserProvider currentUserProvider,
     ILogger<ExecutePipelineCommandHandler> logger) : IRequestHandler<ExecutePipelineCommand, ErrorOr<string>>
@@ -59,7 +59,7 @@ public class ExecutePipelineCommandHandler(
     {
         // Create a new scope for background execution to avoid ObjectDisposedException
         using var scope = serviceProvider.CreateScope();
-        var scopedPipelines = scope.ServiceProvider.GetRequiredService<IEnumerable<ISkillPipeline>>();
+        var scopedPipelines = scope.ServiceProvider.GetRequiredService<IEnumerable<IToolPipeline>>();
         var pipeline = scopedPipelines.FirstOrDefault(p => p.Name == pipelineName);
 
         if (pipeline == null)

@@ -16,7 +16,7 @@ public record PipelineExecutionResponse(
     string PipelineName,
     PipelineExecutionStatus Status,
     string? Summary = null,
-    IReadOnlyList<SkillStepResult>? Steps = null,
+    IReadOnlyList<ToolStepResult>? Steps = null,
     PipelineApprovalInfo? ApprovalInfo = null);
 
 public record PipelineApprovalInfo(

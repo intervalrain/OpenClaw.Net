@@ -10,4 +10,5 @@ public record SubmitNodeApprovalCommand(
     Guid ExecutionId,
     string NodeId,
     bool Approved,
-    Guid? ApproverUserId) : IRequest<ErrorOr<bool>>;
+    Guid? ApproverUserId,
+    string? EditedOutput = null) : IRequest<ErrorOr<bool>>;

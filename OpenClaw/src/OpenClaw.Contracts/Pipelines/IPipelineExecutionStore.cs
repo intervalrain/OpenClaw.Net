@@ -19,5 +19,5 @@ public interface IPipelineExecutionStore
 
     Task<bool> WaitForApprovalAsync(string executionId, CancellationToken ct);
 
-    Task SetResultAsync(string executionId, SkillPipelineResult result, CancellationToken ct);
+    Task SetResultAsync(string executionId, ToolPipelineResult result, CancellationToken ct);
 }

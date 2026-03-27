@@ -281,16 +281,23 @@
 .mini-graph {
     background: var(--bg-color);
     border-radius: 8px;
-    height: 150px;
+    min-height: 200px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     overflow: hidden;
 }
 
-.mini-graph-placeholder {
+.mini-graph-placeholder,
+.mini-graph-loading {
     color: var(--text-muted);
     font-size: 0.9rem;
+}
+
+.mini-graph-legend {
+    padding: 6px 0;
+    text-align: center;
 }
 
 /* Schedule Info */

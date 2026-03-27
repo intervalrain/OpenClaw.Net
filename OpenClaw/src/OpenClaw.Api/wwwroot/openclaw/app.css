@@ -1277,6 +1277,11 @@ body {
 .skill-item-description {
     font-size: 0.8rem;
     color: var(--text-muted);
+    white-space: pre-wrap;
+    cursor: pointer;
+}
+
+.skill-item-description.collapsed {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1506,6 +1511,19 @@ body {
     padding: 16px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+}
+
+.channel-header:hover {
+    background: var(--bg-tertiary);
+}
+
+.channel-card.collapsed .channel-body {
+    display: none;
+}
+
+.channel-card.collapsed .channel-header {
+    border-bottom: none;
 }
 
 .channel-info {

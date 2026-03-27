@@ -1,11 +1,13 @@
 using Asp.Versioning;
 using Mediator;
 using Microsoft.AspNetCore.Mvc;
+using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Contracts.Workflows;
 using OpenClaw.Contracts.Workflows.Commands;
 using OpenClaw.Contracts.Workflows.Queries;
 using OpenClaw.Contracts.Workflows.Requests;
+using OpenClaw.Domain.Users.Repositories;
 using OpenClaw.Domain.Workflows;
 using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
@@ -16,7 +18,10 @@ namespace OpenClaw.Api.Workflows.Controllers;
 public class WorkflowController(
     ISender sender,
     ICurrentUserProvider currentUserProvider,
-    ISkillRegistry skillRegistry) : ApiController
+    IToolRegistry toolRegistry,
+    ISkillStore skillStore,
+    IConfigStore configStore,
+    IUserPreferenceRepository userPreferenceRepository) : ApiController
 {
     private Guid GetUserId()
     {
@@ -228,6 +233,7 @@ public class WorkflowController(
     public async Task<IActionResult> ApproveNode(
         Guid executionId,
         string nodeId,
+        [FromBody] ApproveNodeRequest? request,
         CancellationToken ct)
     {
         var userId = GetUserId();
@@ -235,7 +241,8 @@ public class WorkflowController(
             executionId,
             nodeId,
             true,
-            userId == Guid.Empty ? null : userId), ct);
+            userId == Guid.Empty ? null : userId,
+            request?.EditedOutput), ct);
 
         return result.Match<IActionResult>(
             _ => Ok(new { approved = true }),
@@ -260,21 +267,82 @@ public class WorkflowController(
             errors => Problem(errors));
     }
 
-    // === Skills (for editor dropdown) ===
+    // === Argument Suggestions ===
 
+    /// <summary>
+    /// Given a list of parameter keys, resolve default values from ConfigStore then UserPreference.
+    /// </summary>
+    [HttpPost("args/suggest")]
+    public async Task<IActionResult> SuggestArgValues(
+        [FromBody] List<string> keys,
+        CancellationToken ct)
+    {
+        var userId = GetUserId();
+        var result = new Dictionary<string, string?>();
+
+        foreach (var key in keys)
+        {
+            // Priority 1: ConfigStore
+            var configValue = configStore.Get(key);
+            if (configValue is not null)
+            {
+                result[key] = configValue;
+                continue;
+            }
+
+            // Priority 2: UserPreference
+            if (userId != Guid.Empty)
+            {
+                var pref = await userPreferenceRepository.GetByKeyAsync(userId, key, ct);
+                if (pref?.Value is not null)
+                {
+                    result[key] = pref.Value;
+                    continue;
+                }
+            }
+        }
+
+        return Ok(result);
+    }
+
+    // === Skills & Tools (for editor) ===
+
+    /// <summary>
+    /// Returns Markdown-defined Skills for workflow nodes.
+    /// </summary>
     [HttpGet("skills")]
     public IActionResult ListAvailableSkills()
     {
-        var skills = skillRegistry.GetAllSkills()
+        var skills = skillStore.GetAllSkills()
             .Select(s => new
             {
                 s.Name,
                 s.Description,
-                Parameters = s.Parameters
+                s.Instructions,
+                s.Tools
             })
             .OrderBy(s => s.Name)
             .ToList();
 
         return Ok(skills);
+    }
+
+    /// <summary>
+    /// Returns available Tools (C# function calling) with their parameter schemas.
+    /// </summary>
+    [HttpGet("tools")]
+    public IActionResult ListAvailableTools()
+    {
+        var tools = toolRegistry.GetAllSkills()
+            .Select(t => new
+            {
+                t.Name,
+                t.Description,
+                Parameters = t.Parameters
+            })
+            .OrderBy(t => t.Name)
+            .ToList();
+
+        return Ok(tools);
     }
 }

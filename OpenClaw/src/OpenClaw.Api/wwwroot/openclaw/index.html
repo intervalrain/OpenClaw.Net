@@ -144,7 +144,7 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
                         </svg>
-                        <span>Skills</span>
+                        <span>Tools</span>
                     </button>
                     <button class="settings-tab" data-tab="preferences">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -206,12 +206,12 @@
                         </button>
                     </div>
 
-                    <!-- Skills Tab -->
+                    <!-- Tools Tab -->
                     <div class="settings-panel" data-panel="skills">
-                        <h4>Skills</h4>
-                        <p class="setting-hint">Use <code>/skill_name args</code> to directly invoke a skill</p>
+                        <h4>Tools</h4>
+                        <p class="setting-hint">Use <code>/tool_name args</code> to directly invoke a tool</p>
                         <div id="skills-list" class="skills-list">
-                            <!-- Skills will be rendered here -->
+                            <!-- Tools will be rendered here -->
                         </div>
                     </div>
 
@@ -243,8 +243,8 @@
                         <p class="setting-hint">Configure messaging channels to receive messages from external platforms</p>
 
                         <!-- Telegram Channel -->
-                        <div class="channel-card" id="telegram-channel">
-                            <div class="channel-header">
+                        <div class="channel-card collapsed" id="telegram-channel">
+                            <div class="channel-header" onclick="this.parentElement.classList.toggle('collapsed')">
                                 <div class="channel-info">
                                     <svg class="channel-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -254,7 +254,7 @@
                                         <div class="channel-status" id="telegram-status">Not configured</div>
                                     </div>
                                 </div>
-                                <label class="toggle-switch">
+                                <label class="toggle-switch" onclick="event.stopPropagation()">
                                     <input type="checkbox" id="telegram-enabled">
                                     <span class="toggle-slider"></span>
                                 </label>

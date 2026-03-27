@@ -33,6 +33,7 @@ public class SubmitNodeApprovalCommandHandler(
             request.ExecutionId,
             request.NodeId,
             request.Approved,
+            request.EditedOutput,
             ct);
 
         return request.Approved;

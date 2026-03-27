@@ -1,10 +1,10 @@
 namespace OpenClaw.Contracts.Skills;
 
-public interface ISkillRegistry
+public interface IToolRegistry
 {
-    IReadOnlyList<IAgentSkill> GetAllSkills();
-    IAgentSkill? GetSkill(string name);
-    bool TryGetSkill(string name, out IAgentSkill? skill);
+    IReadOnlyList<IAgentTool> GetAllSkills();
+    IAgentTool? GetSkill(string name);
+    bool TryGetSkill(string name, out IAgentTool? skill);
     TSkill? GetSkill<TSkill>();
     bool TryGetSkill<TSkill>(out TSkill? skill);
 }

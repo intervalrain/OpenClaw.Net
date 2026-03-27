@@ -11,6 +11,6 @@ public class PipelineExecution
     public PipelineExecutionStatus Status { get; set; }
     public PipelineApprovalInfo? PendingApproval { get; set; }
     public bool? ApprovalDecision { get; set; }
-    public SkillPipelineResult? Result { get; set; }
+    public ToolPipelineResult? Result { get; set; }
     public DateTime CreatedAt { get; init; }
 }

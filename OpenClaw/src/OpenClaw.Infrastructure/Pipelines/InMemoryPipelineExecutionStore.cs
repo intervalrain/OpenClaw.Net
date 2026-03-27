@@ -95,7 +95,7 @@ public class InMemoryPipelineExecutionStore : IPipelineExecutionStore
         return false;
     }
 
-    public Task SetResultAsync(string executionId, SkillPipelineResult result, CancellationToken ct)
+    public Task SetResultAsync(string executionId, ToolPipelineResult result, CancellationToken ct)
     {
         if (_executions.TryGetValue(executionId, out var execution))
         {

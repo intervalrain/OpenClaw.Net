@@ -10,6 +10,10 @@
     <link rel="stylesheet" href="/css/top-header.css">
     <link rel="stylesheet" href="/css/auth-modal.css">
     <link rel="stylesheet" href="css/workflows.css">
+    <!-- Cytoscape.js for mini graph preview -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
 </head>
 <body>
     <!-- Top header will be injected by top-header.js -->
@@ -81,7 +85,14 @@
             </div>
         </div>
         <div class="drawer-footer">
-            <button class="btn btn-primary" id="runWorkflowBtn">
+            <button class="btn btn-primary" id="editWorkflowBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Edit
+            </button>
+            <button class="btn btn-success" id="runWorkflowBtn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M8 5v14l11-7z"/>
                 </svg>

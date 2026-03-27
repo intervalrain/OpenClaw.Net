@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace OpenClaw.Contracts.Workflows;
 
 /// <summary>
@@ -45,6 +47,7 @@ public record ScheduleConfig
 /// <summary>
 /// Frequency options for workflow scheduling.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<ScheduleFrequency>))]
 public enum ScheduleFrequency
 {
     Daily,

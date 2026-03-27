@@ -10,7 +10,7 @@ public static class WedaTemplateApplicationModule
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         // Skill Pipelines
-        services.AddScoped<ISkillPipeline, AdoTaskSyncPipeline>();
+        services.AddScoped<IToolPipeline, AdoTaskSyncPipeline>();
 
         return services;
     }

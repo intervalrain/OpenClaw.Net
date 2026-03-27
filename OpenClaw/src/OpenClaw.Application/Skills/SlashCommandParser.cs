@@ -11,7 +11,7 @@ public record SlashCommand(string SkillName, string RawArguments);
 public interface ISlashCommandParser
 {
     bool TryParse(string input, out SlashCommand? command);
-    string ConvertToJson(SlashCommand command, IAgentSkill skill);
+    string ConvertToJson(SlashCommand command, IAgentTool skill);
 }
 
 public partial class SlashCommandParser : ISlashCommandParser
@@ -37,7 +37,7 @@ public partial class SlashCommandParser : ISlashCommandParser
         return true;
     }
 
-    public string ConvertToJson(SlashCommand command, IAgentSkill skill)
+    public string ConvertToJson(SlashCommand command, IAgentTool skill)
     {
         if (string.IsNullOrWhiteSpace(command.RawArguments))
             return "{}";
