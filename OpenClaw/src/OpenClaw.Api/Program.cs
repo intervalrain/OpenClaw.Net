@@ -13,7 +13,7 @@ using OpenClaw.Infrastructure;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Hosting;
 using OpenClaw.Hosting.Observability;
-using OpenClaw.Application.Workflows;
+using OpenClaw.Application.CronJobs;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,8 +26,8 @@ var builder = WebApplication.CreateBuilder(args);
         .AddOpenClawTelemetry(builder.Configuration)
         .AddApplication()
         .AddInfrastructure(builder.Configuration)
-        // Workflow scheduler background service
-        .AddHostedService<WorkflowSchedulerService>()
+        // Background scheduler services
+        .AddHostedService<CronJobSchedulerService>()
         .AddWedaCore<IAssemblyMarker, IContractsMarker, IApplicationMarker>(
             builder.Configuration,
             services => services.AddMediator(options =>

@@ -394,10 +394,10 @@
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Pipeline Drawer -->
-    <div id="pipeline-drawer" class="pipeline-drawer">
+    <!-- Cron Job Drawer -->
+    <div id="cronjob-drawer" class="cronjob-drawer">
         <div class="drawer-header">
-            <h3>Pipelines</h3>
+            <h3>Cron Jobs</h3>
             <button id="drawer-close-btn" class="drawer-close-btn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 6L6 18M6 6l12 12"/>
@@ -405,24 +405,28 @@
             </button>
         </div>
         <div class="drawer-content">
-            <div id="pipeline-list" class="pipeline-list">
-                <!-- Pipelines will be loaded here -->
+            <div id="cronjobDrawerList" class="cronjob-list">
+                <!-- Cron job items will be loaded here -->
             </div>
         </div>
-        <div id="drawer-executions" class="drawer-executions">
-            <div class="executions-header">Recent Executions</div>
-            <div id="execution-list" class="execution-list">
-                <!-- Executions will be loaded here -->
-            </div>
+        <div class="drawer-footer">
+            <a href="/cronjobs/index.html" class="drawer-footer-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                Open Editor
+            </a>
         </div>
     </div>
 
-    <!-- Pipeline Toggle Button -->
-    <button id="pipeline-toggle-btn" class="pipeline-toggle-btn" title="Open Pipelines">
+    <!-- Cron Job Toggle Button -->
+    <button id="cronjob-toggle-btn" class="cronjob-toggle-btn" title="Open Cron Jobs">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
         </svg>
-        <span id="pipeline-badge" class="pipeline-badge" style="display: none;">0</span>
     </button>
 
     <script src="/js/auth.js"></script>

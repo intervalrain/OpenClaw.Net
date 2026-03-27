@@ -10,8 +10,7 @@ function createTopHeader(activePage = '') {
     if (!activePage) {
         const path = window.location.pathname;
         if (path.includes('/openclaw')) activePage = 'chat';
-        else if (path.includes('/workflows')) activePage = 'workflows';
-        else if (path.includes('/pipelines')) activePage = 'pipelines';
+        else if (path.includes('/cronjobs')) activePage = 'cronjobs';
         else if (path.includes('/wiki')) activePage = 'wiki';
         else if (path.includes('/wedally')) activePage = 'wedally';
     }
@@ -31,24 +30,12 @@ function createTopHeader(activePage = '') {
                     </svg>
                     <span>Chat</span>
                 </a>
-                <a href="/workflows/index.html" class="nav-link ${activePage === 'workflows' ? 'active' : ''}">
+                <a href="/cronjobs/index.html" class="nav-link ${activePage === 'cronjobs' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="6" cy="6" r="3"/>
-                        <circle cx="6" cy="18" r="3"/>
-                        <line x1="20" y1="4" x2="8.12" y2="15.88"/>
-                        <line x1="14.47" y1="14.48" x2="20" y2="20"/>
-                        <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
                     </svg>
-                    <span>Workflows</span>
-                </a>
-                <a href="/pipelines/index.html" class="nav-link ${activePage === 'pipelines' ? 'active' : ''}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="6" y1="3" x2="6" y2="15"/>
-                        <circle cx="18" cy="6" r="3"/>
-                        <circle cx="6" cy="18" r="3"/>
-                        <path d="M18 9a9 9 0 0 1-9 9"/>
-                    </svg>
-                    <span>Pipelines</span>
+                    <span>Cron Jobs</span>
                 </a>
                 <a href="/wiki/index.html" class="nav-link ${activePage === 'wiki' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

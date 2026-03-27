@@ -2024,8 +2024,8 @@ body {
     color: var(--text-primary);
 }
 
-/* ==================== Pipeline Drawer ==================== */
-.pipeline-drawer {
+/* ==================== Cron Job Drawer ==================== */
+.cronjob-drawer {
     position: fixed;
     top: 0;
     right: -360px;
@@ -2040,7 +2040,7 @@ body {
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
 }
 
-.pipeline-drawer.open {
+.cronjob-drawer.open {
     right: 0;
 }
 
@@ -2080,67 +2080,90 @@ body {
     padding: 16px;
 }
 
-.pipeline-list {
+.cronjob-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.pipeline-card {
+.cronjob-card {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     padding: 12px;
     transition: border-color 0.15s;
+    cursor: pointer;
 }
 
-.pipeline-card:hover {
+.cronjob-card:hover {
     border-color: var(--border-color);
 }
 
-.pipeline-card-header {
+.cronjob-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
-.pipeline-card-name {
+.cronjob-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cronjob-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cronjob-status-dot.active {
+    background: #22c55e;
+}
+
+.cronjob-status-dot.inactive {
+    background: var(--text-muted);
+}
+
+.cronjob-card-name {
     font-weight: 500;
     font-size: 0.9rem;
     color: var(--text-primary);
 }
 
-.pipeline-card-status {
+.cronjob-card-status {
     font-size: 0.7rem;
     padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
 }
 
-.pipeline-card-status.idle {
+.cronjob-card-status.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.cronjob-card-status.inactive {
     background: var(--bg-secondary);
     color: var(--text-muted);
 }
 
-.pipeline-card-status.running {
-    background: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
-}
-
-.pipeline-card-desc {
+.cronjob-card-schedule {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-bottom: 12px;
     line-height: 1.4;
+    font-family: monospace;
 }
 
-.pipeline-card-actions {
+.cronjob-card-actions {
     display: flex;
     gap: 8px;
 }
 
-.pipeline-run-btn {
+.cronjob-run-btn {
     flex: 1;
     padding: 8px 12px;
     font-size: 0.8rem;
@@ -2157,124 +2180,51 @@ body {
     transition: opacity 0.15s;
 }
 
-.pipeline-run-btn:hover {
+.cronjob-run-btn:hover {
     opacity: 0.9;
 }
 
-.pipeline-run-btn:disabled {
+.cronjob-run-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.pipeline-run-btn svg {
+.cronjob-run-btn svg {
     width: 14px;
     height: 14px;
 }
 
-/* Drawer Executions Section */
-.drawer-executions {
+/* Drawer Footer */
+.drawer-footer {
     border-top: 1px solid var(--border-subtle);
-    max-height: 300px;
-    display: flex;
-    flex-direction: column;
+    padding: 12px 16px;
 }
 
-.executions-header {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    padding: 12px 16px 8px;
-    font-weight: 500;
-}
-
-.execution-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 16px 16px;
-}
-
-.execution-item {
+.drawer-footer-btn {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px;
-    background: var(--bg-tertiary);
-    border-radius: 6px;
-    margin-bottom: 6px;
-}
-
-.execution-item:last-child {
-    margin-bottom: 0;
-}
-
-.execution-status-icon {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.execution-status-icon.running {
-    background: #3b82f6;
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-.execution-status-icon.waiting {
-    background: #f59e0b;
-    animation: pulse 1s ease-in-out infinite;
-}
-
-.execution-status-icon.completed {
-    background: #22c55e;
-}
-
-.execution-status-icon.failed {
-    background: #ef4444;
-}
-
-.execution-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.execution-name {
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
     font-size: 0.85rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
     color: var(--text-primary);
-    font-weight: 500;
-}
-
-.execution-time {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
-
-.execution-actions {
-    display: flex;
-    gap: 4px;
-}
-
-.execution-action-btn {
-    padding: 4px 8px;
-    font-size: 0.7rem;
-    border-radius: 4px;
-    border: none;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
     cursor: pointer;
-    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
 }
 
-.execution-action-btn.approve {
-    background: #22c55e;
-    color: white;
+.drawer-footer-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
 }
 
-.execution-action-btn.reject {
-    background: transparent;
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-}
-
-/* Pipeline Toggle Button */
-.pipeline-toggle-btn {
+/* Cron Job Toggle Button */
+.cronjob-toggle-btn {
     position: fixed;
     bottom: 24px;
     right: 24px;
@@ -2293,30 +2243,13 @@ body {
     z-index: 1400;
 }
 
-.pipeline-toggle-btn:hover {
+.cronjob-toggle-btn:hover {
     transform: scale(1.05);
 }
 
-.pipeline-toggle-btn.hidden {
+.cronjob-toggle-btn.hidden {
     opacity: 0;
     pointer-events: none;
-}
-
-.pipeline-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    background: #ef4444;
-    color: white;
-    font-size: 0.7rem;
-    font-weight: 600;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 /* Drawer overlay for mobile */
@@ -2340,12 +2273,12 @@ body {
 
 /* Responsive Drawer */
 @media (max-width: 600px) {
-    .pipeline-drawer {
+    .cronjob-drawer {
         width: 100%;
         right: -100%;
     }
 
-    .pipeline-toggle-btn {
+    .cronjob-toggle-btn {
         bottom: 16px;
         right: 16px;
     }
