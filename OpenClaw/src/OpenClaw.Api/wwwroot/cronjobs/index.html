@@ -44,47 +44,9 @@
 
             <!-- Job Editor (hidden until job selected) -->
             <div class="job-editor hidden" id="jobEditor">
-                <!-- Top: Tool Instances Section -->
-                <section class="tool-instances-section">
-                    <div class="section-header">
-                        <h4>Tool Instances</h4>
-                        <button class="btn btn-sm btn-outline" id="newToolInstanceBtn">+ New Tool</button>
-                    </div>
-                    <div class="tool-instances-list" id="toolInstancesList">
-                        <!-- Rendered by JS: list of saved tool instances -->
-                    </div>
-
-                    <!-- Tool Instance Editor (shown when creating/editing) -->
-                    <div class="tool-instance-editor hidden" id="toolInstanceEditor">
-                        <input type="hidden" id="tiId" value="">
-                        <div class="form-group">
-                            <label>Name</label>
-                            <input type="text" id="tiName" placeholder="e.g. sync-tasks">
-                        </div>
-                        <div class="form-group">
-                            <label>Tool</label>
-                            <select id="tiToolSelect">
-                                <option value="">Select tool...</option>
-                            </select>
-                        </div>
-                        <div class="tool-args" id="tiArgs">
-                            <!-- Tool args editor rendered here -->
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <input type="text" id="tiDescription" placeholder="Optional description">
-                        </div>
-                        <div class="editor-actions">
-                            <button class="btn btn-secondary btn-sm" onclick="cancelToolInstance()">Cancel</button>
-                            <button class="btn btn-primary btn-sm" onclick="saveToolInstance()">Save</button>
-                        </div>
-                    </div>
-                </section>
-
-                <hr class="section-divider">
-
-                <!-- Bottom: Job Configuration -->
-                <section class="job-config-section">
+                <div class="editor-columns">
+                    <!-- Left: Job Configuration -->
+                    <section class="job-config-section">
                     <h4>Job Configuration</h4>
 
                     <div class="form-row">
@@ -169,15 +131,46 @@
                             <button class="btn btn-primary" id="saveJobBtn">Save</button>
                         </div>
                     </div>
-                </section>
 
-                <!-- Recent Executions -->
-                <section class="executions-section">
-                    <h4>Recent Executions</h4>
-                    <div id="executionsList" class="executions-list">
-                        <!-- Rendered by JS -->
+                    <!-- Recent Executions -->
+                    <div class="executions-section">
+                        <h4>Recent Executions</h4>
+                        <div id="executionsList" class="executions-list"></div>
                     </div>
                 </section>
+
+                    <!-- Right: Tool Instances -->
+                    <aside class="tool-instances-section">
+                        <div class="section-header">
+                            <h4>Tool Instances</h4>
+                            <button class="btn btn-sm btn-outline" id="newToolInstanceBtn">+ New Tool</button>
+                        </div>
+                        <div class="tool-instances-list" id="toolInstancesList"></div>
+
+                        <div class="tool-instance-editor hidden" id="toolInstanceEditor">
+                            <input type="hidden" id="tiId" value="">
+                            <div class="form-group">
+                                <label>Name</label>
+                                <input type="text" id="tiName" placeholder="e.g. sync-tasks">
+                            </div>
+                            <div class="form-group">
+                                <label>Tool</label>
+                                <select id="tiToolSelect">
+                                    <option value="">Select tool...</option>
+                                </select>
+                            </div>
+                            <div class="tool-args" id="tiArgs"></div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <input type="text" id="tiDescription" placeholder="Optional description">
+                            </div>
+                            <div class="editor-actions">
+                                <button class="btn btn-secondary btn-sm" onclick="cancelToolInstance()">Cancel</button>
+                                <button class="btn btn-primary btn-sm" onclick="saveToolInstance()">Save</button>
+                            </div>
+                        </div>
+                    </aside>
+                </div><!-- .editor-columns -->
             </div>
         </main>
     </div>

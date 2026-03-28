@@ -11,6 +11,9 @@ let skills = [];
 let currentJobId = null;
 let editingToolInstanceId = null;
 
+// Tool arg values (persisted across tag switches)
+let _toolArgValues = {};
+
 // Autocomplete state
 let acActiveDropdown = null;
 let acItems = [];
@@ -86,7 +89,7 @@ function formatDuration(ms) {
 // ===== Jobs =====
 async function loadJobs() {
     try {
-        const res = await authFetch('/api/v1/cronjob');
+        const res = await authFetch('/api/v1/cron-job');
         if (!res.ok) throw new Error('Failed to load jobs');
         jobs = await res.json();
         renderJobsList();
@@ -211,12 +214,12 @@ async function saveJob() {
     try {
         let res;
         if (currentJobId) {
-            res = await authFetch(`/api/v1/cronjob/${currentJobId}`, {
+            res = await authFetch(`/api/v1/cron-job/${currentJobId}`, {
                 method: 'PUT',
                 body: JSON.stringify(payload)
             });
         } else {
-            res = await authFetch('/api/v1/cronjob', {
+            res = await authFetch('/api/v1/cron-job', {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
@@ -246,7 +249,7 @@ async function deleteJob() {
     if (!confirm('Delete this cron job?')) return;
 
     try {
-        const res = await authFetch(`/api/v1/cronjob/${currentJobId}`, {
+        const res = await authFetch(`/api/v1/cron-job/${currentJobId}`, {
             method: 'DELETE'
         });
         if (!res.ok) throw new Error('Delete failed');
@@ -268,7 +271,7 @@ async function runJob() {
     if (!currentJobId) return;
 
     try {
-        const res = await authFetch(`/api/v1/cronjob/${currentJobId}/execute`, {
+        const res = await authFetch(`/api/v1/cron-job/${currentJobId}/execute`, {
             method: 'POST'
         });
         if (!res.ok) throw new Error('Execution failed');
@@ -395,20 +398,21 @@ async function saveToolInstance() {
         return;
     }
 
-    // Gather args
-    const args = {};
-    document.querySelectorAll('#tiArgs .arg-row').forEach(row => {
-        const key = row.dataset.argKey;
-        const input = row.querySelector('input, textarea');
-        if (key && input) {
-            args[key] = input.value;
-        }
-    });
+    // Gather args from tag editor
+    const args = { ..._toolArgValues }; // saved values from tag editor interactions
+    // Also capture currently visible editor input
+    const activeInput = document.querySelector('#argEditorPanel [data-arg-key]');
+    if (activeInput) {
+        const key = activeInput.dataset.argKey;
+        if (key && activeInput.value) args[key] = activeInput.value;
+    }
+    // Remove empty values
+    Object.keys(args).forEach(k => { if (!args[k]) delete args[k]; });
 
     const payload = {
         name,
         toolName,
-        arguments: args,
+        argsJson: JSON.stringify(args),
         description: document.getElementById('tiDescription').value.trim()
     };
 
@@ -468,7 +472,7 @@ async function deleteToolInstance(id) {
 // ===== Tools / Skills Loading =====
 async function loadTools() {
     try {
-        const res = await authFetch('/api/v1/cronjob/tools');
+        const res = await authFetch('/api/v1/cron-job/tools');
         if (!res.ok) throw new Error('Failed to load tools');
         tools = await res.json();
         populateToolSelect();
@@ -501,7 +505,7 @@ function populateToolSelect() {
 
 async function loadSkills() {
     try {
-        const res = await authFetch('/api/v1/cronjob/skills');
+        const res = await authFetch('/api/v1/cron-job/skills');
         if (!res.ok) throw new Error('Failed to load skills');
         skills = await res.json();
     } catch (err) {
@@ -518,49 +522,173 @@ function renderToolArgs(toolName, existingArgs) {
 
     const tool = tools.find(t => (t.name || t) === toolName);
     if (!tool || !tool.parameters) {
-        // Fallback: render a generic key-value area
-        container.innerHTML = `
-            <div class="arg-hint" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
-                No parameter schema available for this tool. Arguments will be passed as-is.
-            </div>
-        `;
+        container.innerHTML = '<div class="arg-hint">No parameters for this tool.</div>';
         return;
     }
 
-    const params = tool.parameters;
-    const paramList = Array.isArray(params) ? params : Object.entries(params).map(([k, v]) => ({
-        name: k,
-        ...(typeof v === 'object' ? v : { type: typeof v })
-    }));
+    const schema = tool.parameters;
+    const properties = schema.properties || {};
+    const requiredList = schema.required || [];
+    // Initialize arg values from existing args
+    _toolArgValues = {};
+    const parsed = existingArgs || {};
+    Object.entries(parsed).forEach(([k, v]) => { if (v) _toolArgValues[k] = v; });
 
-    paramList.forEach(param => {
-        const key = param.name || param.key;
-        const val = existingArgs ? (existingArgs[key] || '') : '';
-        const isTextarea = param.type === 'text' || param.type === 'string' && (param.multiline || param.long);
+    if (Object.keys(properties).length === 0) {
+        container.innerHTML = '<div class="arg-hint">This tool has no parameters.</div>';
+        return;
+    }
 
-        const row = document.createElement('div');
-        row.className = 'arg-row';
-        row.dataset.argKey = key;
-
-        const label = document.createElement('label');
-        label.textContent = key;
-        if (param.required) label.textContent += ' *';
-        row.appendChild(label);
-
-        let input;
-        if (isTextarea) {
-            input = document.createElement('textarea');
-            input.rows = 3;
-        } else {
-            input = document.createElement('input');
-            input.type = 'text';
-        }
-        input.value = val;
-        input.placeholder = param.description || param.placeholder || '';
-        row.appendChild(input);
-
-        container.appendChild(row);
+    // Sort: required first, then optional
+    const entries = Object.entries(properties).sort(([aKey], [bKey]) => {
+        const aReq = requiredList.includes(aKey) ? 0 : 1;
+        const bReq = requiredList.includes(bKey) ? 0 : 1;
+        return aReq - bReq;
     });
+
+    // Tag cloud
+    const tagsDiv = document.createElement('div');
+    tagsDiv.className = 'arg-tags';
+
+    // Editor panel (shown when a tag is clicked)
+    const editorDiv = document.createElement('div');
+    editorDiv.className = 'arg-editor-panel';
+    editorDiv.id = 'argEditorPanel';
+
+    entries.forEach(([key, prop]) => {
+        const isRequired = requiredList.includes(key);
+        const val = parsed[key] || '';
+        const hasValue = val !== '';
+
+        // Determine tag status class
+        let statusClass = 'arg-tag-optional'; // blue
+        if (isRequired && !hasValue) statusClass = 'arg-tag-required'; // red
+        else if (isRequired && hasValue) statusClass = 'arg-tag-ready'; // green
+        else if (hasValue) statusClass = 'arg-tag-filled'; // teal
+
+        const tag = document.createElement('span');
+        tag.className = `arg-tag ${statusClass}`;
+        tag.dataset.argKey = key;
+        tag.textContent = key;
+
+        // Badge for count/type
+        const badge = document.createElement('span');
+        badge.className = 'arg-tag-badge';
+        badge.textContent = prop.type || 'str';
+        tag.appendChild(badge);
+
+        tag.onclick = () => openArgEditor(key, prop, isRequired, editorDiv, tagsDiv);
+        tagsDiv.appendChild(tag);
+    });
+
+    container.appendChild(tagsDiv);
+    container.appendChild(editorDiv);
+
+    // Auto-fill from AppConfig > UserConfig > UserPreference
+    autoFillToolArgs(entries, tagsDiv);
+}
+
+function openArgEditor(key, prop, isRequired, editorDiv, tagsDiv) {
+    // Save current editor value before switching
+    const prevInput = editorDiv.querySelector('[data-arg-key] input, [data-arg-key] textarea, [data-arg-key] select');
+    if (prevInput) {
+        const prevKey = prevInput.closest('[data-arg-key]')?.dataset.argKey || prevInput.dataset.argKey;
+        if (prevKey && prevInput.value) _toolArgValues[prevKey] = prevInput.value;
+    }
+
+    // Highlight active tag
+    tagsDiv.querySelectorAll('.arg-tag').forEach(t => t.classList.remove('arg-tag-active'));
+    const activeTag = tagsDiv.querySelector(`[data-arg-key="${key}"]`);
+    if (activeTag) activeTag.classList.add('arg-tag-active');
+
+    // Restore saved value
+    const currentVal = _toolArgValues[key] || '';
+
+    editorDiv.innerHTML = `
+        <div class="arg-editor-row" data-arg-key="${escapeHtml(key)}">
+            <div class="arg-editor-header">
+                <span class="arg-editor-name">${escapeHtml(key)}</span>
+                ${isRequired ? '<span class="arg-editor-required">required</span>' : '<span class="arg-editor-optional">optional</span>'}
+                <span class="arg-editor-type">${escapeHtml(prop.type || 'string')}</span>
+            </div>
+            ${prop.description ? `<div class="arg-editor-desc">${escapeHtml(prop.description)}</div>` : ''}
+            <div class="arg-editor-input">
+                ${buildArgInput(key, prop, currentVal)}
+            </div>
+        </div>
+    `;
+
+    // Focus the input
+    const input = editorDiv.querySelector('input, textarea, select');
+    if (input) {
+        input.focus();
+        // Update tag status on input change
+        input.addEventListener('input', () => updateTagStatus(key, input.value, isRequired, tagsDiv));
+        input.addEventListener('change', () => updateTagStatus(key, input.value, isRequired, tagsDiv));
+    }
+}
+
+function buildArgInput(key, prop, val) {
+    if (prop.type === 'boolean') {
+        return `<select data-arg-key="${escapeHtml(key)}">
+            <option value="" ${!val ? 'selected' : ''}>-- not set --</option>
+            <option value="true" ${val === 'true' ? 'selected' : ''}>true</option>
+            <option value="false" ${val === 'false' ? 'selected' : ''}>false</option>
+        </select>`;
+    }
+    if (prop.type === 'integer' || prop.type === 'number') {
+        return `<input type="number" data-arg-key="${escapeHtml(key)}" value="${escapeHtml(val)}" placeholder="Enter ${escapeHtml(key)}...">`;
+    }
+    if (prop.description && prop.description.length > 100) {
+        return `<textarea data-arg-key="${escapeHtml(key)}" rows="4" placeholder="Enter ${escapeHtml(key)}...">${escapeHtml(val)}</textarea>`;
+    }
+    return `<input type="text" data-arg-key="${escapeHtml(key)}" value="${escapeHtml(val)}" placeholder="Enter ${escapeHtml(key)}...">`;
+}
+
+async function autoFillToolArgs(entries, tagsDiv) {
+    // Collect defaultKeys that don't already have values
+    const keysToLookup = [];
+    const keyToParam = {}; // defaultKey -> paramName
+    entries.forEach(([key, prop]) => {
+        if (_toolArgValues[key]) return; // already has value
+        const defaultKey = prop.defaultKey || key; // use defaultKey if available, else try param name itself
+        keysToLookup.push(defaultKey);
+        keyToParam[defaultKey] = key;
+    });
+
+    if (keysToLookup.length === 0) return;
+
+    try {
+        const res = await authFetch('/api/v1/tool-instance/args/suggest', {
+            method: 'POST',
+            body: JSON.stringify(keysToLookup)
+        });
+        if (!res.ok) return;
+
+        const suggestions = await res.json();
+        for (const [lookupKey, value] of Object.entries(suggestions)) {
+            const paramName = keyToParam[lookupKey];
+            if (paramName && value && !_toolArgValues[paramName]) {
+                _toolArgValues[paramName] = value;
+                // Update tag status
+                const isRequired = entries.find(([k]) => k === paramName);
+                updateTagStatus(paramName, value, !!isRequired, tagsDiv);
+            }
+        }
+    } catch (err) {
+        console.error('Auto-fill tool args error:', err);
+    }
+}
+
+function updateTagStatus(key, value, isRequired, tagsDiv) {
+    const tag = tagsDiv.querySelector(`[data-arg-key="${key}"]`);
+    if (!tag) return;
+    tag.classList.remove('arg-tag-required', 'arg-tag-ready', 'arg-tag-optional', 'arg-tag-filled');
+    const hasValue = value && value.trim() !== '';
+    if (isRequired && !hasValue) tag.classList.add('arg-tag-required');
+    else if (isRequired && hasValue) tag.classList.add('arg-tag-ready');
+    else if (hasValue) tag.classList.add('arg-tag-filled');
+    else tag.classList.add('arg-tag-optional');
 }
 
 // ===== Executions =====
@@ -573,7 +701,7 @@ async function loadExecutions(jobId) {
     }
 
     try {
-        const res = await authFetch(`/api/v1/cronjob/executions?cronJobId=${jobId}`);
+        const res = await authFetch(`/api/v1/cron-job/executions?cronJobId=${jobId}`);
         if (!res.ok) throw new Error('Failed to load executions');
         const executions = await res.json();
         renderExecutions(executions);

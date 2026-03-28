@@ -77,7 +77,7 @@ public class CronJobExecutor(
         await uow.SaveChangesAsync();
 
         // 1. Build system prompt from @skill references in context
-        var systemPrompt = await BuildSystemPromptAsync(job.ContextJson, skillStore);
+        var systemPrompt = BuildSystemPrompt(job.ContextJson, skillStore);
 
         // 2. Build available tools from #tool-instance references in content
         var (toolDefs, toolMap, processedContent) = await BuildToolsAsync(
@@ -133,7 +133,7 @@ public class CronJobExecutor(
         await uow.SaveChangesAsync();
     }
 
-    private static async Task<string> BuildSystemPromptAsync(
+    private static string BuildSystemPrompt(
         string? contextJson, ISkillStore skillStore)
     {
         var parts = new List<string> { "You are a helpful assistant executing a scheduled task." };
@@ -148,7 +148,13 @@ public class CronJobExecutor(
                 var skill = skillStore.GetSkill(name);
                 if (skill is not null)
                 {
-                    parts.Add($"## Skill: {skill.Name}\n{skill.Instructions}");
+                    // Resolve {SKILL_DIR} placeholder to actual directory path
+                    var instructions = skill.Instructions;
+                    if (skill is SkillDefinition sd && sd.DirectoryPath is not null)
+                    {
+                        instructions = instructions.Replace("{SKILL_DIR}", sd.DirectoryPath);
+                    }
+                    parts.Add($"## Skill: {skill.Name}\n{instructions}");
                 }
             }
         }

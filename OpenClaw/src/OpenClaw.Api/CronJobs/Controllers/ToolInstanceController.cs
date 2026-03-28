@@ -16,6 +16,7 @@ public class ToolInstanceController(
     ISender sender,
     ICurrentUserProvider currentUserProvider,
     IConfigStore configStore,
+    IUserConfigStore userConfigStore,
     IUserPreferenceRepository userPreferenceRepository) : ApiController
 {
     private Guid GetUserId()
@@ -90,11 +91,17 @@ public class ToolInstanceController(
 
         foreach (var key in keys)
         {
+            // Priority 1: AppConfig (global)
             var configValue = configStore.Get(key);
             if (configValue is not null) { result[key] = configValue; continue; }
 
             if (userId != Guid.Empty)
             {
+                // Priority 2: UserConfig (per-user, encrypted)
+                var userConfigValue = await userConfigStore.GetAsync(userId, key, ct);
+                if (userConfigValue is not null) { result[key] = userConfigValue; continue; }
+
+                // Priority 3: UserPreference (per-user, plain)
                 var pref = await userPreferenceRepository.GetByKeyAsync(userId, key, ct);
                 if (pref?.Value is not null) { result[key] = pref.Value; continue; }
             }

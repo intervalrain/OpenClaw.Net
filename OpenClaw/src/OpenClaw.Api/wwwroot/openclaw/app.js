@@ -2221,7 +2221,7 @@ async function loadCronJobs() {
     listEl.innerHTML = '<p class="setting-hint" style="text-align: center; padding: 20px;">Loading...</p>';
 
     try {
-        const res = await authFetch('/api/v1/cronjob');
+        const res = await authFetch('/api/v1/cron-job');
         if (res.ok) {
             const data = await res.json();
             cronJobs = data.jobs || data || [];
@@ -2295,7 +2295,7 @@ async function executeCronJob(jobId, btn) {
     btn.innerHTML = '<span class="status-dot"></span> Running...';
 
     try {
-        const res = await authFetch(`/api/v1/cronjob/${encodeURIComponent(jobId)}/execute`, {
+        const res = await authFetch(`/api/v1/cron-job/${encodeURIComponent(jobId)}/execute`, {
             method: 'POST'
         });
 

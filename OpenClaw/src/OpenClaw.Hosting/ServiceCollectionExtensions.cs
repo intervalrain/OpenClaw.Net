@@ -78,7 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILlmProviderFactory, LlmProviderFactory>();
 
         // skills
-        services.AddSkillsFromAssemblies();
+        services.AddSkillsFromAssemblies(configuration);
         services.AddScoped<IToolSettingsService, ToolSettingsService>();
         services.AddSingleton<ISlashCommandParser, SlashCommandParser>();
         // services.AddSingleton<IAgentTool>(ReadFileSkill.Default);
@@ -117,7 +117,7 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    private static IServiceCollection AddSkillsFromAssemblies(this IServiceCollection services)
+    private static IServiceCollection AddSkillsFromAssemblies(this IServiceCollection services, IConfiguration configuration)
     {
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => a.FullName?.StartsWith("OpenClaw.Tools") == true)
@@ -175,11 +175,12 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IToolRegistry, ToolRegistry>();
 
-        // Register Markdown Skill store (skills/ directory at project root)
-        var skillsDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "skills");
-        if (!Directory.Exists(skillsDir))
+        // Register Markdown Skill store
+        var skillsDir = configuration["Skills:Directory"] ?? "skills";
+        if (!Path.IsPathRooted(skillsDir))
         {
-            skillsDir = Path.Combine(Directory.GetCurrentDirectory(), "skills");
+            // Relative paths resolve from the content root (where the .csproj is)
+            skillsDir = Path.GetFullPath(skillsDir, Directory.GetCurrentDirectory());
         }
         services.AddSingleton<ISkillStore>(sp =>
         {

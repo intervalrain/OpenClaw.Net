@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Security;
 using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
@@ -24,7 +25,6 @@ using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
 using OpenClaw.Infrastructure.Skills.Persistence;
-using OpenClaw.Contracts.Configuration;
 using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure;
@@ -92,6 +92,16 @@ public static class WedaTemplateInfrastructureModule
             var uow = sp.GetRequiredService<IUnitOfWork>();
 
             return new DatabaseConfigStore(repository, encryption, uow, fallback: envStore);
+        });
+
+        // user configuration (per-user, encrypted)
+        services.AddScoped<IUserConfigRepository, UserConfigRepository>();
+        services.AddScoped<IUserConfigStore>(sp =>
+        {
+            var repository = sp.GetRequiredService<IUserConfigRepository>();
+            var encryption = sp.GetRequiredService<IEncryptionService>();
+            var uow = sp.GetRequiredService<IUnitOfWork>();
+            return new DatabaseUserConfigStore(repository, encryption, uow);
         });
 
         // security

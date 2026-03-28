@@ -27,6 +27,7 @@ public class AgentPipelineBuilder(IServiceProvider _serviceProvider)
         IEnumerable<IAgentTool> skills,
         AgentPipelineOptions options)
     {
-        return new AgentPipeline(llmProviderFactory, skills, options, _middlewares);
+        var skillStore = _serviceProvider.GetService<ISkillStore>();
+        return new AgentPipeline(llmProviderFactory, skills, options, skillStore, _middlewares);
     }
 }

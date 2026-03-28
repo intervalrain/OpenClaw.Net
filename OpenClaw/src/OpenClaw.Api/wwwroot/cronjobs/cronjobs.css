@@ -157,11 +157,26 @@
 
 /* ===== Job Editor ===== */
 .job-editor {
-    max-width: 800px;
+    width: 100%;
 }
 
 .job-editor.hidden {
     display: none;
+}
+
+.editor-columns {
+    display: flex;
+    gap: 24px;
+}
+
+.editor-columns .job-config-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.editor-columns .tool-instances-section {
+    width: 320px;
+    flex-shrink: 0;
 }
 
 /* Section headers */
@@ -268,42 +283,154 @@
     margin-bottom: 12px;
 }
 
-.tool-args .arg-row {
+/* Tag cloud */
+.arg-tags {
     display: flex;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.arg-tag {
+    display: inline-flex;
     align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1.5px solid transparent;
+}
+
+.arg-tag:hover {
+    filter: brightness(1.1);
+}
+
+.arg-tag-badge {
+    font-size: 0.65rem;
+    opacity: 0.6;
+    font-weight: 400;
+}
+
+/* Tag states */
+.arg-tag-required {
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.3);
+}
+
+.arg-tag-ready {
+    background: rgba(39, 174, 96, 0.12);
+    color: #27ae60;
+    border-color: rgba(39, 174, 96, 0.3);
+}
+
+.arg-tag-optional {
+    background: rgba(52, 152, 219, 0.1);
+    color: #3498db;
+    border-color: rgba(52, 152, 219, 0.2);
+}
+
+.arg-tag-filled {
+    background: rgba(26, 188, 156, 0.12);
+    color: #1abc9c;
+    border-color: rgba(26, 188, 156, 0.3);
+}
+
+.arg-tag-active {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+}
+
+/* Editor panel (shown on tag click) */
+.arg-editor-panel {
+    min-height: 0;
+}
+
+.arg-editor-panel:empty {
+    display: none;
+}
+
+.arg-editor-row {
+    background: var(--bg-color);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.arg-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 8px;
 }
 
-.tool-args .arg-row label {
-    min-width: 120px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-muted);
+.arg-editor-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-color);
 }
 
-.tool-args .arg-row input,
-.tool-args .arg-row textarea {
-    flex: 1;
+.arg-editor-required {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.arg-editor-optional {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--card-bg);
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.arg-editor-type {
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: var(--text-muted);
+    background: var(--card-bg);
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.arg-editor-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+.arg-editor-input input,
+.arg-editor-input textarea,
+.arg-editor-input select {
+    width: 100%;
     padding: 8px 10px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    background: var(--bg-color);
+    background: var(--card-bg);
     color: var(--text-color);
     font-size: 0.875rem;
     font-family: inherit;
+    box-sizing: border-box;
 }
 
-.tool-args .arg-row input:focus,
-.tool-args .arg-row textarea:focus {
+.arg-editor-input textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.arg-editor-input input:focus,
+.arg-editor-input textarea:focus,
+.arg-editor-input select:focus {
     outline: none;
     border-color: var(--primary-color);
-}
-
-.tool-args .arg-hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 2px;
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
 }
 
 /* ===== Section Divider ===== */
