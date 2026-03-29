@@ -4,18 +4,19 @@ using Weda.Core.Domain;
 
 namespace OpenClaw.Domain.Chat.Entities;
 
-public class Conversation(string title) : AggregateRoot<Guid>(Guid.NewGuid())
+public class Conversation(string title, Guid userId) : AggregateRoot<Guid>(Guid.NewGuid()), IUserScoped
 {
     public string? Title { get; private set; } = title;
+    public Guid UserId { get; private set; } = userId;
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; private set; }
 
     public List<ConversationMessage> Messages { get; private set; } = [];
 
-    private Conversation(): this(string.Empty) { }
+    private Conversation(): this(string.Empty, Guid.Empty) { }
 
-    public static Conversation Create(string? title = null)
-        => new(title ?? "New Chat");
+    public static Conversation Create(Guid userId, string? title = null)
+        => new(title ?? "New Chat", userId);
 
     public void AddMessage(ChatRole role, string content)
     {
@@ -29,4 +30,6 @@ public class Conversation(string title) : AggregateRoot<Guid>(Guid.NewGuid())
         Title = title;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public Guid GetOwnerUserId() => UserId;
 }

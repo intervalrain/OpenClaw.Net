@@ -18,11 +18,27 @@ public class ConversationRepository(AppDbContext dbContext)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
+    public async Task<Conversation?> GetByIdAndUserAsync(Guid id, Guid userId, CancellationToken ct = default)
+    {
+        return await DbSet
+            .Include(c => c.Messages.OrderBy(m => m.CreatedAt))
+            .FirstOrDefaultAsync(c => c.Id == id && c.UserId == userId, ct);
+    }
+
     public override async Task<List<Conversation>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await DbSet
             .Include(c => c.Messages)
             .OrderByDescending(c => c.UpdatedAt ?? c.CreatedAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Conversation>> GetAllByUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await DbSet
+            .Include(c => c.Messages)
+            .Where(c => c.UserId == userId)
+            .OrderByDescending(c => c.UpdatedAt ?? c.CreatedAt)
+            .ToListAsync(ct);
     }
 }

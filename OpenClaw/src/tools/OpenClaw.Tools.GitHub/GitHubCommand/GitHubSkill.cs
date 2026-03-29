@@ -21,6 +21,20 @@ public class GitHubSkill(IServiceProvider serviceProvider) : AgentToolBase<GitHu
         viewing workflow runs, or querying GitHub API. Requires gh CLI with GH_TOKEN or gh auth.
         """;
 
+    // Allowed gh subcommands
+    private static readonly HashSet<string> AllowedSubcommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "pr", "issue", "run", "api", "repo", "release", "gist",
+        "project", "codespace", "search", "status", "auth"
+    };
+
+    // Blocked shell injection patterns
+    private static readonly string[] BlockedPatterns =
+    [
+        "&&", "||", ";", "|", "`", "$(", "<(", ">(", "&>", "<<<", ">|",
+        "> ", ">> ", "< ", "<< ", "\n", "\r"
+    ];
+
     public override async Task<ToolResult> ExecuteAsync(GitHubSkillArgs args, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(args.Command))
@@ -38,12 +52,27 @@ public class GitHubSkill(IServiceProvider serviceProvider) : AgentToolBase<GitHu
         // Build the full command
         var ghCommand = args.Command.Trim();
 
-        // If command doesn't start with common gh subcommands, treat it as raw gh command
-        // Otherwise prepend 'gh' if needed
-        if (!ghCommand.StartsWith("gh "))
+        // Remove 'gh ' prefix if present
+        if (ghCommand.StartsWith("gh ", StringComparison.OrdinalIgnoreCase))
         {
-            ghCommand = $"gh {ghCommand}";
+            ghCommand = ghCommand[3..].Trim();
         }
+
+        // Validate subcommand against whitelist
+        var subcommand = ghCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        if (subcommand is null || !AllowedSubcommands.Contains(subcommand))
+        {
+            return ToolResult.Failure($"gh subcommand '{subcommand}' is not allowed. Allowed: {string.Join(", ", AllowedSubcommands.Order())}");
+        }
+
+        // Block shell injection patterns
+        var blockedPattern = BlockedPatterns.FirstOrDefault(p => ghCommand.Contains(p));
+        if (blockedPattern is not null)
+        {
+            return ToolResult.Failure($"Command contains blocked pattern: '{blockedPattern}'");
+        }
+
+        ghCommand = $"gh {ghCommand}";
 
         try
         {

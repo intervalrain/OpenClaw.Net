@@ -17,6 +17,23 @@ public class GitSkill : AgentToolBase<GitSkillArgs>
 
     private const int maxLength = 50000;
 
+    // Allowed git subcommands — reject anything not in this list
+    private static readonly HashSet<string> AllowedSubcommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "status", "log", "diff", "show", "branch", "checkout", "switch",
+        "add", "commit", "push", "pull", "fetch", "merge", "rebase",
+        "stash", "tag", "remote", "config", "rev-parse", "describe",
+        "shortlog", "blame", "ls-files", "ls-tree", "reflog", "cherry-pick",
+        "reset", "restore", "clean", "init", "clone", "worktree"
+    };
+
+    // Blocked shell injection patterns
+    private static readonly string[] BlockedPatterns =
+    [
+        "&&", "||", ";", "|", "`", "$(", "<(", ">(", "&>", "<<<", ">|",
+        "> ", ">> ", "< ", "<< ", "\n", "\r"
+    ];
+
     public override async Task<ToolResult> ExecuteAsync(GitSkillArgs args, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(args.Command))
@@ -28,6 +45,20 @@ public class GitSkill : AgentToolBase<GitSkillArgs>
         if (command.StartsWith("git ", StringComparison.OrdinalIgnoreCase))
         {
             command = command[4..].Trim();
+        }
+
+        // Validate subcommand against whitelist
+        var subcommand = command.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        if (subcommand is null || !AllowedSubcommands.Contains(subcommand))
+        {
+            return ToolResult.Failure($"Git subcommand '{subcommand}' is not allowed. Allowed: {string.Join(", ", AllowedSubcommands.Order())}");
+        }
+
+        // Block shell injection patterns
+        var blockedPattern = BlockedPatterns.FirstOrDefault(p => command.Contains(p));
+        if (blockedPattern is not null)
+        {
+            return ToolResult.Failure($"Command contains blocked pattern: '{blockedPattern}'");
         }
 
         try

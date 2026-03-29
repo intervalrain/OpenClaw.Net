@@ -35,12 +35,20 @@ public static class ServiceCollectionExtensions
         // Logging
         services.AddLogging(builder => builder.AddSerilog());
 
-        // HttpClient with SSL validation bypass (for local/dev scenarios)
-        services.AddHttpClient("SkipSslValidation")
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            });
+        // HttpClient for local/dev scenarios — SSL bypass only when ASPNETCORE_ENVIRONMENT=Development
+        var isDev = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+        if (isDev)
+        {
+            services.AddHttpClient("SkipSslValidation")
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                });
+        }
+        else
+        {
+            services.AddHttpClient("SkipSslValidation");
+        }
 
         // Middlewares
         services.AddSingleton<LoggingMiddleware>();

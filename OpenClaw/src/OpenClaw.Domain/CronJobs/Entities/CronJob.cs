@@ -5,7 +5,7 @@ namespace OpenClaw.Domain.CronJobs.Entities;
 /// <summary>
 /// Represents a scheduled cron job that executes a prompt with optional tool context.
 /// </summary>
-public class CronJob : Entity<Guid>
+public class CronJob : Entity<Guid>, IUserScoped
 {
     public string Name { get; private set; } = string.Empty;
 
@@ -98,4 +98,6 @@ public class CronJob : Entity<Guid>
     {
         LastScheduledAt = DateTime.UtcNow;
     }
+
+    public Guid GetOwnerUserId() => CreatedByUserId;
 }

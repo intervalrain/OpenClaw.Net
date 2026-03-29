@@ -20,6 +20,17 @@ public class CronJobExecutionRepository(AppDbContext context)
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<CronJobExecution>> GetByUserAsync(
+        Guid userId, int limit = 20, int offset = 0, CancellationToken ct = default)
+    {
+        return await DbContext.Set<CronJobExecution>()
+            .Where(x => x.CronJob!.CreatedByUserId == userId)
+            .OrderByDescending(x => x.StartedAt)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<CronJobExecution>> GetRecentAsync(
         int limit = 20, int offset = 0, CancellationToken ct = default)
     {

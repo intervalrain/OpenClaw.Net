@@ -5,6 +5,10 @@ using Weda.Core.Application.Security;
 
 namespace OpenClaw.Infrastructure.Security.PasswordHasher;
 
+/// <summary>
+/// PBKDF2-SHA256 password hasher with 100K iterations.
+/// Note: Named BCryptPasswordHasher for historical reasons but uses PBKDF2 internally.
+/// </summary>
 public class BCryptPasswordHasher : IPasswordHasher
 {
     private const int SaltSize = 16;

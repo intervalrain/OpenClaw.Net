@@ -5,7 +5,7 @@ namespace OpenClaw.Domain.CronJobs.Entities;
 /// <summary>
 /// Represents a pre-configured tool instance with a user-facing name for #reference in prompts.
 /// </summary>
-public class ToolInstance : Entity<Guid>
+public class ToolInstance : Entity<Guid>, IUserScoped
 {
     /// <summary>
     /// User-facing name for #reference in prompts.
@@ -60,4 +60,6 @@ public class ToolInstance : Entity<Guid>
         if (description is not null) Description = description;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public Guid GetOwnerUserId() => CreatedByUserId;
 }

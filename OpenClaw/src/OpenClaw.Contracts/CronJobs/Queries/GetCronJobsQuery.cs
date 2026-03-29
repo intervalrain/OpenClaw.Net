@@ -12,15 +12,17 @@ public record GetCronJobsQuery(
     bool? IsActive = null) : IRequest<ErrorOr<IReadOnlyList<CronJobResponse>>>;
 
 /// <summary>
-/// Query to get a specific cron job by ID.
+/// Query to get a specific cron job by ID. UserId is required for ownership validation.
 /// </summary>
 public record GetCronJobQuery(
-    Guid Id) : IRequest<ErrorOr<CronJobResponse>>;
+    Guid Id,
+    Guid UserId) : IRequest<ErrorOr<CronJobResponse>>;
 
 /// <summary>
-/// Query to list executions for a cron job.
+/// Query to list executions for a cron job. UserId is required for ownership validation.
 /// </summary>
 public record GetCronJobExecutionsQuery(
+    Guid UserId,
     Guid? CronJobId,
     int Limit = 20,
     int Offset = 0) : IRequest<ErrorOr<IReadOnlyList<CronJobExecutionResponse>>>;

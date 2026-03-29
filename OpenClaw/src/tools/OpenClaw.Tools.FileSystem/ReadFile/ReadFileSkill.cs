@@ -35,13 +35,20 @@ public class ReadFileSkill : AgentToolBase<ReadFileArgs>
             return ToolResult.Failure("Path is required.");
         }
 
+        // Path traversal protection
+        var pathError = PathSecurity.ValidatePath(args.Path);
+        if (pathError is not null)
+        {
+            return ToolResult.Failure(pathError);
+        }
+
         if (!File.Exists(args.Path))
         {
             return ToolResult.Failure($"File not found: {args.Path}");
         }
 
-        // Check if file is sensitive
-        var fileName = Path.GetFileName(args.Path);
+        // Check if file is sensitive (using the resolved full path's filename)
+        var fileName = Path.GetFileName(Path.GetFullPath(args.Path));
         if (IsSensitiveFile(fileName))
         {
             return ToolResult.Failure($"Access denied: '{fileName}' is a sensitive file and cannot be read for security reasons.");

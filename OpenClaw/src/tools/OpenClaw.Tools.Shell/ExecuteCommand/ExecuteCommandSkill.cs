@@ -29,8 +29,10 @@ public class ExecuteCommandSkill(
         "sudo", "su ", "rm -rf", "rm -fr", "mkfs", "dd ",
         ":(){", "fork", "> /dev/", "chmod 777", "chmod -R",
         "curl | sh", "curl | bash", "wget | sh", "wget | bash",
-        "eval ", "exec ", "&&", "||", ";", "|", "`", "$(",
-        "> ", ">> ", "< ", "<< ",
+        "eval ", "exec ",
+        // Shell injection operators
+        "&&", "||", ";", "|", "`", "$(", "<(", ">(", "&>", "<<<", ">|",
+        "> ", ">> ", "< ", "<< ", "\n", "\r",
         // Sensitive file access patterns
         ".env", "credentials", "secrets", ".npmrc", ".pypirc",
         "id_rsa", "id_ed25519", "private_key", "apikey", "api_key",
@@ -52,8 +54,12 @@ public class ExecuteCommandSkill(
             return ToolResult.Failure("Command is required.");
         }
 
+        // Normalize whitespace to prevent bypass via extra spaces (e.g., "rm   -rf")
+        var normalizedCommand = System.Text.RegularExpressions.Regex.Replace(
+            args.Command.Trim(), @"\s+", " ");
+
         var blockedPattern = _blockedPatterns.FirstOrDefault(p =>
-            args.Command.Contains(p, StringComparison.OrdinalIgnoreCase));
+            normalizedCommand.Contains(p, StringComparison.OrdinalIgnoreCase));
 
         if (blockedPattern is not null)
         {
@@ -61,7 +67,7 @@ public class ExecuteCommandSkill(
         }
 
         // Check allowed commands
-        var commandName = args.Command.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+        var commandName = normalizedCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 
         if (!_allowedCommands.Contains(commandName))
         {

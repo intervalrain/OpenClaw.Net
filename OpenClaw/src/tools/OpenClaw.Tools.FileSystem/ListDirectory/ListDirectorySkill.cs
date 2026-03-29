@@ -14,6 +14,13 @@ public class ListDirectorySkill : AgentToolBase<ListDirectoryArgs>
     {
         var path = args.Path ?? ".";
 
+        // Path traversal protection
+        var pathError = PathSecurity.ValidatePath(path);
+        if (pathError is not null)
+        {
+            return Task.FromResult(ToolResult.Failure(pathError));
+        }
+
         if (!Directory.Exists(path))
         {
             return Task.FromResult(ToolResult.Failure($"Directory not found: {path}"));

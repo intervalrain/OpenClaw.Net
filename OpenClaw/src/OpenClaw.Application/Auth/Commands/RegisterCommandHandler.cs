@@ -21,6 +21,13 @@ public class RegisterCommandHandler(
 {
     public async ValueTask<ErrorOr<RegisterResponse>> Handle(RegisterCommand request, CancellationToken ct)
     {
+        // Password complexity validation
+        var passwordError = ValidatePassword(request.Password);
+        if (passwordError is not null)
+        {
+            return Error.Validation("Password.TooWeak", passwordError);
+        }
+
         // Check if email already exists
         var existingUser = await userRepository.GetByEmailAsync(request.Email, ct);
         if (existingUser is not null)
@@ -55,5 +62,28 @@ public class RegisterCommandHandler(
             Name: user.Name,
             Status: user.Status.ToString(),
             Message: "Registration submitted. Please wait for admin approval.");
+    }
+
+    private static string? ValidatePassword(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password))
+            return "Password is required.";
+
+        if (password.Length < 12)
+            return "Password must be at least 12 characters long.";
+
+        if (!password.Any(char.IsUpper))
+            return "Password must contain at least one uppercase letter.";
+
+        if (!password.Any(char.IsLower))
+            return "Password must contain at least one lowercase letter.";
+
+        if (!password.Any(char.IsDigit))
+            return "Password must contain at least one digit.";
+
+        if (!password.Any(c => !char.IsLetterOrDigit(c)))
+            return "Password must contain at least one special character.";
+
+        return null;
     }
 }

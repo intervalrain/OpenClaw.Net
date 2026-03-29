@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 using Weda.Core.Presentation;
 
+using OpenClaw.Api.Security;
 using OpenClaw.Application.Auth.Commands;
 using OpenClaw.Contracts.Auth.Commands;
 using OpenClaw.Contracts.Auth.Requests;
@@ -19,7 +20,7 @@ namespace OpenClaw.Api.Auth.Controllers;
 /// </summary>
 [AllowAnonymous]
 [ApiVersion("1.0")]
-public class AuthController(ISender _mediator) : ApiController
+public class AuthController(ISender _mediator, LoginRateLimiter rateLimiter) : ApiController
 {
     /// <summary>
     /// Login with email and password.
@@ -28,17 +29,36 @@ public class AuthController(ISender _mediator) : ApiController
     /// <returns>The authentication response with JWT token.</returns>
     /// <response code="200">Login successful, returns JWT token.</response>
     /// <response code="401">Invalid credentials or account not active.</response>
+    /// <response code="429">Too many failed attempts, account temporarily locked.</response>
     [HttpPost("login")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        var rateLimitKey = request.Email.ToLowerInvariant();
+
+        // Check account lockout
+        if (rateLimiter.IsLockedOut(rateLimitKey))
+        {
+            var remaining = rateLimiter.GetRemainingLockout(rateLimitKey);
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { message = $"Too many failed login attempts. Try again in {remaining?.Minutes ?? 15} minutes." });
+        }
+
         var command = new LoginCommand(request.Email, request.Password);
         var result = await _mediator.Send(command);
 
-        return result.Match(Ok, Problem);
+        if (result.IsError)
+        {
+            rateLimiter.RecordFailedAttempt(rateLimitKey);
+            return Problem(result.Errors);
+        }
+
+        rateLimiter.RecordSuccessfulLogin(rateLimitKey);
+        return Ok(result.Value);
     }
-    
+
     /// <summary>
     /// Refresh access token using refresh token
     /// </summary>

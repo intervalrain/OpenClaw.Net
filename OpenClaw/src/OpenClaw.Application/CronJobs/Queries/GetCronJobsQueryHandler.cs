@@ -68,6 +68,11 @@ public class GetCronJobQueryHandler(
             return Error.NotFound($"CronJob {request.Id} not found");
         }
 
+        if (job.CreatedByUserId != request.UserId)
+        {
+            return Error.NotFound($"CronJob {request.Id} not found");
+        }
+
         return GetCronJobsQueryHandler.ToResponse(job);
     }
 }

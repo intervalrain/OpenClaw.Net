@@ -6,6 +6,10 @@
 # dotenv files
 .env
 
+# Build output directories
+[Bb]in/
+[Oo]bj/
+
 # User-specific files
 *.rsuser
 *.suo

@@ -23,7 +23,19 @@ public class AesEncryptionService(ILogger<AesEncryptionService> logger) : IEncry
 
         if (string.IsNullOrEmpty(keyString))
         {
-            keyString = GenerateAndPersistKey();
+            // In development, auto-generate for convenience
+            var isDev = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+            if (isDev)
+            {
+                keyString = GenerateAndPersistKey();
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Encryption key is not configured. Set the '{ConfigKeys.EncryptionKey}' environment variable " +
+                    "with a Base64-encoded 32-byte key. Generate one with: " +
+                    "dotnet run -e \"Console.WriteLine(Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))\"");
+            }
         }
 
         var key = Convert.FromBase64String(keyString);
@@ -41,7 +53,7 @@ public class AesEncryptionService(ILogger<AesEncryptionService> logger) : IEncry
         var newKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
         ConfigLoader.AppendToEnvFile(ConfigKeys.EncryptionKey, newKey);
-        logger.LogInformation("Generated new encryption key and saved to .env");
+        logger.LogWarning("Auto-generated encryption key (development only). For production, pre-generate and set via environment variable.");
 
         // Set for current process
         Environment.SetEnvironmentVariable(ConfigKeys.EncryptionKey, newKey);

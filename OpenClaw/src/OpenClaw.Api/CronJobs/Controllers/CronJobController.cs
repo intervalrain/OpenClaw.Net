@@ -39,7 +39,10 @@ public class CronJobController(
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        var result = await sender.Send(new GetCronJobQuery(id), ct);
+        var userId = GetUserId();
+        if (userId == Guid.Empty) return Unauthorized();
+
+        var result = await sender.Send(new GetCronJobQuery(id, userId), ct);
         return result.Match<IActionResult>(Ok, errors => Problem(errors));
     }
 
@@ -98,7 +101,10 @@ public class CronJobController(
         [FromQuery] Guid? cronJobId, [FromQuery] int limit = 20, [FromQuery] int offset = 0,
         CancellationToken ct = default)
     {
-        var result = await sender.Send(new GetCronJobExecutionsQuery(cronJobId, limit, offset), ct);
+        var userId = GetUserId();
+        if (userId == Guid.Empty) return Unauthorized();
+
+        var result = await sender.Send(new GetCronJobExecutionsQuery(userId, cronJobId, limit, offset), ct);
         return result.Match<IActionResult>(Ok, errors => Problem(errors));
     }
 

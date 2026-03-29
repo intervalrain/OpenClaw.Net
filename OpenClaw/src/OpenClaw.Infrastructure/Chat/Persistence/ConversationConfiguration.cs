@@ -17,6 +17,11 @@ public class ConversationConfiguration : IEntityTypeConfiguration<Conversation>
         builder.Property(c => c.Title)
             .HasMaxLength(200);
 
+        builder.Property(c => c.UserId)
+            .IsRequired();
+
+        builder.HasIndex(c => c.UserId);
+
         builder.Property(c => c.CreatedAt)
             .IsRequired();
 
