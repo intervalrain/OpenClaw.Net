@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('saveJobBtn').addEventListener('click', saveJob);
     document.getElementById('deleteJobBtn').addEventListener('click', deleteJob);
     document.getElementById('runJobBtn').addEventListener('click', runJob);
+    document.getElementById('cancelTiBtn').addEventListener('click', cancelToolInstance);
+    document.getElementById('saveTiBtn').addEventListener('click', saveToolInstance);
 
     // Schedule frequency change
     document.getElementById('schedFrequency').addEventListener('change', updateScheduleUI);
@@ -40,6 +42,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Autocomplete on textareas
     setupAutocomplete('jobContext', 'contextAutocomplete', ['@']);
     setupAutocomplete('jobContent', 'contentAutocomplete', ['@', '#']);
+
+    // Event delegation for dynamic elements
+    document.getElementById('jobList').addEventListener('click', (e) => {
+        const item = e.target.closest('[data-action="select-job"]');
+        if (item) selectJob(item.dataset.id);
+    });
+    document.getElementById('toolInstancesList').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        if (btn.dataset.action === 'edit-ti') editToolInstance(btn.dataset.id);
+        else if (btn.dataset.action === 'delete-ti') deleteToolInstance(btn.dataset.id);
+    });
+    document.getElementById('executionsList').addEventListener('click', (e) => {
+        const item = e.target.closest('[data-action="toggle-exec"]');
+        if (item) toggleExecution(item);
+    });
 
     // Load data
     await Promise.all([
@@ -111,7 +129,7 @@ function renderJobsList() {
         const scheduleLabel = getScheduleLabel(job.schedule);
         const isEnabled = job.wakeMode !== 'Manual';
         return `
-            <div class="job-item ${isActive ? 'active' : ''}" onclick="selectJob('${escapeHtml(job.id)}')" data-id="${escapeHtml(job.id)}">
+            <div class="job-item ${isActive ? 'active' : ''}" data-action="select-job" data-id="${escapeHtml(job.id)}">
                 <div class="job-status-dot ${isEnabled ? 'active' : 'disabled'}"></div>
                 <div class="job-item-info">
                     <div class="job-item-name">${escapeHtml(job.name || 'Untitled')}</div>
@@ -343,13 +361,13 @@ function renderToolInstancesList() {
             <span class="ti-item-tool">${escapeHtml(ti.toolName || ti.tool || '')}</span>
             <span class="ti-item-desc">${escapeHtml(ti.description || '')}</span>
             <div class="ti-item-actions">
-                <button class="btn-icon" onclick="editToolInstance('${escapeHtml(ti.id)}')" title="Edit">
+                <button class="btn-icon" data-action="edit-ti" data-id="${escapeHtml(ti.id)}" title="Edit">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
                 </button>
-                <button class="btn-icon" onclick="deleteToolInstance('${escapeHtml(ti.id)}')" title="Delete">
+                <button class="btn-icon" data-action="delete-ti" data-id="${escapeHtml(ti.id)}" title="Delete">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"/>
                         <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -728,7 +746,7 @@ function renderExecutions(executions) {
         const duration = exec.durationMs ? formatDuration(exec.durationMs) : '';
 
         return `
-            <div class="exec-item" onclick="toggleExecution(this)">
+            <div class="exec-item" data-action="toggle-exec">
                 <div class="exec-item-header">
                     <span class="exec-status-badge ${badgeClass}">${escapeHtml(exec.status || 'Unknown')}</span>
                     <span class="exec-time">${escapeHtml(formatDate(exec.startedAt || exec.createdAt))}</span>
