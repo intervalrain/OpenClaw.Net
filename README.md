@@ -1,37 +1,43 @@
 # OpenClaw.Net
 
-An AI Agent Platform built with .NET, featuring a modular skill system, multi-provider LLM support, and a modern web interface.
+An enterprise-grade AI Agent Platform built with .NET, featuring multi-user workspace isolation, two-layer model provider management, a modular tool system, and a modern web interface.
 
 ## Features
 
 ### Core Capabilities
 - **Multi-Provider LLM Support**: Ollama, OpenAI, Anthropic, and custom OpenAI-compatible endpoints
-- **Multi-Channel Support**: Web UI and Telegram Bot integration
-- **Modular Skill System**: Auto-registered skills via assembly scanning
-- **Slash Commands**: Direct skill invocation with `/skill_name args` syntax
+- **Two-Layer Model Providers**: SuperAdmin manages global providers; users can add their own with personal API keys
+- **Multi-Channel Support**: Web UI and Telegram Bot with per-user channel configuration
+- **Modular Tool System**: Auto-registered C# tools via assembly scanning
+- **Markdown Skills**: Declarative skill definitions (`SKILL.md`) that compose tools with LLM instructions
+- **CronJob Scheduler**: Scheduled task execution with LLM-assisted argument resolution
 - **Real-time Streaming**: SSE (Server-Sent Events) for streaming responses
-- **Conversation History**: Persistent chat history with PostgreSQL
+- **Conversation History**: Persistent chat history with automatic compaction
 - **Vision Support**: Image upload and analysis with OpenAI Vision API
-- **Modern Web UI**: Dark/light theme, autocomplete, and responsive design
 
-### Workflow & Pipeline System
-- **Workflow Engine**: DAG-based workflow execution with multiple node types
-  - Start/End nodes for flow control
-  - Skill nodes with timeout support
-  - Approval nodes for human-in-the-loop workflows
-- **Pipeline Execution**: Background task execution with approval gates
-- **Scheduled Workflows**: Cron-based scheduling with auto-approve options
+### Multi-User & Security
+- **Per-User Data Isolation**: All data scoped by authenticated user (conversations, cron jobs, tools, configs, channels)
+- **Role-Based Access Control**: Three-tier roles (User / Admin / SuperAdmin) with fine-grained permissions
+- **JWT Authentication**: Token-based auth with refresh tokens and account lockout
+- **Content Security Policy**: Strict CSP enforcement with no inline scripts
+- **Encrypted Config Storage**: AES-256 encryption for user secrets and API keys at rest
+- **Security Middleware**: Audit logging, login rate limiting, path traversal protection
 
-### Integrations
+### Administration (SuperAdmin)
+- **Application Settings**: Unified admin panel for user management, model providers, and app configuration
+- **Global Model Providers**: Configure shared LLM providers available to all users
+- **App Config Management**: System-wide encrypted configuration (API keys, tokens)
+- **User Management**: Approve/reject registrations, manage roles and status
+
+### Integrations (Tools)
 - **Azure DevOps**: Work items, repositories, builds, pipelines, and PRs
 - **Notion**: Pages, databases, search, and comments
 - **GitHub**: Issues, PRs, and CI workflows via GitHub CLI
 - **Web Search**: Integrated SearXNG for web search capabilities
-
-### User Management
-- **User Preferences**: Persistent key-value settings per user
-- **Role-based Access**: User roles with authorization controls
-- **JWT Authentication**: Token-based authentication with refresh support
+- **File System**: Read, write, list with path traversal protection
+- **Shell**: Restricted command execution
+- **PDF**: Read and search PDF documents
+- **Image Generation**: DALL-E integration
 
 ## Architecture
 
@@ -39,59 +45,19 @@ An AI Agent Platform built with .NET, featuring a modular skill system, multi-pr
 OpenClaw.Net/
 ├── OpenClaw/
 │   ├── src/
-│   │   ├── OpenClaw.Api/              # ASP.NET Core Web API
-│   │   ├── OpenClaw.Application/      # Business logic, Skills, Pipelines
-│   │   ├── OpenClaw.Contracts/        # Interfaces, DTOs, Shared types
-│   │   ├── OpenClaw.Domain/           # Domain entities
-│   │   ├── OpenClaw.Infrastructure/   # EF Core, External services
-│   │   ├── OpenClaw.Channels.Telegram/# Telegram Bot channel adapter
-│   │   └── OpenClaw.Hosting/          # Hosting extensions
-│   └── skills/
-│       └── OpenClaw.Skills.Http/      # HTTP-based skills (Weather, etc.)
-└── docker-compose.yml
+│   │   ├── OpenClaw.Api/                # ASP.NET Core Web API + Static Frontend
+│   │   ├── OpenClaw.Application/        # Business logic, CronJob executor, Agent pipeline
+│   │   ├── OpenClaw.Contracts/          # Interfaces, DTOs, shared types
+│   │   ├── OpenClaw.Domain/             # Domain entities (User, CronJob, ModelProvider, etc.)
+│   │   ├── OpenClaw.Infrastructure/     # EF Core, security, persistence
+│   │   ├── OpenClaw.Channels.Telegram/  # Telegram Bot channel adapter
+│   │   ├── OpenClaw.Hosting/            # DI registration, service extensions
+│   │   ├── Weda.Core/                   # Framework core (CQRS, middleware, security)
+│   │   └── tools/                       # Built-in tools (FileSystem, Git, Shell, etc.)
+│   ├── skills/                          # Markdown-based skill definitions (SKILL.md)
+│   ├── docs/                            # Documentation
+│   └── docker-compose.yml
 ```
-
-## Built-in Skills
-
-### Productivity & Integration
-
-| Skill | Description | Slash Command |
-|-------|-------------|---------------|
-| `azure_devops` | Azure DevOps work items, repos, builds | `/azure_devops my_work_items` |
-| `notion` | Notion pages, databases, search | `/notion search "query"` |
-| `github` | GitHub issues, PRs, CI via gh CLI | `/github list_issues` |
-| `git` | Local git operations | `/git status` |
-
-### Web & Search
-
-| Skill | Description | Slash Command |
-|-------|-------------|---------------|
-| `web_search` | Search the web via SearXNG | `/web_search query` |
-| `http_request` | Send HTTP GET/POST requests | `/http_request url` |
-| `weather` | Get weather via wttr.in | `/weather Taipei` |
-
-### File System & Shell
-
-| Skill | Description | Slash Command |
-|-------|-------------|---------------|
-| `read_file` | Read file contents | `/read_file path` |
-| `write_file` | Write content to file | `/write_file path content` |
-| `list_directory` | List directory contents | `/list_directory path` |
-| `shell` | Execute shell commands (restricted) | `/shell cmd` |
-| `tmux` | Tmux session management | `/tmux list_sessions` |
-
-### Media & Documents
-
-| Skill | Description | Slash Command |
-|-------|-------------|---------------|
-| `image_generation` | Generate images via DALL-E | `/image_generation "prompt"` |
-| `pdf` | Read and search PDF files | `/pdf read "file.pdf"` |
-
-### Settings
-
-| Skill | Description | Slash Command |
-|-------|-------------|---------------|
-| `preference` | Manage user preferences | `/preference get key` |
 
 ## Quick Start
 
@@ -104,19 +70,36 @@ OpenClaw.Net/
 
 ```bash
 cd OpenClaw
+
+# Configure secrets in .env
+cp .env.example .env  # Edit with your values
+
 docker compose up -d
 ```
 
 Services will be available at:
-- **Web UI**: http://localhost:5001/openclaw/
-- **API**: http://localhost:5001/api/v1/
+- **Web UI**: http://localhost:5001
+- **API Docs**: http://localhost:5001/swagger
 - **SearXNG**: http://localhost:8080
+
+### First-Time Setup
+
+1. Open http://localhost:5001 - you'll be redirected to the setup page
+2. Create the initial SuperAdmin account
+3. Go to **Settings > Models** to configure your LLM provider
+4. Start chatting!
 
 ### Configuration
 
-1. Open the web UI and go to **Settings**
-2. Add a model provider (Ollama, OpenAI, or Anthropic)
-3. Start chatting!
+Key environment variables (set in `.env`):
+
+| Variable | Description |
+|----------|-------------|
+| `JWT_SECRET` | JWT signing key (>= 32 chars, required) |
+| `OPENCLAW_ENCRYPTION_KEY` | AES-256 key for encrypting secrets at rest |
+| `LLM_PROVIDER` | Default LLM provider (`ollama` or `openai`) |
+| `OPENAI_API_KEY` | OpenAI API key (if using OpenAI) |
+| `OLLAMA_URL` | Ollama server URL (default: `http://localhost:11434`) |
 
 ## Development
 
@@ -125,144 +108,105 @@ Services will be available at:
 ```bash
 cd OpenClaw
 
-# Restore dependencies
-dotnet restore
+# Start infrastructure services
+docker compose up -d postgres nats-broker nats-bus searxng
 
-# Run the API (requires Docker services)
-docker compose up -d postgres nats-broker searxng
+# Run the API
 dotnet run --project src/OpenClaw.Api
 ```
 
 ### Database Migrations
 
+Migrations are **automatically applied** on startup. To create a new migration:
+
 ```bash
-cd OpenClaw/src/OpenClaw.Infrastructure
-
-# Add migration
-dotnet ef migrations add MigrationName -s ../OpenClaw.Api
-
-# Apply migrations
-dotnet ef database update -s ../OpenClaw.Api
+cd OpenClaw
+dotnet ef migrations add MigrationName \
+  --project src/OpenClaw.Infrastructure \
+  --startup-project src/OpenClaw.Api
 ```
 
-### Creating a New Skill
+### Creating a New Tool (C#)
 
-1. Create a new class inheriting from `AgentSkillBase<TArgs>`:
+Tools are C# classes that provide executable capabilities (file I/O, API calls, shell commands, etc.).
 
 ```csharp
-public class MySkill(IServiceProvider sp) : AgentSkillBase<MySkillArgs>
+public class MyTool(IServiceProvider sp) : AgentSkillBase<MyToolArgs>
 {
-    public override string Name => "my_skill";
-    public override string Description => "Description of what this skill does";
+    public override string Name => "my_tool";
+    public override string Description => "What this tool does";
 
-    public override async Task<SkillResult> ExecuteAsync(MySkillArgs args, CancellationToken ct)
+    public override async Task<SkillResult> ExecuteAsync(MyToolArgs args, CancellationToken ct)
     {
-        // Implementation
         return SkillResult.Success("Result");
     }
 }
 
-public record MySkillArgs(
+public record MyToolArgs(
     [property: Description("Parameter description")]
     string? Parameter
 );
 ```
 
-2. The skill will be auto-registered via assembly scanning.
+Tools are auto-registered via assembly scanning under `src/tools/`.
 
-## API Endpoints
+### Creating a Markdown Skill
 
-### Chat
-- `POST /api/v1/chat` - Send chat message
+Skills are declarative definitions that compose tools with LLM instructions. Create a `SKILL.md` file in the `skills/` directory:
+
+```markdown
+---
+name: my-skill
+description: What this skill does
+tools:
+  - shell
+  - read_file
+---
+
+## Instructions
+
+You are a helpful assistant that...
+```
+
+Skills can be invoked via `@my-skill` mention in chat or referenced in CronJob context.
+
+## API Overview
+
+### Chat & Conversations
 - `POST /api/v1/chat/stream` - Stream chat response (SSE)
-
-### Conversations
-- `GET /api/v1/conversation` - List conversations
-- `POST /api/v1/conversation` - Create conversation
-- `GET /api/v1/conversation/{id}` - Get conversation with messages
-- `DELETE /api/v1/conversation/{id}` - Delete conversation
-
-### Pipelines
-- `GET /api/v1/pipelines` - List available pipelines
-- `POST /api/v1/pipelines/{name}/execute` - Execute pipeline
-- `GET /api/v1/pipelines/executions` - List recent executions
-- `GET /api/v1/pipelines/executions/{id}` - Get execution details
-- `POST /api/v1/pipelines/executions/{id}/approve` - Approve pending execution
-- `POST /api/v1/pipelines/executions/{id}/reject` - Reject pending execution
-
-### User Preferences
-- `GET /api/v1/user-preferences` - List all preferences
-- `GET /api/v1/user-preferences/{key}` - Get specific preference
-- `PUT /api/v1/user-preferences/{key}` - Set preference
-- `DELETE /api/v1/user-preferences/{key}` - Delete preference
+- `GET/POST/DELETE /api/v1/conversation` - Manage conversations
 
 ### Model Providers
-- `GET /api/v1/model-provider` - List providers
-- `POST /api/v1/model-provider` - Create provider
-- `POST /api/v1/model-provider/{id}/activate` - Set active provider
-- `DELETE /api/v1/model-provider/{id}` - Delete provider
+- `GET/POST/PUT/DELETE /api/v1/model-provider` - Global providers (SuperAdmin)
+- `GET/POST/PUT/DELETE /api/v1/user-model-provider` - User providers
+- `GET /api/v1/user-model-provider/available` - List available global providers
 
-### Skills
-- `GET /api/v1/skill-settings` - List all skills with enable status
-- `POST /api/v1/skill-settings/{name}/enable` - Enable skill
-- `POST /api/v1/skill-settings/{name}/disable` - Disable skill
+### CronJobs
+- `GET/POST/PUT/DELETE /api/v1/cron-job` - Manage scheduled jobs
+- `POST /api/v1/cron-job/{id}/execute` - Manual execution
+- `GET/POST/PUT/DELETE /api/v1/tool-instance` - Manage tool instances
 
-## Telegram Bot Integration
+### Configuration
+- `GET/PUT/DELETE /api/v1/user-config/{key}` - Per-user encrypted config
+- `GET/PUT/DELETE /api/v1/app-config/{key}` - Global app config (SuperAdmin)
+- `GET/PUT /api/v1/channel-settings/telegram` - Per-user Telegram settings
 
-OpenClaw supports Telegram as a messaging channel. Messages are processed via NATS JetStream for reliable message delivery.
-
-### Setup
-
-1. Create a Telegram Bot via [@BotFather](https://t.me/BotFather) and get your bot token
-2. Configure the bot token in Settings UI or via environment variable:
-
-```bash
-TELEGRAM__BOTTOKEN=your_bot_token_here
-```
-
-3. The bot will automatically start polling for messages when the application starts
-
-### Bot Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome message |
-| `/new` | Start a new conversation |
-| `/help` | Show available commands |
-| `/skills` | List available skills |
-| `/skill_name args` | Execute a skill directly |
-
-### Architecture
-
-```
-Telegram API → TelegramChannelAdapter (Polling) → NATS JetStream
-                                                        ↓
-                                            TelegramEventController
-                                                        ↓
-                                          HandleTelegramMessageCommand
-                                                        ↓
-                                              AgentPipeline → LLM
-                                                        ↓
-                                              TelegramBotClient.SendMessage
-```
-
-### Channel Settings
-
-Telegram bot settings can be configured via the Settings UI:
-- **Bot Token**: Your Telegram bot token
-- **Allowed Chat IDs**: Restrict bot to specific chats (comma-separated, empty = allow all)
-- **Enable/Disable**: Toggle the Telegram channel on/off
+### User Management
+- `POST /api/v1/auth/login` - Login
+- `POST /api/v1/auth/register` - Register
+- `GET/POST /api/v1/user-management` - User admin (SuperAdmin)
 
 ## Tech Stack
 
 - **Backend**: .NET 10, ASP.NET Core, Entity Framework Core, Mediator (CQRS)
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL with auto-migration
 - **Messaging**: NATS JetStream
 - **Search**: SearXNG
 - **Channels**: Web UI, Telegram Bot
-- **Frontend**: Vanilla JS, CSS Variables, marked.js, highlight.js, KaTeX
+- **Frontend**: Vanilla JS (CSP-compliant), CSS Variables, marked.js, highlight.js, KaTeX
+- **Security**: JWT, AES-256, CSP, audit logging, rate limiting
+- **CI/CD**: GitHub Actions (build, test, dependency vulnerability scan)
 - **Containerization**: Docker, Docker Compose
-- **External APIs**: OpenAI, Azure DevOps, Notion, GitHub CLI
 
 ## License
 
