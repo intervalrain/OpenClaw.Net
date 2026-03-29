@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management - OpenClaw Admin</title>
+    <title>Application Settings - OpenClaw</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/home.css">
@@ -17,8 +17,8 @@
     <div class="container">
         <div class="page-header">
             <div class="page-title">
-                <h1>User Management</h1>
-                <p class="subtitle">Manage user registrations and permissions</p>
+                <h1>Application Settings</h1>
+                <p class="subtitle">Manage users, model providers, and system configuration</p>
             </div>
         </div>
 
@@ -30,6 +30,8 @@
                     <span class="badge" id="pendingCount">0</span>
                 </button>
                 <button class="tab" data-tab="all">All Users</button>
+                <button class="tab" data-tab="providers">Model Providers</button>
+                <button class="tab" data-tab="appconfig">App Config</button>
             </div>
 
             <!-- Pending Users Tab -->
@@ -54,7 +56,83 @@
                     <div class="loading">Loading users...</div>
                 </div>
             </section>
+            <!-- App Config Tab -->
+            <section class="tab-content" id="appconfigTab">
+                <p class="text-muted" style="margin-bottom: 1rem;">
+                    Global application configuration. These values are shared across all users and take precedence over environment variables.
+                </p>
+                <div class="config-add-row">
+                    <input type="text" id="admin-config-key" placeholder="KEY" class="config-input-key">
+                    <input type="password" id="admin-config-value" placeholder="Value (encrypted)" class="config-input-value">
+                    <button class="btn btn-primary btn-sm" id="admin-add-config-btn" title="Add">+</button>
+                </div>
+                <div class="user-list" id="appConfigList">
+                    <div class="loading">Loading configuration...</div>
+                </div>
+            </section>
+
+            <!-- Model Providers Tab -->
+            <section class="tab-content" id="providersTab">
+                <div class="provider-toolbar">
+                    <button class="btn btn-primary" id="addProviderBtn">+ Add Global Provider</button>
+                </div>
+                <div class="user-list" id="providerList">
+                    <div class="loading">Loading model providers...</div>
+                </div>
+            </section>
         </main>
+
+        <!-- Add/Edit Provider Modal -->
+        <div class="modal" id="providerModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="providerModalTitle">Add Global Model Provider</h2>
+                    <button class="close-btn" id="closeProviderModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editProviderId" value="">
+                    <div class="user-detail">
+                        <label>Provider Type</label>
+                        <select id="adminProviderType">
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="custom">Custom OpenAI-Compatible</option>
+                        </select>
+                    </div>
+                    <div class="user-detail">
+                        <label>Display Name</label>
+                        <input type="text" id="adminProviderName" placeholder="e.g., Company Ollama Server">
+                    </div>
+                    <div class="user-detail" id="adminUrlGroup">
+                        <label>API URL</label>
+                        <input type="text" id="adminProviderUrl" placeholder="http://localhost:11434">
+                    </div>
+                    <div class="user-detail" id="adminApiKeyGroup" style="display:none;">
+                        <label>API Key</label>
+                        <input type="password" id="adminProviderApiKey" placeholder="sk-...">
+                    </div>
+                    <div class="user-detail">
+                        <label>Model Name</label>
+                        <input type="text" id="adminProviderModel" placeholder="qwen2.5:7b">
+                    </div>
+                    <div class="user-detail">
+                        <label>Description (shown to users)</label>
+                        <input type="text" id="adminProviderDesc" placeholder="e.g., Shared GPT-4o for the team">
+                    </div>
+                    <div class="user-detail">
+                        <label class="role-checkbox" id="adminAllowOverrideLabel">
+                            <input type="checkbox" id="adminAllowOverride" checked>
+                            Allow users to use their own API key
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelProviderModal">Cancel</button>
+                    <button class="btn btn-primary" id="saveProviderBtn">Save</button>
+                </div>
+            </div>
+        </div>
 
         <footer class="footer">
             <p>&copy; 2026 OpenClaw. All rights reserved.</p>

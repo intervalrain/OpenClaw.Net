@@ -2,7 +2,8 @@
 let messagesEl, userInputEl, sendBtn, themeToggle;
 let currentConversationId = null;
 let conversations = [];
-let modelProviders = [];
+let modelProviders = [];      // user's own model providers
+let availableProviders = [];  // global providers available to add
 let skills = [];
 let appConfigs = [];
 
@@ -45,6 +46,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Show admin-only nav items based on user role
     initAdminNavItems();
+
+    // Channel header toggle (CSP-compliant replacement for inline onclick)
+    document.getElementById('telegram-channel-header').addEventListener('click', (e) => {
+        // Don't toggle when clicking the toggle switch itself
+        if (e.target.closest('#telegram-toggle-label')) return;
+        document.getElementById('telegram-channel').classList.toggle('collapsed');
+    });
+    document.getElementById('telegram-toggle-label').addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
 
     // Event Listeners
     sendBtn.addEventListener('click', sendMessage);
@@ -471,8 +482,11 @@ function renderMarkdown(content) {
         }
     });
 
-    // Render markdown
-    return marked.parse(content);
+    // Render markdown and sanitize with DOMPurify to prevent XSS
+    const html = marked.parse(content);
+    return typeof DOMPurify !== 'undefined'
+        ? DOMPurify.sanitize(html, { ADD_TAGS: ['katex-display'], ADD_ATTR: ['class', 'style'] })
+        : html;
 }
 
 // Input history navigation - get user messages from current conversation
@@ -725,17 +739,23 @@ async function loadConversations() {
 function renderConversationList() {
     const list = document.getElementById('conversation-list');
     list.innerHTML = conversations.map(c => `
-        <div class="conversation-item ${c.id === currentConversationId ? 'active' : ''}" 
-             data-id="${c.id}">
-            <span class="title">${c.title}</span>
-            <button class="delete-btn" onclick="deleteConversation('${c.id}', event)">🗑️</button>
+        <div class="conversation-item ${c.id === currentConversationId ? 'active' : ''}"
+             data-id="${escapeHtml(c.id)}">
+            <span class="title">${escapeHtml(c.title)}</span>
+            <button class="delete-btn" data-action="delete-conv" data-id="${escapeHtml(c.id)}">🗑️</button>
         </div>
     `).join('');
 
     // Add click handlers
     list.querySelectorAll('.conversation-item').forEach(item => {
         item.addEventListener('click', () => selectConversation(item.dataset.id));
-    })
+    });
+    list.querySelectorAll('[data-action="delete-conv"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteConversation(btn.dataset.id, e);
+        });
+    });
 }
 
 async function createNewConversation() {
@@ -788,8 +808,7 @@ const MODELS_KEY = 'openclaw_models';
 function getSettings() {
     const saved = localStorage.getItem(SETTINGS_KEY);
     return saved ? JSON.parse(saved) : {
-        language: 'auto',
-        activeModelId: null
+        language: 'auto'
     };
 }
 
@@ -799,83 +818,127 @@ function saveSettings(settings) {
 
 async function loadModelProviders() {
     try {
-        const res = await authFetch('/api/v1/model-provider');
-        if (res.ok) {
-            modelProviders = await res.json();
+        const [userRes, availableRes] = await Promise.all([
+            authFetch('/api/v1/user-model-provider'),
+            authFetch('/api/v1/user-model-provider/available')
+        ]);
+        if (userRes.ok) {
+            modelProviders = await userRes.json();
+        }
+        if (availableRes.ok) {
+            availableProviders = await availableRes.json();
         }
     } catch (e) {
         console.error('Failed to load model providers:', e);
         modelProviders = [];
+        availableProviders = [];
     }
     return modelProviders;
 }
 
-function getActiveModelProviderId() {
-    const active = modelProviders.find(p => p.isActive);
-    return active?.id || null;
-}
 
 function renderModelList() {
     const listEl = document.getElementById('model-list');
+    const availableListEl = document.getElementById('available-provider-list');
 
+    // --- Render user's own providers ---
     if (modelProviders.length === 0) {
-        listEl.innerHTML = '<p class="setting-hint">No model providers configured.</p>';
-        return;
-    }
-
-    listEl.innerHTML = modelProviders.map(p => `
-        <div class="model-item ${p.isActive ? 'active' : ''}" data-id="${p.id}">
-            <input type="radio" name="active-model" class="model-item-radio"
-                   value="${p.id}" ${p.isActive ? 'checked' : ''}>
-            <div class="model-item-info">
-                <div class="model-item-name">${escapeHtml(p.name)}</div>
-                <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
-            </div>
-            <div class="model-item-actions">
+        listEl.innerHTML = '<p class="setting-hint">No model providers configured. Add a custom provider or select from the global providers below.</p>';
+    } else {
+        listEl.innerHTML = modelProviders.map(p => {
+            const isGlobalRef = !!p.globalModelProviderId;
+            const badge = isGlobalRef
+                ? '<span class="provider-badge global">Global</span>'
+                : '<span class="provider-badge custom">Custom</span>';
+            const editBtn = isGlobalRef ? '' : `
                 <button class="model-item-btn edit" data-id="${p.id}" title="Edit">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
-                </button>
-                <button class="model-item-btn delete" data-id="${p.id}" title="Delete">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `).join('');
+                </button>`;
+            return `
+            <div class="model-item ${p.isDefault ? 'active' : ''}" data-id="${p.id}">
+                <input type="radio" name="active-model" class="model-item-radio"
+                       value="${p.id}" ${p.isDefault ? 'checked' : ''}>
+                <div class="model-item-info">
+                    <div class="model-item-name">${escapeHtml(p.name)} ${badge}</div>
+                    <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
+                </div>
+                <div class="model-item-actions">
+                    ${editBtn}
+                    <button class="model-item-btn delete" data-id="${p.id}" title="Remove">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
 
-    // Add event listeners for radio buttons
-    listEl.querySelectorAll('.model-item-radio').forEach(radio => {
-        radio.addEventListener('change', async (e) => {
-            const id = e.target.value;
-            await activateModelProvider(id);
-            renderModelList();
-        });
-    });
-
-    // Add event listeners for edit buttons
-    listEl.querySelectorAll('.model-item-btn.edit').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = btn.dataset.id;
-            openEditModelModal(id);
-        });
-    });
-
-    // Add event listeners for delete buttons
-    listEl.querySelectorAll('.model-item-btn.delete').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = btn.dataset.id;
-            if (confirm('Delete this model provider?')) {
-                await deleteModelProvider(id);
+        // Event listeners for radio buttons (set default)
+        listEl.querySelectorAll('.model-item-radio').forEach(radio => {
+            radio.addEventListener('change', async (e) => {
+                const id = e.target.value;
+                await setDefaultModelProvider(id);
                 renderModelList();
-            }
+            });
         });
-    });
+
+        // Event listeners for edit buttons (custom providers only)
+        listEl.querySelectorAll('.model-item-btn.edit').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditModelModal(btn.dataset.id);
+            });
+        });
+
+        // Event listeners for delete buttons
+        listEl.querySelectorAll('.model-item-btn.delete').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('Remove this model provider from your list?')) {
+                    await deleteModelProvider(btn.dataset.id);
+                    renderModelList();
+                }
+            });
+        });
+    }
+
+    // --- Render available global providers ---
+    // Filter out global providers already added by user
+    const userGlobalIds = new Set(modelProviders.filter(p => p.globalModelProviderId).map(p => p.globalModelProviderId));
+    const available = availableProviders.filter(p => !userGlobalIds.has(p.id));
+
+    if (available.length === 0) {
+        availableListEl.innerHTML = '<p class="setting-hint">All global providers have been added to your list, or none are available.</p>';
+    } else {
+        availableListEl.innerHTML = available.map(p => `
+            <div class="model-item available-item" data-id="${p.id}">
+                <div class="model-item-info">
+                    <div class="model-item-name">${escapeHtml(p.name)}</div>
+                    <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
+                    ${p.description ? `<div class="model-item-desc">${escapeHtml(p.description)}</div>` : ''}
+                </div>
+                <div class="model-item-actions">
+                    <button class="model-item-btn add-global" data-id="${p.id}" data-name="${escapeHtml(p.name)}" title="Add to my list">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        // Event listeners for add buttons
+        availableListEl.querySelectorAll('.model-item-btn.add-global').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await addGlobalProvider(btn.dataset.id, btn.dataset.name);
+                renderModelList();
+            });
+        });
+    }
 }
 
 // Edit Model Provider
@@ -904,21 +967,43 @@ function openEditModelModal(id) {
     document.getElementById('add-model-modal').classList.add('active');
 }
 
-async function activateModelProvider(id) {
+async function setDefaultModelProvider(id) {
     try {
-        await authFetch(`/api/v1/model-provider/${id}/activate`, { method: 'POST' });
+        await authFetch(`/api/v1/user-model-provider/${id}/set-default`, { method: 'POST' });
         await loadModelProviders();
     } catch (e) {
-        console.error('Failed to activate provider:', e);
+        console.error('Failed to set default provider:', e);
     }
 }
 
 async function deleteModelProvider(id) {
     try {
-        await authFetch(`/api/v1/model-provider/${id}`, { method: 'DELETE' });
+        await authFetch(`/api/v1/user-model-provider/${id}`, { method: 'DELETE' });
         await loadModelProviders();
     } catch (e) {
         console.error('Failed to delete provider:', e);
+    }
+}
+
+async function addGlobalProvider(globalId, name) {
+    try {
+        const isFirst = modelProviders.length === 0;
+        const res = await authFetch('/api/v1/user-model-provider', {
+            method: 'POST',
+            body: JSON.stringify({
+                globalModelProviderId: globalId,
+                name: name,
+                isDefault: isFirst
+            })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            alert(err.message || 'Failed to add provider');
+            return;
+        }
+        await loadModelProviders();
+    } catch (e) {
+        console.error('Failed to add global provider:', e);
     }
 }
 
@@ -1017,7 +1102,7 @@ function renderSkillsList() {
                     ${escapeHtml(s.name)}
                     <code>/${escapeHtml(s.name)}</code>
                 </div>
-                <div class="skill-item-description collapsed" onclick="this.classList.toggle('collapsed')">${escapeHtml(s.description)}</div>
+                <div class="skill-item-description collapsed" data-action="toggle-desc">${escapeHtml(s.description)}</div>
             </div>
             <label class="toggle-switch">
                 <input type="checkbox" ${s.isEnabled ? 'checked' : ''} data-skill="${escapeHtml(s.name)}">
@@ -1035,6 +1120,11 @@ function renderSkillsList() {
             await toggleSkill(skillName, enabled);
             e.target.disabled = false;
         });
+    });
+
+    // Add event listeners for description expand/collapse
+    listEl.querySelectorAll('[data-action="toggle-desc"]').forEach(el => {
+        el.addEventListener('click', () => el.classList.toggle('collapsed'));
     });
 }
 
@@ -1141,7 +1231,7 @@ async function validateTelegramBot() {
         if (!res.ok || !result.success) {
             botInfoEl.style.display = 'block';
             botInfoEl.className = 'bot-info-card channel-validation-status error';
-            botInfoEl.innerHTML = `<span>Validation failed: ${result.message || 'Invalid token'}</span>`;
+            botInfoEl.innerHTML = `<span>Validation failed: ${escapeHtml(result.message || 'Invalid token')}</span>`;
             return;
         }
 
@@ -1151,7 +1241,7 @@ async function validateTelegramBot() {
             <div class="bot-name">${escapeHtml(result.botInfo.firstName)}</div>
             <div class="bot-username">@${escapeHtml(result.botInfo.username || 'N/A')}</div>
             <div class="bot-details">
-                Bot ID: ${result.botInfo.id}<br>
+                Bot ID: ${escapeHtml(String(result.botInfo.id))}<br>
                 Can join groups: ${result.botInfo.canJoinGroups ? 'Yes' : 'No'}
             </div>
         `;
@@ -1159,7 +1249,7 @@ async function validateTelegramBot() {
         console.error('Telegram validation error:', e);
         botInfoEl.style.display = 'block';
         botInfoEl.className = 'bot-info-card channel-validation-status error';
-        botInfoEl.innerHTML = `<span>Validation failed: ${e.message}</span>`;
+        botInfoEl.innerHTML = `<span>Validation failed: ${escapeHtml(e.message)}</span>`;
     } finally {
         validateBtn.disabled = false;
         validateBtn.textContent = 'Validate';
@@ -1227,7 +1317,7 @@ function initTelegramChannel() {
 // App Config Functions
 async function loadAppConfigs() {
     try {
-        const res = await authFetch('/api/v1/app-config');
+        const res = await authFetch('/api/v1/user-config');
         if (res.ok) {
             appConfigs = await res.json();
         }
@@ -1351,7 +1441,7 @@ async function addAppConfig() {
 
 async function saveAppConfig(key, value, isSecret) {
     try {
-        const res = await authFetch(`/api/v1/app-config/${encodeURIComponent(key)}`, {
+        const res = await authFetch(`/api/v1/user-config/${encodeURIComponent(key)}`, {
             method: 'PUT',
             body: JSON.stringify({ value, isSecret })
         });
@@ -1372,7 +1462,7 @@ async function saveAppConfig(key, value, isSecret) {
 
 async function deleteAppConfig(key) {
     try {
-        const res = await authFetch(`/api/v1/app-config/${encodeURIComponent(key)}`, {
+        const res = await authFetch(`/api/v1/user-config/${encodeURIComponent(key)}`, {
             method: 'DELETE'
         });
 
@@ -1783,7 +1873,7 @@ async function validateModel() {
 
     try {
         // Validate through backend API to avoid CORS issues
-        const res = await authFetch('/api/v1/model-provider/validate', {
+        const res = await authFetch('/api/v1/user-model-provider/validate', {
             method: 'POST',
             body: JSON.stringify({
                 type: type,
@@ -1840,17 +1930,17 @@ async function saveModelProvider() {
     try {
         let res;
         if (isEditMode) {
-            // Update existing provider
-            res = await authFetch(`/api/v1/model-provider/${providerId}`, {
+            // Update existing user provider
+            res = await authFetch(`/api/v1/user-model-provider/${providerId}`, {
                 method: 'PUT',
                 body: JSON.stringify(provider)
             });
             if (!res.ok) throw new Error('Failed to update provider');
         } else {
-            // Create new provider
+            // Create new custom user provider
             const isFirstProvider = modelProviders.length === 0;
-            provider.isActive = isFirstProvider;
-            res = await authFetch('/api/v1/model-provider', {
+            provider.isDefault = isFirstProvider;
+            res = await authFetch('/api/v1/user-model-provider', {
                 method: 'POST',
                 body: JSON.stringify(provider)
             });
@@ -2022,9 +2112,13 @@ function renderImagePreviews() {
     previewArea.innerHTML = pendingImages.map((img, index) => `
         <div class="image-preview-item" data-index="${index}">
             <img src="${img.previewUrl}" alt="Preview ${index + 1}">
-            <button class="remove-btn" onclick="removeImage(${index})">&times;</button>
+            <button class="remove-btn" data-action="remove-image" data-index="${index}">&times;</button>
         </div>
     `).join('');
+
+    previewArea.querySelectorAll('[data-action="remove-image"]').forEach(btn => {
+        btn.addEventListener('click', () => removeImage(parseInt(btn.dataset.index)));
+    });
 }
 
 function removeImage(index) {

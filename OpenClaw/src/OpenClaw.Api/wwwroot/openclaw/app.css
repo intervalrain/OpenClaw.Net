@@ -1167,6 +1167,50 @@ body {
     padding: 12px;
 }
 
+.section-divider {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.provider-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.provider-badge.global {
+    background: var(--accent);
+    color: #fff;
+}
+
+.provider-badge.custom {
+    background: var(--bg-primary);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+}
+
+.model-item-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-style: italic;
+}
+
+.model-item-btn.add-global {
+    color: var(--accent);
+}
+
+.model-item-btn.add-global:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
 /* Add Model Modal specific */
 .setting-group input[type="text"],
 .setting-group input[type="password"] {

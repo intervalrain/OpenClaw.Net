@@ -44,11 +44,18 @@ function createTopHeader(activePage = '') {
                     </svg>
                     <span>Wiki</span>
                 </a>
-                <a href="/wedally/index.html" class="nav-link admin-only ${activePage === 'wedally' ? 'active' : ''}" style="display: none;">
+                <a href="/wedally/index.html" class="nav-link admin-only ${activePage === 'wedally' ? 'active' : ''}" target="_blank" style="display: none;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                     </svg>
                     <span>Wedally</span>
+                </a>
+                <a href="/admin/index.html" class="nav-link superadmin-only" target="_blank" style="display: none;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                    <span>Settings</span>
                 </a>
                 <a href="/swagger" class="nav-link admin-only" target="_blank" style="display: none;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -96,12 +103,14 @@ function updateNavUserArea() {
         if (isAuthenticated() && user) {
             userArea.innerHTML = `
                 <span class="user-name">${user.name || user.email}</span>
-                <span class="logout-link" onclick="handleNavLogout()">Logout</span>
+                <span class="logout-link" id="navLogoutBtn">Logout</span>
             `;
+            document.getElementById('navLogoutBtn').addEventListener('click', handleNavLogout);
         } else {
             userArea.innerHTML = `
-                <span class="logout-link" onclick="handleNavLogin()">Login</span>
+                <span class="logout-link" id="navLoginBtn">Login</span>
             `;
+            document.getElementById('navLoginBtn').addEventListener('click', handleNavLogin);
         }
     }
 
@@ -115,12 +124,16 @@ function showAdminNavItems() {
     const user = getCurrentUser();
     if (!user || !user.roles) return;
 
-    const isAdmin = user.roles.some(role =>
-        role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin'
-    );
+    const isSuperAdmin = user.roles.some(role => role.toLowerCase() === 'superadmin');
+    const isAdmin = isSuperAdmin || user.roles.some(role => role.toLowerCase() === 'admin');
 
     if (isAdmin) {
         document.querySelectorAll('.top-nav .admin-only').forEach(el => {
+            el.style.display = '';
+        });
+    }
+    if (isSuperAdmin) {
+        document.querySelectorAll('.top-nav .superadmin-only').forEach(el => {
             el.style.display = '';
         });
     }

@@ -1,14 +1,17 @@
 using Asp.Versioning;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using OpenClaw.Contracts.Configuration;
 
+using Weda.Core.Application.Security.Models;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Configuration.Controllers;
 
 [ApiVersion("1.0")]
+[Authorize(Policy = Policy.SuperAdminOnly)]
 public class AppConfigController(IConfigStore configStore) : ApiController
 {
     [HttpGet]

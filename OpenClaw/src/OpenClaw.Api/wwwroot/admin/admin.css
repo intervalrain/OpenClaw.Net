@@ -425,6 +425,67 @@
     color: var(--text-muted);
 }
 
+/* App Config */
+.config-add-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.config-input-key {
+    width: 200px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-family: monospace;
+    text-transform: uppercase;
+}
+
+.config-input-value {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-color);
+}
+
+.config-avatar {
+    background: #2c3e50 !important;
+    font-size: 1.1rem;
+}
+
+/* Provider Management */
+.provider-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.provider-avatar {
+    background: #9b59b6 !important;
+    font-size: 1.25rem;
+}
+
+#providerModal input[type="text"],
+#providerModal input[type="password"],
+#providerModal select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+#adminAllowOverrideLabel {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .user-card {
