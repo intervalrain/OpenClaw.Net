@@ -8,7 +8,8 @@ An enterprise-grade AI Agent Platform built with .NET, featuring multi-user work
 - **Multi-Provider LLM Support**: Ollama, OpenAI, Anthropic, and custom OpenAI-compatible endpoints
 - **Two-Layer Model Providers**: SuperAdmin manages global providers; users can add their own with personal API keys
 - **Multi-Channel Support**: Web UI and Telegram Bot with per-user channel configuration
-- **Modular Tool System**: Auto-registered tools via assembly scanning + Markdown-based Skill definitions
+- **Modular Tool System**: Auto-registered C# tools via assembly scanning
+- **Markdown Skills**: Declarative skill definitions (`SKILL.md`) that compose tools with LLM instructions
 - **CronJob Scheduler**: Scheduled task execution with LLM-assisted argument resolution
 - **Real-time Streaming**: SSE (Server-Sent Events) for streaming responses
 - **Conversation History**: Persistent chat history with automatic compaction
@@ -125,9 +126,9 @@ dotnet ef migrations add MigrationName \
   --startup-project src/OpenClaw.Api
 ```
 
-### Creating a New Tool
+### Creating a New Tool (C#)
 
-Create a class inheriting from `AgentSkillBase<TArgs>`:
+Tools are C# classes that provide executable capabilities (file I/O, API calls, shell commands, etc.).
 
 ```csharp
 public class MyTool(IServiceProvider sp) : AgentSkillBase<MyToolArgs>
@@ -147,11 +148,11 @@ public record MyToolArgs(
 );
 ```
 
-Tools are auto-registered via assembly scanning.
+Tools are auto-registered via assembly scanning under `src/tools/`.
 
 ### Creating a Markdown Skill
 
-Create a `SKILL.md` file in the `skills/` directory:
+Skills are declarative definitions that compose tools with LLM instructions. Create a `SKILL.md` file in the `skills/` directory:
 
 ```markdown
 ---
@@ -166,6 +167,8 @@ tools:
 
 You are a helpful assistant that...
 ```
+
+Skills can be invoked via `@my-skill` mention in chat or referenced in CronJob context.
 
 ## API Overview
 
