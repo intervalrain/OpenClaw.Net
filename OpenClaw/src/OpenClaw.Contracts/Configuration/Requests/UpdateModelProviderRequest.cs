@@ -4,4 +4,6 @@ public record UpdateModelProviderRequest(
     string Name,
     string Url,
     string ModelName,
-    string? ApiKey);
+    string? ApiKey,
+    string? Description = null,
+    bool? AllowUserOverride = null);

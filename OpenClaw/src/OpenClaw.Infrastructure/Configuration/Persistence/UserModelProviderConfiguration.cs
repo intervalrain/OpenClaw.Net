@@ -5,17 +5,24 @@ using OpenClaw.Domain.Configuration.Entities;
 
 namespace OpenClaw.Infrastructure.Configuration.Persistence;
 
-public class ModelProviderConfiguration : IEntityTypeConfiguration<ModelProvider>
+public class UserModelProviderConfiguration : IEntityTypeConfiguration<UserModelProvider>
 {
-    public void Configure(EntityTypeBuilder<ModelProvider> builder)
+    public void Configure(EntityTypeBuilder<UserModelProvider> builder)
     {
-        builder.ToTable("model_providers");
+        builder.ToTable("user_model_providers");
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
             .HasColumnName("id")
             .ValueGeneratedNever();
+
+        builder.Property(x => x.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
+
+        builder.Property(x => x.GlobalModelProviderId)
+            .HasColumnName("global_model_provider_id");
 
         builder.Property(x => x.Type)
             .HasColumnName("type")
@@ -41,17 +48,8 @@ public class ModelProviderConfiguration : IEntityTypeConfiguration<ModelProvider
             .HasColumnName("encrypted_api_key")
             .HasMaxLength(1000);
 
-        builder.Property(x => x.Description)
-            .HasColumnName("description")
-            .HasMaxLength(500);
-
-        builder.Property(x => x.AllowUserOverride)
-            .HasColumnName("allow_user_override")
-            .HasDefaultValue(true)
-            .IsRequired();
-
-        builder.Property(x => x.IsActive)
-            .HasColumnName("is_active")
+        builder.Property(x => x.IsDefault)
+            .HasColumnName("is_default")
             .IsRequired();
 
         builder.Property(x => x.CreatedAt)
@@ -61,7 +59,16 @@ public class ModelProviderConfiguration : IEntityTypeConfiguration<ModelProvider
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at");
 
-        builder.HasIndex(x => x.IsActive)
-            .HasDatabaseName("ix_model_providers_is_active");
+        builder.HasIndex(x => x.UserId)
+            .HasDatabaseName("ix_user_model_providers_user_id");
+
+        builder.HasIndex(x => new { x.UserId, x.Name })
+            .IsUnique()
+            .HasDatabaseName("ix_user_model_providers_user_id_name");
+
+        builder.HasOne<ModelProvider>()
+            .WithMany()
+            .HasForeignKey(x => x.GlobalModelProviderId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

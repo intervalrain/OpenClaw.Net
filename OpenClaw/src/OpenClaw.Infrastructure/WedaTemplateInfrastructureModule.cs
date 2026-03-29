@@ -76,6 +76,7 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IModelProviderRepository, ModelProviderRepository>();
+        services.AddScoped<IUserModelProviderRepository, UserModelProviderRepository>();
         services.AddScoped<IChannelSettingsRepository, ChannelSettingsRepository>();
         services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
         services.AddScoped<IAppConfigRepository, AppConfigRepository>();
@@ -129,7 +130,22 @@ public static class WedaTemplateInfrastructureModule
 
     private static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.Section));
+        var jwtSection = configuration.GetSection(JwtSettings.Section);
+        var secret = jwtSection["Secret"];
+
+        // Validate JWT secret at startup — reject placeholder or weak secrets
+        if (string.IsNullOrWhiteSpace(secret)
+            || secret.StartsWith("${")
+            || secret.Contains("super-secret")
+            || secret.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "JWT secret is not configured or is too weak. " +
+                "Set a cryptographically strong secret (>=32 chars) via environment variable 'JwtSettings__Secret' " +
+                "or the JwtSettings:Secret configuration path.");
+        }
+
+        services.Configure<JwtSettings>(jwtSection);
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 
         services

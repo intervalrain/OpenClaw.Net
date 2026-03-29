@@ -1,13 +1,13 @@
 namespace OpenClaw.Contracts.Configuration.Dtos;
 
-public record ModelProviderDto(
+public record UserModelProviderDto(
     Guid Id,
     string Type,
     string Name,
     string Url,
     string ModelName,
     string? ApiKeyMasked,
-    string? Description,
-    bool AllowUserOverride,
-    bool IsActive,
+    Guid? GlobalModelProviderId,
+    string? GlobalProviderName,
+    bool IsDefault,
     DateTime CreatedAt);

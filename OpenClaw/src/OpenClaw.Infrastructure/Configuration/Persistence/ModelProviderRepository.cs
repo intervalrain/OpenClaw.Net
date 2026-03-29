@@ -17,4 +17,12 @@ public class ModelProviderRepository(AppDbContext context)
         return await DbContext.Set<ModelProvider>()
             .FirstOrDefaultAsync(x => x.IsActive, cancellationToken);
     }
+
+    public async Task<List<ModelProvider>> GetAllActiveAsync(CancellationToken cancellationToken = default)
+    {
+        return await DbContext.Set<ModelProvider>()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+    }
 }

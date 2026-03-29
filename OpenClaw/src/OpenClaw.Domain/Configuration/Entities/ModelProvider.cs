@@ -9,6 +9,8 @@ public class ModelProvider : Entity<Guid>
     public string Url { get; private set; } = string.Empty;
     public string ModelName { get; private set; } = string.Empty;
     public string? EncryptedApiKey { get; private set; }
+    public string? Description { get; private set; }
+    public bool AllowUserOverride { get; private set; }
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -21,6 +23,8 @@ public class ModelProvider : Entity<Guid>
         string url,
         string modelName,
         string? encryptedApiKey,
+        string? description = null,
+        bool allowUserOverride = true,
         bool isActive = false)
     {
         return new ModelProvider
@@ -30,18 +34,25 @@ public class ModelProvider : Entity<Guid>
             Url = url,
             ModelName = modelName,
             EncryptedApiKey = encryptedApiKey,
+            Description = description,
+            AllowUserOverride = allowUserOverride,
             IsActive = isActive,
             CreatedAt = DateTime.UtcNow
         };
     }
 
-    public void Update(string name, string url, string modelName, string? encryptedApiKey)
+    public void Update(string name, string url, string modelName, string? encryptedApiKey,
+        string? description = null, bool? allowUserOverride = null)
     {
         Name = name;
         Url = url;
         ModelName = modelName;
         if (encryptedApiKey is not null)
             EncryptedApiKey = encryptedApiKey;
+        if (description is not null)
+            Description = description;
+        if (allowUserOverride.HasValue)
+            AllowUserOverride = allowUserOverride.Value;
         UpdatedAt = DateTime.UtcNow;
     }
 
