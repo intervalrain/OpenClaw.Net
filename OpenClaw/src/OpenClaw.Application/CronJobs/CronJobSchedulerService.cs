@@ -63,7 +63,7 @@ public class CronJobSchedulerService(
                     job.MarkScheduledExecution();
                     await uow.SaveChangesAsync(ct);
 
-                    await executor.ExecuteAsync(job, null, ExecutionTrigger.Scheduled, ct);
+                    await executor.ExecuteAsync(job, job.CreatedByUserId, ExecutionTrigger.Scheduled, ct);
                 }
             }
             catch (Exception ex)

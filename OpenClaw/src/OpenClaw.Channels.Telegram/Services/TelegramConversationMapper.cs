@@ -40,7 +40,7 @@ public class TelegramConversationMapper
             ? $"{TelegramTitlePrefix}{username}"
             : $"{TelegramTitlePrefix}{chatId}";
 
-        var conversation = Conversation.Create(title);
+        var conversation = Conversation.Create(Guid.Empty, title);
         await repository.AddAsync(conversation, ct);
         await uow.SaveChangesAsync(ct);
 

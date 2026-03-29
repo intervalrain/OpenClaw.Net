@@ -24,12 +24,14 @@ namespace OpenClaw.Api.Chat.Controllers;
 public class ChatController(
     IAgentPipeline pipeline,
     IConversationRepository repository,
+    ICurrentUserProvider currentUserProvider,
     ILlmProviderFactory llmProviderFactory,
     ISlashCommandParser slashCommandParser,
     IToolRegistry skillRegistry,
     IToolSettingsService skillSettingsService,
     IUnitOfWork uow) : ApiController
 {
+    private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -44,7 +46,8 @@ public class ChatController(
         // Convert image attachments to ImageContent
         var images = ConvertToImageContent(request.Images);
 
-        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, ct);
+        var userId = GetUserId();
+        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, ct);
 
         // Save messages to DB
         if (conversation != null)
@@ -123,7 +126,8 @@ public class ChatController(
             var images = ConvertToImageContent(request.Images);
 
             // Stream LLM response with history (including any injected skill results)
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, ct);
+            var streamUserId = GetUserId();
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, ct);
 
             await foreach (var evt in eventStream)
             {
@@ -175,7 +179,8 @@ public class ChatController(
         if (!conversationId.HasValue)
             return (null, [], false);
 
-        var conversation = await repository.GetByIdAsync(conversationId.Value, ct);
+        var userId = GetUserId();
+        var conversation = await repository.GetByIdAndUserAsync(conversationId.Value, userId, ct);
         if (conversation == null)
             return (null, [], false);
 
@@ -244,7 +249,7 @@ public class ChatController(
 
         try
         {
-            var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
+            var llmProvider = await llmProviderFactory.GetProviderAsync(GetUserId(), ct: ct);
             var response = await llmProvider.ChatAsync(summaryMessages, ct: ct);
             return response.Content ?? "Previous conversation context.";
         }
@@ -274,7 +279,7 @@ public class ChatController(
 
         try
         {
-            var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
+            var llmProvider = await llmProviderFactory.GetProviderAsync(GetUserId(), ct: ct);
             var response = await llmProvider.ChatAsync(messages, ct: ct);
             var title = response.Content?.Trim() ?? userMessage[..Math.Min(30, userMessage.Length)];
             return title.Length > 50 ? title[..50] : title;

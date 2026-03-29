@@ -22,13 +22,16 @@ public class AgentPipeline(
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
+        Guid? userId = null,
         CancellationToken ct = default)
     {
         var context = new AgentContext
         {
             UserInput = userInput,
             Images = images,
-            LlmProvider = await llmProviderFactory.GetProviderAsync(ct),
+            LlmProvider = userId.HasValue
+                ? await llmProviderFactory.GetProviderAsync(userId.Value, ct: ct)
+                : await llmProviderFactory.GetProviderAsync(ct),
             Skills = _skillMap.Values.ToList(),
             Options = options
         };
@@ -56,6 +59,7 @@ public class AgentPipeline(
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
+        Guid? userId = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
@@ -97,7 +101,9 @@ public class AgentPipeline(
             }
         }
 
-        var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
+        var llmProvider = userId.HasValue
+            ? await llmProviderFactory.GetProviderAsync(userId.Value, ct: ct)
+            : await llmProviderFactory.GetProviderAsync(ct);
 
         for (int i = 0; i < options.MaxIterations; i++)
         {

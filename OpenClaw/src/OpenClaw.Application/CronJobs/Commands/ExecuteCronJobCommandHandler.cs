@@ -20,6 +20,11 @@ public class ExecuteCronJobCommandHandler(
             return Error.NotFound($"CronJob {request.Id} not found");
         }
 
+        if (request.UserId.HasValue && job.CreatedByUserId != request.UserId.Value)
+        {
+            return Error.NotFound($"CronJob {request.Id} not found");
+        }
+
         if (!job.IsActive)
         {
             return Error.Validation("Cannot execute inactive cron job");
