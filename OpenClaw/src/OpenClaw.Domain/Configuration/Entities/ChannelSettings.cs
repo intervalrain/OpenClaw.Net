@@ -4,6 +4,7 @@ namespace OpenClaw.Domain.Configuration.Entities;
 
 public class ChannelSettings : Entity<Guid>
 {
+    public Guid UserId { get; private set; }
     public string ChannelType { get; private set; } = string.Empty;
     public bool Enabled { get; private set; }
     public string? EncryptedBotToken { get; private set; }
@@ -16,6 +17,7 @@ public class ChannelSettings : Entity<Guid>
     private ChannelSettings() : base(Guid.NewGuid()) { }
 
     public static ChannelSettings Create(
+        Guid userId,
         string channelType,
         bool enabled = false,
         string? encryptedBotToken = null,
@@ -25,6 +27,7 @@ public class ChannelSettings : Entity<Guid>
     {
         return new ChannelSettings
         {
+            UserId = userId,
             ChannelType = channelType,
             Enabled = enabled,
             EncryptedBotToken = encryptedBotToken,

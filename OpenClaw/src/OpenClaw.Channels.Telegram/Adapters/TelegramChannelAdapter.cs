@@ -111,24 +111,41 @@ public class TelegramChannelAdapter(
             var repository = scope.ServiceProvider.GetRequiredService<IChannelSettingsRepository>();
             var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
 
-            var settings = await repository.GetByChannelTypeAsync("telegram", ct);
+            // Load all enabled Telegram channel settings across users
+            var allSettings = await repository.GetAllEnabledByChannelTypeAsync("telegram", ct);
 
-            if (settings is null || string.IsNullOrEmpty(settings.EncryptedBotToken))
+            if (allSettings.Count == 0)
             {
-                logger.LogInformation("No Telegram settings in database, using appsettings fallback");
+                logger.LogInformation("No enabled Telegram settings in database, using appsettings fallback");
                 return fallbackOptions.Value;
             }
 
-            var botToken = encryption.Decrypt(settings.EncryptedBotToken);
+            // Use the first config that has a bot token for the system bot
+            var primary = allSettings.FirstOrDefault(s => !string.IsNullOrEmpty(s.EncryptedBotToken));
+            if (primary is null)
+            {
+                logger.LogInformation("No Telegram settings with bot token found, using appsettings fallback");
+                return fallbackOptions.Value;
+            }
 
-            logger.LogInformation("Loaded Telegram settings from database");
+            var botToken = encryption.Decrypt(primary.EncryptedBotToken!);
+
+            // Aggregate allowed user IDs from all enabled user configs
+            var allAllowedUserIds = allSettings
+                .SelectMany(s => s.GetAllowedUserIdsList())
+                .Distinct()
+                .ToArray();
+
+            logger.LogInformation("Loaded Telegram settings from database ({Count} user config(s), {AllowedCount} allowed IDs)",
+                allSettings.Count, allAllowedUserIds.Length);
+
             return new TelegramBotOptions
             {
-                Enabled = settings.Enabled,
+                Enabled = true,
                 BotToken = botToken,
-                WebhookUrl = settings.WebhookUrl,
-                SecretToken = settings.SecretToken,
-                AllowedUserIds = settings.GetAllowedUserIdsList().ToArray()
+                WebhookUrl = primary.WebhookUrl,
+                SecretToken = primary.SecretToken,
+                AllowedUserIds = allAllowedUserIds
             };
         }
         catch (Exception ex)

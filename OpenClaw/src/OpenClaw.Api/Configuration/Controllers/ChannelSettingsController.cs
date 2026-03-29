@@ -1,5 +1,6 @@
 using Asp.Versioning;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using OpenClaw.Contracts.Configuration.Dtos;
@@ -9,23 +10,31 @@ using OpenClaw.Domain.Configuration.Entities;
 using OpenClaw.Domain.Configuration.Repositories;
 
 using Weda.Core.Application.Interfaces;
+using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
+
+using AuthorizeAttribute = Microsoft.AspNetCore.Authorization.AuthorizeAttribute;
 
 namespace OpenClaw.Api.Configuration.Controllers;
 
 [ApiVersion("1.0")]
+[Authorize]
 public class ChannelSettingsController(
     IChannelSettingsRepository repository,
     IEncryptionService encryption,
+    ICurrentUserProvider currentUserProvider,
     IUnitOfWork uow,
     IHttpClientFactory httpClientFactory) : ApiController
 {
     private const string TelegramChannelType = "telegram";
+    private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
 
     [HttpGet("telegram")]
     public async Task<IActionResult> GetTelegramSettings(CancellationToken ct)
     {
-        var settings = await repository.GetByChannelTypeAsync(TelegramChannelType, ct);
+        var userId = GetUserId();
+        var settings = await repository.GetByUserAndChannelTypeAsync(userId, TelegramChannelType, ct);
+
         if (settings is null)
         {
             return Ok(new ChannelSettingsDto(
@@ -40,16 +49,7 @@ public class ChannelSettingsController(
                 null));
         }
 
-        return Ok(new ChannelSettingsDto(
-            settings.Id,
-            settings.ChannelType,
-            settings.Enabled,
-            MaskBotToken(settings.EncryptedBotToken),
-            settings.WebhookUrl,
-            settings.SecretToken,
-            settings.GetAllowedUserIdsList(),
-            settings.CreatedAt,
-            settings.UpdatedAt));
+        return Ok(MapToDto(settings));
     }
 
     [HttpPut("telegram")]
@@ -57,7 +57,8 @@ public class ChannelSettingsController(
         [FromBody] UpdateChannelSettingsRequest request,
         CancellationToken ct)
     {
-        var settings = await repository.GetByChannelTypeAsync(TelegramChannelType, ct);
+        var userId = GetUserId();
+        var settings = await repository.GetByUserAndChannelTypeAsync(userId, TelegramChannelType, ct);
 
         var encryptedToken = string.IsNullOrEmpty(request.BotToken)
             ? null
@@ -68,6 +69,7 @@ public class ChannelSettingsController(
         if (settings is null)
         {
             settings = ChannelSettings.Create(
+                userId,
                 TelegramChannelType,
                 request.Enabled,
                 encryptedToken,
@@ -89,16 +91,7 @@ public class ChannelSettingsController(
 
         await uow.SaveChangesAsync(ct);
 
-        return Ok(new ChannelSettingsDto(
-            settings.Id,
-            settings.ChannelType,
-            settings.Enabled,
-            MaskBotToken(settings.EncryptedBotToken),
-            settings.WebhookUrl,
-            settings.SecretToken,
-            settings.GetAllowedUserIdsList(),
-            settings.CreatedAt,
-            settings.UpdatedAt));
+        return Ok(MapToDto(settings));
     }
 
     [HttpPost("telegram/validate")]
@@ -151,6 +144,17 @@ public class ChannelSettingsController(
             return BadRequest(new { success = false, message = $"Validation failed: {ex.Message}" });
         }
     }
+
+    private static ChannelSettingsDto MapToDto(ChannelSettings settings) => new(
+        settings.Id,
+        settings.ChannelType,
+        settings.Enabled,
+        MaskBotToken(settings.EncryptedBotToken),
+        settings.WebhookUrl,
+        settings.SecretToken,
+        settings.GetAllowedUserIdsList(),
+        settings.CreatedAt,
+        settings.UpdatedAt);
 
     private static string? MaskBotToken(string? encryptedToken)
     {
