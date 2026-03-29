@@ -1,0 +1,107 @@
+/**
+ * Shared Theme System
+ * Dark/Light mode support for all pages
+ * NOTE: Dark theme is default (matches app.css pattern)
+ */
+
+/* Dark theme (default) */
+:root {
+    --primary-color: #4a9eff;
+    --primary-hover: #3d8ce6;
+    --text-color: #ececec;
+    --text-muted: #8e8e8e;
+    --bg-color: #212121;
+    --card-bg: #2f2f2f;
+    --border-color: #424242;
+    --error-color: #ff6b6b;
+    --error-hover: #e55555;
+    --success-color: #4caf50;
+    --success-hover: #43a047;
+    --danger-color: #ff6b6b;
+    --warning-color: #ffb74d;
+
+    /* Additional variables for consistency */
+    --bg-primary: #212121;
+    --bg-secondary: #171717;
+    --bg-tertiary: #3a3a3a;
+    --text-primary: #ececec;
+    --text-secondary: #b4b4b4;
+    --border-subtle: #2f2f2f;
+
+    /* Status badge colors - dark mode */
+    --status-success-bg: #1b4332;
+    --status-success-text: #95d5b2;
+    --status-warning-bg: #5c4d1a;
+    --status-warning-text: #ffd97d;
+    --status-error-bg: #4a1c1c;
+    --status-error-text: #ff9999;
+    --status-info-bg: #1a3a5c;
+    --status-info-text: #7eb8ff;
+
+    /* Work item type colors - dark mode */
+    --type-task-bg: #1a3a5c;
+    --type-task-text: #7eb8ff;
+    --type-bug-bg: #4a1c1c;
+    --type-bug-text: #ff9999;
+    --type-story-bg: #1b4332;
+    --type-story-text: #95d5b2;
+
+    /* Code colors */
+    --code-inline-color: #f8b4b4;
+}
+
+/* Light theme */
+[data-theme="light"] {
+    --primary-color: #3498db;
+    --primary-hover: #2980b9;
+    --text-color: #333;
+    --text-muted: #666;
+    --bg-color: #f5f7fa;
+    --card-bg: #fff;
+    --border-color: #e1e5e9;
+    --error-color: #e74c3c;
+    --error-hover: #c0392b;
+    --success-color: #27ae60;
+    --success-hover: #219a52;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+
+    /* Additional variables for consistency */
+    --bg-primary: #f5f7fa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f0f0f0;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --border-subtle: #e1e5e9;
+
+    /* Status badge colors - light mode */
+    --status-success-bg: #d4edda;
+    --status-success-text: #155724;
+    --status-warning-bg: #fff3cd;
+    --status-warning-text: #856404;
+    --status-error-bg: #f8d7da;
+    --status-error-text: #721c24;
+    --status-info-bg: #cce5ff;
+    --status-info-text: #004085;
+
+    /* Work item type colors - light mode */
+    --type-task-bg: #e3f2fd;
+    --type-task-text: #1565c0;
+    --type-bug-bg: #ffebee;
+    --type-bug-text: #c62828;
+    --type-story-bg: #e8f5e9;
+    --type-story-text: #2e7d32;
+
+    /* Code colors */
+    --code-inline-color: #c7254e;
+}
+
+/* Smooth transitions for theme changes */
+body,
+.container,
+.card,
+.modal-content,
+.drawer,
+.sidebar {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}

@@ -40,8 +40,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Status)
             .HasConversion<string>()
             .HasMaxLength(20)
-            .IsRequired()
-            .HasDefaultValue(UserStatus.Active);
+            .IsRequired();
 
         // ValueComparer for List<string> collections
         var stringListComparer = new ValueComparer<List<string>>(
@@ -80,6 +79,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired(false);
 
         builder.Property(u => u.LastLoginAt)
+            .IsRequired(false);
+
+        builder.Property(u => u.WorkspacePath)
+            .HasMaxLength(500)
             .IsRequired(false);
     }
 }

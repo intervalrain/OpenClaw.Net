@@ -4,14 +4,34 @@ An AI Agent Platform built with .NET, featuring a modular skill system, multi-pr
 
 ## Features
 
+### Core Capabilities
 - **Multi-Provider LLM Support**: Ollama, OpenAI, Anthropic, and custom OpenAI-compatible endpoints
 - **Multi-Channel Support**: Web UI and Telegram Bot integration
 - **Modular Skill System**: Auto-registered skills via assembly scanning
 - **Slash Commands**: Direct skill invocation with `/skill_name args` syntax
 - **Real-time Streaming**: SSE (Server-Sent Events) for streaming responses
 - **Conversation History**: Persistent chat history with PostgreSQL
-- **Web Search**: Integrated SearXNG for web search capabilities
+- **Vision Support**: Image upload and analysis with OpenAI Vision API
 - **Modern Web UI**: Dark/light theme, autocomplete, and responsive design
+
+### Workflow & Pipeline System
+- **Workflow Engine**: DAG-based workflow execution with multiple node types
+  - Start/End nodes for flow control
+  - Skill nodes with timeout support
+  - Approval nodes for human-in-the-loop workflows
+- **Pipeline Execution**: Background task execution with approval gates
+- **Scheduled Workflows**: Cron-based scheduling with auto-approve options
+
+### Integrations
+- **Azure DevOps**: Work items, repositories, builds, pipelines, and PRs
+- **Notion**: Pages, databases, search, and comments
+- **GitHub**: Issues, PRs, and CI workflows via GitHub CLI
+- **Web Search**: Integrated SearXNG for web search capabilities
+
+### User Management
+- **User Preferences**: Persistent key-value settings per user
+- **Role-based Access**: User roles with authorization controls
+- **JWT Authentication**: Token-based authentication with refresh support
 
 ## Architecture
 
@@ -33,15 +53,45 @@ OpenClaw.Net/
 
 ## Built-in Skills
 
+### Productivity & Integration
+
 | Skill | Description | Slash Command |
 |-------|-------------|---------------|
-| `weather` | Get weather via wttr.in | `/weather Taipei` |
+| `azure_devops` | Azure DevOps work items, repos, builds | `/azure_devops my_work_items` |
+| `notion` | Notion pages, databases, search | `/notion search "query"` |
+| `github` | GitHub issues, PRs, CI via gh CLI | `/github list_issues` |
+| `git` | Local git operations | `/git status` |
+
+### Web & Search
+
+| Skill | Description | Slash Command |
+|-------|-------------|---------------|
 | `web_search` | Search the web via SearXNG | `/web_search query` |
 | `http_request` | Send HTTP GET/POST requests | `/http_request url` |
+| `weather` | Get weather via wttr.in | `/weather Taipei` |
+
+### File System & Shell
+
+| Skill | Description | Slash Command |
+|-------|-------------|---------------|
 | `read_file` | Read file contents | `/read_file path` |
 | `write_file` | Write content to file | `/write_file path content` |
 | `list_directory` | List directory contents | `/list_directory path` |
-| `execute_command` | Execute shell commands (restricted) | `/execute_command cmd` |
+| `shell` | Execute shell commands (restricted) | `/shell cmd` |
+| `tmux` | Tmux session management | `/tmux list_sessions` |
+
+### Media & Documents
+
+| Skill | Description | Slash Command |
+|-------|-------------|---------------|
+| `image_generation` | Generate images via DALL-E | `/image_generation "prompt"` |
+| `pdf` | Read and search PDF files | `/pdf read "file.pdf"` |
+
+### Settings
+
+| Skill | Description | Slash Command |
+|-------|-------------|---------------|
+| `preference` | Manage user preferences | `/preference get key` |
 
 ## Quick Start
 
@@ -123,6 +173,7 @@ public record MySkillArgs(
 ## API Endpoints
 
 ### Chat
+- `POST /api/v1/chat` - Send chat message
 - `POST /api/v1/chat/stream` - Stream chat response (SSE)
 
 ### Conversations
@@ -130,6 +181,20 @@ public record MySkillArgs(
 - `POST /api/v1/conversation` - Create conversation
 - `GET /api/v1/conversation/{id}` - Get conversation with messages
 - `DELETE /api/v1/conversation/{id}` - Delete conversation
+
+### Pipelines
+- `GET /api/v1/pipelines` - List available pipelines
+- `POST /api/v1/pipelines/{name}/execute` - Execute pipeline
+- `GET /api/v1/pipelines/executions` - List recent executions
+- `GET /api/v1/pipelines/executions/{id}` - Get execution details
+- `POST /api/v1/pipelines/executions/{id}/approve` - Approve pending execution
+- `POST /api/v1/pipelines/executions/{id}/reject` - Reject pending execution
+
+### User Preferences
+- `GET /api/v1/user-preferences` - List all preferences
+- `GET /api/v1/user-preferences/{key}` - Get specific preference
+- `PUT /api/v1/user-preferences/{key}` - Set preference
+- `DELETE /api/v1/user-preferences/{key}` - Delete preference
 
 ### Model Providers
 - `GET /api/v1/model-provider` - List providers
@@ -190,13 +255,14 @@ Telegram bot settings can be configured via the Settings UI:
 
 ## Tech Stack
 
-- **Backend**: .NET 10, ASP.NET Core, Entity Framework Core
+- **Backend**: .NET 10, ASP.NET Core, Entity Framework Core, Mediator (CQRS)
 - **Database**: PostgreSQL
 - **Messaging**: NATS JetStream
 - **Search**: SearXNG
 - **Channels**: Web UI, Telegram Bot
 - **Frontend**: Vanilla JS, CSS Variables, marked.js, highlight.js, KaTeX
 - **Containerization**: Docker, Docker Compose
+- **External APIs**: OpenAI, Azure DevOps, Notion, GitHub CLI
 
 ## License
 

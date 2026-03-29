@@ -41,6 +41,15 @@ public class ModelProviderConfiguration : IEntityTypeConfiguration<ModelProvider
             .HasColumnName("encrypted_api_key")
             .HasMaxLength(1000);
 
+        builder.Property(x => x.Description)
+            .HasColumnName("description")
+            .HasMaxLength(500);
+
+        builder.Property(x => x.AllowUserOverride)
+            .HasColumnName("allow_user_override")
+            .HasDefaultValue(true)
+            .IsRequired();
+
         builder.Property(x => x.IsActive)
             .HasColumnName("is_active")
             .IsRequired();

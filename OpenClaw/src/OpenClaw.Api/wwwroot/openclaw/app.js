@@ -2,7 +2,8 @@
 let messagesEl, userInputEl, sendBtn, themeToggle;
 let currentConversationId = null;
 let conversations = [];
-let modelProviders = [];
+let modelProviders = [];      // user's own model providers
+let availableProviders = [];  // global providers available to add
 let skills = [];
 let appConfigs = [];
 
@@ -12,6 +13,9 @@ let tempInput = ''; // Store current input when navigating history
 
 // Pending images for upload
 let pendingImages = []; // Array of { base64Data, mimeType, previewUrl }
+
+// AbortController for stopping inference
+let currentAbortController = null;
 
 // Configure marked.js
 marked.setOptions({
@@ -31,12 +35,31 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBtn = document.getElementById('send-btn');
     themeToggle = document.getElementById('theme-toggle');
 
-    // Initialize theme
-    initTheme();
+    // Initialize Chat-specific theme settings (hljs, button text)
+    initChatTheme();
+
+    // Listen for theme changes from top-header.js
+    window.addEventListener('themechange', (e) => {
+        updateHljsTheme(e.detail.theme);
+        updateThemeButtonText(e.detail.theme);
+    });
+
+    // Show admin-only nav items based on user role
+    initAdminNavItems();
+
+    // Channel header toggle (CSP-compliant replacement for inline onclick)
+    document.getElementById('telegram-channel-header').addEventListener('click', (e) => {
+        // Don't toggle when clicking the toggle switch itself
+        if (e.target.closest('#telegram-toggle-label')) return;
+        document.getElementById('telegram-channel').classList.toggle('collapsed');
+    });
+    document.getElementById('telegram-toggle-label').addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
 
     // Event Listeners
     sendBtn.addEventListener('click', sendMessage);
-    themeToggle.addEventListener('click', toggleTheme);
+    themeToggle.addEventListener('click', toggleChatTheme);
 
     userInputEl.addEventListener('keydown', (e) => {
         // Handle autocomplete navigation
@@ -60,6 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 hideAutocomplete();
                 return;
             }
+        }
+
+        // ESC to stop inference (when not in autocomplete)
+        if (e.key === 'Escape' && currentAbortController) {
+            e.preventDefault();
+            stopInference();
+            return;
         }
 
         // Handle input history navigation (↑↓ keys)
@@ -113,12 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initialize conversations
+    // Initialize conversations button (but don't load yet)
     document.getElementById('new-chat-btn').addEventListener('click', createNewConversation);
-    loadConversations();
-
-    // Preload skills for autocomplete
-    loadSkills();
 
     // Logout button
     document.getElementById('logout-btn').addEventListener('click', logout);
@@ -126,11 +152,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Image upload handling
     initImageUpload();
 
-    // Check setup status - show onboarding if no provider configured
-    checkSetupStatus();
-
-    // Update user profile display
-    updateUserProfile();
+    // Check setup status first - this handles authentication and onboarding
+    // Only load data after authentication is confirmed
+    checkSetupStatus().then(() => {
+        // Only load if authenticated
+        if (isAuthenticated()) {
+            loadConversations();
+            loadSkills();
+            updateUserProfile();
+        }
+    });
 });
 
 // Update user profile display from localStorage
@@ -149,36 +180,49 @@ function updateUserProfile() {
     }
 }
 
-// Logout and redirect to login
+// Logout and show login modal
 function logout() {
     clearAuth();
-    window.location.href = '/login.html';
+    showLoginModal(() => {
+        window.location.reload();
+    });
 }
 
 // Setup check - onboarding flow
+// Returns a promise that resolves when authentication is confirmed
 async function checkSetupStatus() {
-    try {
-        const res = await fetch('/api/v1/setup/status');
-        if (!res.ok) return;
+    return new Promise(async (resolve) => {
+        try {
+            const res = await fetch('/api/v1/setup/status');
+            if (!res.ok) {
+                resolve();
+                return;
+            }
 
-        const status = await res.json();
-        
-        if (!status.hasUser) {
-            window.location.href = '/setup.html';
-            return;
-        }
+            const status = await res.json();
 
-        if (!isAuthenticated()) {
-            window.location.href = '/login.html'
-            return;
-        }
+            if (!status.hasUser) {
+                window.location.href = '/setup.html';
+                return; // Never resolves - page is redirecting
+            }
 
-        if (!status.hasModelProvider) {
-            showOnboardingModal();
+            if (!isAuthenticated()) {
+                showLoginModal(() => {
+                    window.location.reload();
+                });
+                return; // Never resolves - waiting for login then reload
+            }
+
+            if (!status.hasModelProvider) {
+                showOnboardingModal();
+            }
+
+            resolve(); // Authenticated, continue
+        } catch (e) {
+            console.error('Failed to check setup status:', e);
+            resolve(); // Resolve anyway to not block
         }
-    } catch (e) {
-        console.error('Failed to check setup status:', e);
-    }
+    });
 }
 
 function showOnboardingModal() {
@@ -199,19 +243,30 @@ function showOnboardingModal() {
     updateProviderTypeUI();
 }
 
-// Theme functions
-function initTheme() {
+// Theme functions for Chat page
+// Uses top-header.js for core theme management, adds Chat-specific updates
+function initChatTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', savedTheme);
     updateHljsTheme(savedTheme);
     updateThemeButtonText(savedTheme);
 }
 
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+function toggleChatTheme() {
+    // Use top-header.js toggleTheme if available, otherwise handle locally
+    if (typeof toggleTheme === 'function') {
+        toggleTheme();
+    } else {
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        if (newTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        localStorage.setItem('theme', newTheme);
+    }
+    // Update Chat-specific UI
+    const newTheme = localStorage.getItem('theme') || 'dark';
     updateHljsTheme(newTheme);
     updateThemeButtonText(newTheme);
 }
@@ -225,10 +280,12 @@ function updateThemeButtonText(theme) {
 
 function updateHljsTheme(theme) {
     const hljsLink = document.getElementById('hljs-theme');
-    if (theme === 'light') {
-        hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css';
-    } else {
-        hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css';
+    if (hljsLink) {
+        if (theme === 'light') {
+            hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css';
+        } else {
+            hljsLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css';
+        }
     }
 }
 
@@ -265,6 +322,28 @@ function updateStatusIndicator(indicator, type, toolName) {
 function removeStatusIndicator(indicator) {
     if (indicator && indicator.parentNode) {
         indicator.parentNode.removeChild(indicator);
+    }
+}
+
+// Stop inference function
+function stopInference() {
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
+}
+
+// Toggle button between send and stop modes
+function setButtonMode(mode) {
+    if (mode === 'stop') {
+        sendBtn.textContent = 'Stop';
+        sendBtn.classList.add('stop-mode');
+        sendBtn.disabled = false;
+        sendBtn.onclick = stopInference;
+    } else {
+        sendBtn.textContent = 'Send';
+        sendBtn.classList.remove('stop-mode');
+        sendBtn.disabled = false;
+        sendBtn.onclick = sendMessage;
     }
 }
 
@@ -403,8 +482,11 @@ function renderMarkdown(content) {
         }
     });
 
-    // Render markdown
-    return marked.parse(content);
+    // Render markdown and sanitize with DOMPurify to prevent XSS
+    const html = marked.parse(content);
+    return typeof DOMPurify !== 'undefined'
+        ? DOMPurify.sanitize(html, { ADD_TAGS: ['katex-display'], ADD_ATTR: ['class', 'style'] })
+        : html;
 }
 
 // Input history navigation - get user messages from current conversation
@@ -463,7 +545,9 @@ async function sendMessage() {
     // Add user message with image previews if any
     addMessageWithImages(message || '[Image]', 'user', pendingImages);
     userInputEl.value = '';
-    sendBtn.disabled = true;
+
+    // Switch to stop mode
+    setButtonMode('stop');
 
     // Prepare images for API
     const images = hasImages ? pendingImages.map(img => ({
@@ -478,6 +562,9 @@ async function sendMessage() {
     let streamingMessage = null;
     let accumulatedContent = '';
 
+    // Create AbortController for this request
+    currentAbortController = new AbortController();
+
     try {
         const settings = getSettings();
         const res = await authFetch('/api/v1/chat/stream', {
@@ -487,7 +574,8 @@ async function sendMessage() {
                 conversationId: currentConversationId,
                 language: settings.language,
                 images: images
-            })
+            }),
+            signal: currentAbortController.signal
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -573,6 +661,15 @@ async function sendMessage() {
                             }
                             addMessage(`Error: ${event.content}`, 'assistant');
                             break;
+
+                        case 'ApprovalRequired':
+                            if (statusIndicator) {
+                                removeStatusIndicator(statusIndicator);
+                                statusIndicator = null;
+                            }
+                            // Create approval UI inline in chat
+                            handleApprovalRequired(event.executionId, event.approvalRequest);
+                            break;
                     }
                 } catch (parseError) {
                     console.error('Failed to parse SSE event:', parseError);
@@ -583,9 +680,20 @@ async function sendMessage() {
         if (statusIndicator) {
             removeStatusIndicator(statusIndicator);
         }
-        addMessage(`Error: ${error.message}`, 'assistant');
+        // Only show error if not aborted by user
+        if (error.name !== 'AbortError') {
+            addMessage(`Error: ${error.message}`, 'assistant');
+        } else {
+            // User stopped the inference - show stopped message if there was partial content
+            if (streamingMessage && accumulatedContent) {
+                // Add a visual indicator that response was stopped
+                accumulatedContent += '\n\n*[Response stopped]*';
+                updateStreamingMessage(streamingMessage, accumulatedContent);
+            }
+        }
     } finally {
-        sendBtn.disabled = false;
+        currentAbortController = null;
+        setButtonMode('send');
         userInputEl.focus();
 
         // Refresh conversation title (may have been updated by backend on first message)
@@ -631,17 +739,23 @@ async function loadConversations() {
 function renderConversationList() {
     const list = document.getElementById('conversation-list');
     list.innerHTML = conversations.map(c => `
-        <div class="conversation-item ${c.id === currentConversationId ? 'active' : ''}" 
-             data-id="${c.id}">
-            <span class="title">${c.title}</span>
-            <button class="delete-btn" onclick="deleteConversation('${c.id}', event)">🗑️</button>
+        <div class="conversation-item ${c.id === currentConversationId ? 'active' : ''}"
+             data-id="${escapeHtml(c.id)}">
+            <span class="title">${escapeHtml(c.title)}</span>
+            <button class="delete-btn" data-action="delete-conv" data-id="${escapeHtml(c.id)}">🗑️</button>
         </div>
     `).join('');
 
     // Add click handlers
     list.querySelectorAll('.conversation-item').forEach(item => {
         item.addEventListener('click', () => selectConversation(item.dataset.id));
-    })
+    });
+    list.querySelectorAll('[data-action="delete-conv"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteConversation(btn.dataset.id, e);
+        });
+    });
 }
 
 async function createNewConversation() {
@@ -694,8 +808,7 @@ const MODELS_KEY = 'openclaw_models';
 function getSettings() {
     const saved = localStorage.getItem(SETTINGS_KEY);
     return saved ? JSON.parse(saved) : {
-        language: 'auto',
-        activeModelId: null
+        language: 'auto'
     };
 }
 
@@ -705,83 +818,127 @@ function saveSettings(settings) {
 
 async function loadModelProviders() {
     try {
-        const res = await authFetch('/api/v1/model-provider');
-        if (res.ok) {
-            modelProviders = await res.json();
+        const [userRes, availableRes] = await Promise.all([
+            authFetch('/api/v1/user-model-provider'),
+            authFetch('/api/v1/user-model-provider/available')
+        ]);
+        if (userRes.ok) {
+            modelProviders = await userRes.json();
+        }
+        if (availableRes.ok) {
+            availableProviders = await availableRes.json();
         }
     } catch (e) {
         console.error('Failed to load model providers:', e);
         modelProviders = [];
+        availableProviders = [];
     }
     return modelProviders;
 }
 
-function getActiveModelProviderId() {
-    const active = modelProviders.find(p => p.isActive);
-    return active?.id || null;
-}
 
 function renderModelList() {
     const listEl = document.getElementById('model-list');
+    const availableListEl = document.getElementById('available-provider-list');
 
+    // --- Render user's own providers ---
     if (modelProviders.length === 0) {
-        listEl.innerHTML = '<p class="setting-hint">No model providers configured.</p>';
-        return;
-    }
-
-    listEl.innerHTML = modelProviders.map(p => `
-        <div class="model-item ${p.isActive ? 'active' : ''}" data-id="${p.id}">
-            <input type="radio" name="active-model" class="model-item-radio"
-                   value="${p.id}" ${p.isActive ? 'checked' : ''}>
-            <div class="model-item-info">
-                <div class="model-item-name">${escapeHtml(p.name)}</div>
-                <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
-            </div>
-            <div class="model-item-actions">
+        listEl.innerHTML = '<p class="setting-hint">No model providers configured. Add a custom provider or select from the global providers below.</p>';
+    } else {
+        listEl.innerHTML = modelProviders.map(p => {
+            const isGlobalRef = !!p.globalModelProviderId;
+            const badge = isGlobalRef
+                ? '<span class="provider-badge global">Global</span>'
+                : '<span class="provider-badge custom">Custom</span>';
+            const editBtn = isGlobalRef ? '' : `
                 <button class="model-item-btn edit" data-id="${p.id}" title="Edit">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                         <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
-                </button>
-                <button class="model-item-btn delete" data-id="${p.id}" title="Delete">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-    `).join('');
+                </button>`;
+            return `
+            <div class="model-item ${p.isDefault ? 'active' : ''}" data-id="${p.id}">
+                <input type="radio" name="active-model" class="model-item-radio"
+                       value="${p.id}" ${p.isDefault ? 'checked' : ''}>
+                <div class="model-item-info">
+                    <div class="model-item-name">${escapeHtml(p.name)} ${badge}</div>
+                    <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
+                </div>
+                <div class="model-item-actions">
+                    ${editBtn}
+                    <button class="model-item-btn delete" data-id="${p.id}" title="Remove">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
 
-    // Add event listeners for radio buttons
-    listEl.querySelectorAll('.model-item-radio').forEach(radio => {
-        radio.addEventListener('change', async (e) => {
-            const id = e.target.value;
-            await activateModelProvider(id);
-            renderModelList();
-        });
-    });
-
-    // Add event listeners for edit buttons
-    listEl.querySelectorAll('.model-item-btn.edit').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = btn.dataset.id;
-            openEditModelModal(id);
-        });
-    });
-
-    // Add event listeners for delete buttons
-    listEl.querySelectorAll('.model-item-btn.delete').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = btn.dataset.id;
-            if (confirm('Delete this model provider?')) {
-                await deleteModelProvider(id);
+        // Event listeners for radio buttons (set default)
+        listEl.querySelectorAll('.model-item-radio').forEach(radio => {
+            radio.addEventListener('change', async (e) => {
+                const id = e.target.value;
+                await setDefaultModelProvider(id);
                 renderModelList();
-            }
+            });
         });
-    });
+
+        // Event listeners for edit buttons (custom providers only)
+        listEl.querySelectorAll('.model-item-btn.edit').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditModelModal(btn.dataset.id);
+            });
+        });
+
+        // Event listeners for delete buttons
+        listEl.querySelectorAll('.model-item-btn.delete').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('Remove this model provider from your list?')) {
+                    await deleteModelProvider(btn.dataset.id);
+                    renderModelList();
+                }
+            });
+        });
+    }
+
+    // --- Render available global providers ---
+    // Filter out global providers already added by user
+    const userGlobalIds = new Set(modelProviders.filter(p => p.globalModelProviderId).map(p => p.globalModelProviderId));
+    const available = availableProviders.filter(p => !userGlobalIds.has(p.id));
+
+    if (available.length === 0) {
+        availableListEl.innerHTML = '<p class="setting-hint">All global providers have been added to your list, or none are available.</p>';
+    } else {
+        availableListEl.innerHTML = available.map(p => `
+            <div class="model-item available-item" data-id="${p.id}">
+                <div class="model-item-info">
+                    <div class="model-item-name">${escapeHtml(p.name)}</div>
+                    <div class="model-item-details">${escapeHtml(p.type)} - ${escapeHtml(p.modelName)}</div>
+                    ${p.description ? `<div class="model-item-desc">${escapeHtml(p.description)}</div>` : ''}
+                </div>
+                <div class="model-item-actions">
+                    <button class="model-item-btn add-global" data-id="${p.id}" data-name="${escapeHtml(p.name)}" title="Add to my list">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        // Event listeners for add buttons
+        availableListEl.querySelectorAll('.model-item-btn.add-global').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await addGlobalProvider(btn.dataset.id, btn.dataset.name);
+                renderModelList();
+            });
+        });
+    }
 }
 
 // Edit Model Provider
@@ -810,21 +967,43 @@ function openEditModelModal(id) {
     document.getElementById('add-model-modal').classList.add('active');
 }
 
-async function activateModelProvider(id) {
+async function setDefaultModelProvider(id) {
     try {
-        await authFetch(`/api/v1/model-provider/${id}/activate`, { method: 'POST' });
+        await authFetch(`/api/v1/user-model-provider/${id}/set-default`, { method: 'POST' });
         await loadModelProviders();
     } catch (e) {
-        console.error('Failed to activate provider:', e);
+        console.error('Failed to set default provider:', e);
     }
 }
 
 async function deleteModelProvider(id) {
     try {
-        await authFetch(`/api/v1/model-provider/${id}`, { method: 'DELETE' });
+        await authFetch(`/api/v1/user-model-provider/${id}`, { method: 'DELETE' });
         await loadModelProviders();
     } catch (e) {
         console.error('Failed to delete provider:', e);
+    }
+}
+
+async function addGlobalProvider(globalId, name) {
+    try {
+        const isFirst = modelProviders.length === 0;
+        const res = await authFetch('/api/v1/user-model-provider', {
+            method: 'POST',
+            body: JSON.stringify({
+                globalModelProviderId: globalId,
+                name: name,
+                isDefault: isFirst
+            })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            alert(err.message || 'Failed to add provider');
+            return;
+        }
+        await loadModelProviders();
+    } catch (e) {
+        console.error('Failed to add global provider:', e);
     }
 }
 
@@ -840,12 +1019,13 @@ async function openSettingsModal() {
 
     document.getElementById('language-select').value = settings.language;
 
-    // Load providers, skills, channel settings, and app configs from backend
-    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs()]);
+    // Load providers, skills, channel settings, app configs, and preferences from backend
+    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences()]);
     renderModelList();
     renderSkillsList();
     renderTelegramSettings();
     renderConfigList();
+    renderPreferenceList();
 
     // Update account info
     const user = getCurrentUser();
@@ -893,7 +1073,7 @@ function initSettingsTabs() {
     }
 }
 
-// Skills Functions
+// Tools Settings Functions
 async function loadSkills() {
     try {
         const res = await authFetch('/api/v1/skill-settings');
@@ -911,7 +1091,7 @@ function renderSkillsList() {
     const listEl = document.getElementById('skills-list');
 
     if (skills.length === 0) {
-        listEl.innerHTML = '<p class="setting-hint">No skills available.</p>';
+        listEl.innerHTML = '<p class="setting-hint">No tools available.</p>';
         return;
     }
 
@@ -922,7 +1102,7 @@ function renderSkillsList() {
                     ${escapeHtml(s.name)}
                     <code>/${escapeHtml(s.name)}</code>
                 </div>
-                <div class="skill-item-description">${escapeHtml(s.description)}</div>
+                <div class="skill-item-description collapsed" data-action="toggle-desc">${escapeHtml(s.description)}</div>
             </div>
             <label class="toggle-switch">
                 <input type="checkbox" ${s.isEnabled ? 'checked' : ''} data-skill="${escapeHtml(s.name)}">
@@ -941,12 +1121,17 @@ function renderSkillsList() {
             e.target.disabled = false;
         });
     });
+
+    // Add event listeners for description expand/collapse
+    listEl.querySelectorAll('[data-action="toggle-desc"]').forEach(el => {
+        el.addEventListener('click', () => el.classList.toggle('collapsed'));
+    });
 }
 
 async function toggleSkill(skillName, enabled) {
     try {
         const action = enabled ? 'enable' : 'disable';
-        const res = await fetch(`/api/v1/skill-settings/${encodeURIComponent(skillName)}/${action}`, {
+        const res = await authFetch(`/api/v1/skill-settings/${encodeURIComponent(skillName)}/${action}`, {
             method: 'POST'
         });
         if (!res.ok) throw new Error('Failed to update skill');
@@ -1046,7 +1231,7 @@ async function validateTelegramBot() {
         if (!res.ok || !result.success) {
             botInfoEl.style.display = 'block';
             botInfoEl.className = 'bot-info-card channel-validation-status error';
-            botInfoEl.innerHTML = `<span>Validation failed: ${result.message || 'Invalid token'}</span>`;
+            botInfoEl.innerHTML = `<span>Validation failed: ${escapeHtml(result.message || 'Invalid token')}</span>`;
             return;
         }
 
@@ -1056,7 +1241,7 @@ async function validateTelegramBot() {
             <div class="bot-name">${escapeHtml(result.botInfo.firstName)}</div>
             <div class="bot-username">@${escapeHtml(result.botInfo.username || 'N/A')}</div>
             <div class="bot-details">
-                Bot ID: ${result.botInfo.id}<br>
+                Bot ID: ${escapeHtml(String(result.botInfo.id))}<br>
                 Can join groups: ${result.botInfo.canJoinGroups ? 'Yes' : 'No'}
             </div>
         `;
@@ -1064,7 +1249,7 @@ async function validateTelegramBot() {
         console.error('Telegram validation error:', e);
         botInfoEl.style.display = 'block';
         botInfoEl.className = 'bot-info-card channel-validation-status error';
-        botInfoEl.innerHTML = `<span>Validation failed: ${e.message}</span>`;
+        botInfoEl.innerHTML = `<span>Validation failed: ${escapeHtml(e.message)}</span>`;
     } finally {
         validateBtn.disabled = false;
         validateBtn.textContent = 'Validate';
@@ -1132,7 +1317,7 @@ function initTelegramChannel() {
 // App Config Functions
 async function loadAppConfigs() {
     try {
-        const res = await authFetch('/api/v1/app-config');
+        const res = await authFetch('/api/v1/user-config');
         if (res.ok) {
             appConfigs = await res.json();
         }
@@ -1256,7 +1441,7 @@ async function addAppConfig() {
 
 async function saveAppConfig(key, value, isSecret) {
     try {
-        const res = await authFetch(`/api/v1/app-config/${encodeURIComponent(key)}`, {
+        const res = await authFetch(`/api/v1/user-config/${encodeURIComponent(key)}`, {
             method: 'PUT',
             body: JSON.stringify({ value, isSecret })
         });
@@ -1277,7 +1462,7 @@ async function saveAppConfig(key, value, isSecret) {
 
 async function deleteAppConfig(key) {
     try {
-        const res = await authFetch(`/api/v1/app-config/${encodeURIComponent(key)}`, {
+        const res = await authFetch(`/api/v1/user-config/${encodeURIComponent(key)}`, {
             method: 'DELETE'
         });
 
@@ -1305,6 +1490,184 @@ function initConfigManagement() {
     const handleEnter = (e) => {
         if (e.key === 'Enter') {
             addAppConfig();
+        }
+    };
+
+    if (keyInput) keyInput.addEventListener('keydown', handleEnter);
+    if (valueInput) valueInput.addEventListener('keydown', handleEnter);
+}
+
+// User Preferences Functions
+let userPreferences = [];
+
+async function loadUserPreferences() {
+    try {
+        const res = await authFetch('/api/v1/user-preference');
+        if (res.ok) {
+            userPreferences = await res.json();
+        }
+    } catch (e) {
+        console.error('Failed to load user preferences:', e);
+        userPreferences = [];
+    }
+    return userPreferences;
+}
+
+function renderPreferenceList() {
+    const listEl = document.getElementById('preference-list');
+
+    if (userPreferences.length === 0) {
+        listEl.innerHTML = `
+            <div class="config-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                <p>No preferences set</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">Add preferences like ado.assignedTo, user.language, etc.</p>
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = userPreferences.map(p => `
+        <div class="config-item" data-key="${escapeHtml(p.key)}">
+            <div class="config-item-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+            </div>
+            <div class="config-item-info">
+                <span class="config-item-key">${escapeHtml(p.key)}</span>
+                <span class="config-item-value">${escapeHtml(p.value || '(empty)')}</span>
+            </div>
+            <div class="config-item-actions">
+                <button class="config-item-btn edit" data-key="${escapeHtml(p.key)}" title="Edit">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
+                <button class="config-item-btn delete" data-key="${escapeHtml(p.key)}" title="Delete">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add event listeners for edit buttons
+    listEl.querySelectorAll('.config-item-btn.edit').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.key;
+            openEditPreferenceModal(key);
+        });
+    });
+
+    // Add event listeners for delete buttons
+    listEl.querySelectorAll('.config-item-btn.delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.key;
+            if (confirm(`Delete preference "${key}"?`)) {
+                await deleteUserPreference(key);
+                await loadUserPreferences();
+                renderPreferenceList();
+            }
+        });
+    });
+}
+
+function openEditPreferenceModal(key) {
+    const pref = userPreferences.find(p => p.key === key);
+    const currentValue = pref ? pref.value : '';
+    const newValue = prompt(`Set new value for "${key}":`, currentValue);
+    if (newValue !== null) {
+        saveUserPreference(key, newValue);
+    }
+}
+
+async function addUserPreference() {
+    const keyInput = document.getElementById('pref-new-key');
+    const valueInput = document.getElementById('pref-new-value');
+
+    const key = keyInput.value.trim().toLowerCase();
+    const value = valueInput.value;
+
+    if (!key) {
+        alert('Please enter a key');
+        return;
+    }
+
+    try {
+        await saveUserPreference(key, value);
+
+        // Clear form
+        keyInput.value = '';
+        valueInput.value = '';
+
+        await loadUserPreferences();
+        renderPreferenceList();
+    } catch (e) {
+        console.error('Failed to add preference:', e);
+        alert('Failed to add preference');
+    }
+}
+
+async function saveUserPreference(key, value) {
+    try {
+        const res = await authFetch(`/api/v1/user-preference/${encodeURIComponent(key)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ value })
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to save preference');
+        }
+
+        await loadUserPreferences();
+        renderPreferenceList();
+        return true;
+    } catch (e) {
+        console.error('Failed to save preference:', e);
+        alert('Failed to save preference');
+        return false;
+    }
+}
+
+async function deleteUserPreference(key) {
+    try {
+        const res = await authFetch(`/api/v1/user-preference/${encodeURIComponent(key)}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to delete preference');
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to delete preference:', e);
+        alert('Failed to delete preference');
+        return false;
+    }
+}
+
+function initPreferenceManagement() {
+    const addBtn = document.getElementById('add-pref-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', addUserPreference);
+    }
+
+    // Allow Enter key to add preference
+    const keyInput = document.getElementById('pref-new-key');
+    const valueInput = document.getElementById('pref-new-value');
+
+    const handleEnter = (e) => {
+        if (e.key === 'Enter') {
+            addUserPreference();
         }
     };
 
@@ -1510,7 +1873,7 @@ async function validateModel() {
 
     try {
         // Validate through backend API to avoid CORS issues
-        const res = await authFetch('/api/v1/model-provider/validate', {
+        const res = await authFetch('/api/v1/user-model-provider/validate', {
             method: 'POST',
             body: JSON.stringify({
                 type: type,
@@ -1567,17 +1930,17 @@ async function saveModelProvider() {
     try {
         let res;
         if (isEditMode) {
-            // Update existing provider
-            res = await authFetch(`/api/v1/model-provider/${providerId}`, {
+            // Update existing user provider
+            res = await authFetch(`/api/v1/user-model-provider/${providerId}`, {
                 method: 'PUT',
                 body: JSON.stringify(provider)
             });
             if (!res.ok) throw new Error('Failed to update provider');
         } else {
-            // Create new provider
+            // Create new custom user provider
             const isFirstProvider = modelProviders.length === 0;
-            provider.isActive = isFirstProvider;
-            res = await authFetch('/api/v1/model-provider', {
+            provider.isDefault = isFirstProvider;
+            res = await authFetch('/api/v1/user-model-provider', {
                 method: 'POST',
                 body: JSON.stringify(provider)
             });
@@ -1632,14 +1995,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('provider-type').addEventListener('change', updateProviderTypeUI);
     }
 
-    // Initialize model providers from backend
-    loadModelProviders();
+    // Note: Model providers are loaded when settings modal opens (openSettingsModal)
+    // Don't load them here to avoid triggering auth before checkSetupStatus
 
-    // Initialize Telegram channel
+    // Initialize Telegram channel event handlers (not data)
     initTelegramChannel();
 
     // Initialize Config Management
     initConfigManagement();
+
+    // Initialize Preference Management
+    initPreferenceManagement();
 });
 
 // ==================== Image Upload Functions ====================
@@ -1746,9 +2112,13 @@ function renderImagePreviews() {
     previewArea.innerHTML = pendingImages.map((img, index) => `
         <div class="image-preview-item" data-index="${index}">
             <img src="${img.previewUrl}" alt="Preview ${index + 1}">
-            <button class="remove-btn" onclick="removeImage(${index})">&times;</button>
+            <button class="remove-btn" data-action="remove-image" data-index="${index}">&times;</button>
         </div>
     `).join('');
+
+    previewArea.querySelectorAll('[data-action="remove-image"]').forEach(btn => {
+        btn.addEventListener('click', () => removeImage(parseInt(btn.dataset.index)));
+    });
 }
 
 function removeImage(index) {
@@ -1759,4 +2129,301 @@ function removeImage(index) {
 function clearImages() {
     pendingImages = [];
     renderImagePreviews();
+}
+
+// ==================== Pipeline Approval ====================
+
+function handleApprovalRequired(executionId, approvalRequest) {
+    if (!approvalRequest) return;
+
+    // Create approval UI using the shared ApprovalUI component
+    const approvalEl = ApprovalUI.createInlineApproval(
+        executionId,
+        approvalRequest,
+        async (execId) => {
+            await submitApprovalDecision(execId, true);
+        },
+        async (execId) => {
+            await submitApprovalDecision(execId, false);
+        }
+    );
+
+    // Wrap in a message container
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message assistant';
+    messageDiv.appendChild(approvalEl);
+
+    messagesEl.appendChild(messageDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function submitApprovalDecision(executionId, approved) {
+    const action = approved ? 'approve' : 'reject';
+
+    try {
+        const response = await authFetch(`/api/v1/pipeline/executions/${executionId}/${action}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to ${action} execution`);
+        }
+
+        // Update the UI to show the decision
+        ApprovalUI.markDecision(executionId, approved);
+
+        // Add a follow-up message
+        addMessage(approved ? 'Approved. Continuing execution...' : 'Rejected. Execution cancelled.', 'assistant');
+
+        // Refresh executions list
+        await loadExecutions();
+
+    } catch (error) {
+        console.error('Approval error:', error);
+        addMessage(`Error: Failed to submit approval - ${error.message}`, 'assistant');
+    }
+}
+
+// ==================== Toast Notifications ====================
+
+const ToastManager = {
+    show(type, title, message, options = {}) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+
+        const iconHtml = this.getIcon(type);
+        const duration = options.duration || 5000;
+        const actions = options.actions || [];
+
+        let actionsHtml = '';
+        if (actions.length > 0) {
+            actionsHtml = '<div class="toast-actions">' +
+                actions.map((action, i) =>
+                    `<button class="toast-btn ${action.type || ''}" data-action="${i}">${action.label}</button>`
+                ).join('') +
+                '</div>';
+        }
+
+        toast.innerHTML = `
+            <div class="toast-icon ${type}">${iconHtml}</div>
+            <div class="toast-content">
+                <div class="toast-title">${escapeHtml(title)}</div>
+                <div class="toast-message">${escapeHtml(message)}</div>
+                ${actionsHtml}
+            </div>
+            <button class="toast-close">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        `;
+
+        container.appendChild(toast);
+
+        // Bind action handlers
+        actions.forEach((action, i) => {
+            const btn = toast.querySelector(`[data-action="${i}"]`);
+            if (btn && action.onClick) {
+                btn.addEventListener('click', () => {
+                    action.onClick();
+                    this.dismiss(toast);
+                });
+            }
+        });
+
+        // Bind close button
+        toast.querySelector('.toast-close').addEventListener('click', () => {
+            this.dismiss(toast);
+        });
+
+        // Auto-dismiss (unless has actions)
+        if (actions.length === 0 && duration > 0) {
+            setTimeout(() => this.dismiss(toast), duration);
+        }
+
+        return toast;
+    },
+
+    dismiss(toast) {
+        toast.classList.add('toast-exit');
+        setTimeout(() => toast.remove(), 200);
+    },
+
+    getIcon(type) {
+        switch (type) {
+            case 'success':
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+            case 'error':
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
+            case 'warning':
+            case 'approval':
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+            case 'info':
+            default:
+                return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+        }
+    }
+};
+
+// ==================== Cron Job Drawer ====================
+
+let cronJobs = [];
+
+function initCronJobDrawer() {
+    const drawer = document.getElementById('cronjob-drawer');
+    const toggleBtn = document.getElementById('cronjob-toggle-btn');
+    const closeBtn = document.getElementById('drawer-close-btn');
+
+    toggleBtn.addEventListener('click', () => {
+        openCronJobDrawer();
+    });
+
+    closeBtn.addEventListener('click', () => {
+        closeCronJobDrawer();
+    });
+
+    // Close on escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && drawer.classList.contains('open')) {
+            closeCronJobDrawer();
+        }
+    });
+}
+
+async function openCronJobDrawer() {
+    const drawer = document.getElementById('cronjob-drawer');
+    const toggleBtn = document.getElementById('cronjob-toggle-btn');
+
+    drawer.classList.add('open');
+    toggleBtn.classList.add('hidden');
+
+    // Load cron jobs when drawer opens
+    await loadCronJobs();
+}
+
+function closeCronJobDrawer() {
+    const drawer = document.getElementById('cronjob-drawer');
+    const toggleBtn = document.getElementById('cronjob-toggle-btn');
+
+    drawer.classList.remove('open');
+    toggleBtn.classList.remove('hidden');
+}
+
+async function loadCronJobs() {
+    const listEl = document.getElementById('cronjobDrawerList');
+    listEl.innerHTML = '<p class="setting-hint" style="text-align: center; padding: 20px;">Loading...</p>';
+
+    try {
+        const res = await authFetch('/api/v1/cron-job');
+        if (res.ok) {
+            const data = await res.json();
+            cronJobs = data.jobs || data || [];
+            renderCronJobDrawerList(cronJobs);
+        }
+    } catch (e) {
+        console.error('Failed to load cron jobs:', e);
+        listEl.innerHTML = '<p class="setting-hint" style="text-align: center; padding: 20px;">Failed to load cron jobs</p>';
+    }
+}
+
+function renderCronJobDrawerList(jobs) {
+    const listEl = document.getElementById('cronjobDrawerList');
+
+    if (!jobs || jobs.length === 0) {
+        listEl.innerHTML = '<p class="setting-hint" style="text-align: center; padding: 20px;">No cron jobs available</p>';
+        return;
+    }
+
+    listEl.innerHTML = jobs.map(job => {
+        const isEnabled = job.enabled !== false;
+        const statusClass = isEnabled ? 'active' : 'inactive';
+        const statusLabel = isEnabled ? 'Active' : 'Inactive';
+        const schedule = job.cronExpression || job.schedule || 'No schedule';
+
+        return `
+            <div class="cronjob-card" data-id="${escapeHtml(job.id || job.name)}">
+                <div class="cronjob-card-header">
+                    <div class="cronjob-card-title">
+                        <span class="cronjob-status-dot ${statusClass}"></span>
+                        <span class="cronjob-card-name">${escapeHtml(job.displayName || job.name)}</span>
+                    </div>
+                    <span class="cronjob-card-status ${statusClass}">${statusLabel}</span>
+                </div>
+                <div class="cronjob-card-schedule">${escapeHtml(schedule)}</div>
+                <div class="cronjob-card-actions">
+                    <button class="cronjob-run-btn" data-id="${escapeHtml(job.id || job.name)}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        Run
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Bind click on card to open editor
+    listEl.querySelectorAll('.cronjob-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            // Don't navigate if clicking the Run button
+            if (e.target.closest('.cronjob-run-btn')) return;
+            const jobId = card.dataset.id;
+            window.open(`/cronjobs/index.html?id=${encodeURIComponent(jobId)}`, '_blank');
+        });
+    });
+
+    // Bind run buttons
+    listEl.querySelectorAll('.cronjob-run-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const jobId = btn.dataset.id;
+            await executeCronJob(jobId, btn);
+        });
+    });
+}
+
+async function executeCronJob(jobId, btn) {
+    btn.disabled = true;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="status-dot"></span> Running...';
+
+    try {
+        const res = await authFetch(`/api/v1/cron-job/${encodeURIComponent(jobId)}/execute`, {
+            method: 'POST'
+        });
+
+        if (!res.ok) {
+            throw new Error('Failed to execute cron job');
+        }
+
+        ToastManager.show('success', 'Job Triggered', `${jobId} execution started`, { duration: 3000 });
+    } catch (e) {
+        console.error('Failed to execute cron job:', e);
+        ToastManager.show('error', 'Execution Failed', e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+// Initialize cron job drawer on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    initCronJobDrawer();
+});
+
+// Show admin-only navigation items based on user role
+function initAdminNavItems() {
+    const user = getCurrentUser();
+    if (!user || !user.roles) return;
+
+    const isAdmin = user.roles.some(role =>
+        role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin'
+    );
+
+    if (isAdmin) {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = '';
+        });
+    }
 }

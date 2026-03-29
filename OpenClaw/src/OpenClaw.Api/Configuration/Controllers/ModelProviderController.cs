@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 using OpenClaw.Contracts.Configuration.Dtos;
@@ -11,11 +12,16 @@ using OpenClaw.Domain.Configuration.Entities;
 using OpenClaw.Domain.Configuration.Repositories;
 
 using Weda.Core.Application.Interfaces;
+using Weda.Core.Application.Security.Models;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Configuration.Controllers;
 
+/// <summary>
+/// Admin-only management of global model providers.
+/// </summary>
 [ApiVersion("1.0")]
+[Authorize(Policy = Policy.SuperAdminOnly)]
 public class ModelProviderController(
     IModelProviderRepository repository,
     IEncryptionService encryption,
@@ -26,15 +32,7 @@ public class ModelProviderController(
     public async Task<IActionResult> ListProviders(CancellationToken ct)
     {
         var providers = await repository.GetAllAsync(ct);
-        var result = providers.Select(p => new ModelProviderDto(
-            p.Id,
-            p.Type,
-            p.Name,
-            p.Url,
-            p.ModelName,
-            Masking(p.EncryptedApiKey),
-            p.IsActive,
-            p.CreatedAt));
+        var result = providers.Select(MapToDto);
 
         return Ok(result);
     }
@@ -45,15 +43,7 @@ public class ModelProviderController(
         var provider = await repository.GetByIdAsync(id, ct);
         return provider is null
             ? NotFound()
-            : Ok(new ModelProviderDto(
-            provider.Id,
-            provider.Type,
-            provider.Name,
-            provider.Url,
-            provider.ModelName,
-            Masking(provider.EncryptedApiKey),
-            provider.IsActive,
-            provider.CreatedAt));
+            : Ok(MapToDto(provider));
     }
 
     [HttpPost]
@@ -66,6 +56,8 @@ public class ModelProviderController(
             request.Url,
             request.ModelName,
             encryptedKey,
+            request.Description,
+            request.AllowUserOverride,
             request.IsActive);
 
         await repository.AddAsync(provider, ct);
@@ -84,7 +76,8 @@ public class ModelProviderController(
             ? null
             : encryption.Encrypt(request.ApiKey);
 
-        provider.Update(request.Name, request.Url, request.ModelName, encryptedKey);
+        provider.Update(request.Name, request.Url, request.ModelName, encryptedKey,
+            request.Description, request.AllowUserOverride);
         await uow.SaveChangesAsync(ct);
 
         return NoContent();
@@ -115,6 +108,18 @@ public class ModelProviderController(
             deactivatedProvider.Deactivate();
         }
         provider.Activate();
+        await uow.SaveChangesAsync(ct);
+
+        return Ok();
+    }
+
+    [HttpPost("{id:guid}/deactivate")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
+    {
+        var provider = await repository.GetByIdAsync(id, ct);
+        if (provider is null) return NotFound();
+
+        provider.Deactivate();
         await uow.SaveChangesAsync(ct);
 
         return Ok();
@@ -211,6 +216,18 @@ public class ModelProviderController(
             return BadRequest(new { success = false, message = $"Validation failed: {ex.Message}" });
         }
     }
+
+    private static ModelProviderDto MapToDto(ModelProvider p) => new(
+        p.Id,
+        p.Type,
+        p.Name,
+        p.Url,
+        p.ModelName,
+        Masking(p.EncryptedApiKey),
+        p.Description,
+        p.AllowUserOverride,
+        p.IsActive,
+        p.CreatedAt);
 
     private static string? Masking(string? encryptedApiKey)
     {

@@ -10,6 +10,7 @@ public interface IAgentPipeline
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
+        Guid? userId = null,
         CancellationToken ct = default);
 
     IAsyncEnumerable<AgentStreamEvent> ExecuteStreamAsync(
@@ -17,5 +18,6 @@ public interface IAgentPipeline
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
+        Guid? userId = null,
         CancellationToken ct = default);
 }

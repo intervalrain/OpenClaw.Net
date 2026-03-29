@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Settings - OpenClaw</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <!-- Top header will be injected by top-header.js -->
+
+    <div class="container">
+        <div class="page-header">
+            <div class="page-title">
+                <h1>Application Settings</h1>
+                <p class="subtitle">Manage users, model providers, and system configuration</p>
+            </div>
+        </div>
+
+        <main class="main-content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-tab="pending">
+                    Pending Approval
+                    <span class="badge" id="pendingCount">0</span>
+                </button>
+                <button class="tab" data-tab="all">All Users</button>
+                <button class="tab" data-tab="providers">Model Providers</button>
+                <button class="tab" data-tab="appconfig">App Config</button>
+            </div>
+
+            <!-- Pending Users Tab -->
+            <section class="tab-content active" id="pendingTab">
+                <div class="user-list" id="pendingUserList">
+                    <div class="loading">Loading pending users...</div>
+                </div>
+            </section>
+
+            <!-- All Users Tab -->
+            <section class="tab-content" id="allTab">
+                <div class="filters">
+                    <select id="statusFilter">
+                        <option value="">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Locked">Locked</option>
+                    </select>
+                </div>
+                <div class="user-list" id="allUserList">
+                    <div class="loading">Loading users...</div>
+                </div>
+            </section>
+            <!-- App Config Tab -->
+            <section class="tab-content" id="appconfigTab">
+                <p class="text-muted" style="margin-bottom: 1rem;">
+                    Global application configuration. These values are shared across all users and take precedence over environment variables.
+                </p>
+                <div class="config-add-row">
+                    <input type="text" id="admin-config-key" placeholder="KEY" class="config-input-key">
+                    <input type="password" id="admin-config-value" placeholder="Value (encrypted)" class="config-input-value">
+                    <button class="btn btn-primary btn-sm" id="admin-add-config-btn" title="Add">+</button>
+                </div>
+                <div class="user-list" id="appConfigList">
+                    <div class="loading">Loading configuration...</div>
+                </div>
+            </section>
+
+            <!-- Model Providers Tab -->
+            <section class="tab-content" id="providersTab">
+                <div class="provider-toolbar">
+                    <button class="btn btn-primary" id="addProviderBtn">+ Add Global Provider</button>
+                </div>
+                <div class="user-list" id="providerList">
+                    <div class="loading">Loading model providers...</div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Add/Edit Provider Modal -->
+        <div class="modal" id="providerModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="providerModalTitle">Add Global Model Provider</h2>
+                    <button class="close-btn" id="closeProviderModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editProviderId" value="">
+                    <div class="user-detail">
+                        <label>Provider Type</label>
+                        <select id="adminProviderType">
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="custom">Custom OpenAI-Compatible</option>
+                        </select>
+                    </div>
+                    <div class="user-detail">
+                        <label>Display Name</label>
+                        <input type="text" id="adminProviderName" placeholder="e.g., Company Ollama Server">
+                    </div>
+                    <div class="user-detail" id="adminUrlGroup">
+                        <label>API URL</label>
+                        <input type="text" id="adminProviderUrl" placeholder="http://localhost:11434">
+                    </div>
+                    <div class="user-detail" id="adminApiKeyGroup" style="display:none;">
+                        <label>API Key</label>
+                        <input type="password" id="adminProviderApiKey" placeholder="sk-...">
+                    </div>
+                    <div class="user-detail">
+                        <label>Model Name</label>
+                        <input type="text" id="adminProviderModel" placeholder="qwen2.5:7b">
+                    </div>
+                    <div class="user-detail">
+                        <label>Description (shown to users)</label>
+                        <input type="text" id="adminProviderDesc" placeholder="e.g., Shared GPT-4o for the team">
+                    </div>
+                    <div class="user-detail">
+                        <label class="role-checkbox" id="adminAllowOverrideLabel">
+                            <input type="checkbox" id="adminAllowOverride" checked>
+                            Allow users to use their own API key
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelProviderModal">Cancel</button>
+                    <button class="btn btn-primary" id="saveProviderBtn">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>&copy; 2026 OpenClaw. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- User Details Modal -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">User Details</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- User details will be loaded here -->
+            </div>
+            <div class="modal-footer" id="modalFooter">
+                <!-- Action buttons will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h2>Delete User</h2>
+                <button class="close-btn" id="closeDeleteModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete "<span id="deleteUserName"></span>"?</p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelDelete">Cancel</button>
+                <button class="btn btn-danger" id="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Text;
+
+using Microsoft.Extensions.DependencyInjection;
+
+using OpenClaw.Contracts.Configuration;
+using OpenClaw.Contracts.Skills;
+
+namespace OpenClaw.Tools.GitHub.GitHubCommand;
+
+/// <summary>
+/// GitHub operations via gh CLI: issues, PRs, CI runs, code review, API queries.
+/// Requires: gh CLI installed and authenticated (via GH_TOKEN config or gh auth login)
+/// </summary>
+public class GitHubSkill(IServiceProvider serviceProvider) : AgentToolBase<GitHubSkillArgs>
+{
+    public override string Name => "github";
+    public override string Description => """
+        GitHub operations via gh CLI. Use when: checking PR/CI status, creating/listing issues or PRs,
+        viewing workflow runs, or querying GitHub API. Requires gh CLI with GH_TOKEN or gh auth.
+        """;
+
+    // Allowed gh subcommands
+    private static readonly HashSet<string> AllowedSubcommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "pr", "issue", "run", "api", "repo", "release", "gist",
+        "project", "codespace", "search", "status", "auth"
+    };
+
+    // Blocked shell injection patterns
+    private static readonly string[] BlockedPatterns =
+    [
+        "&&", "||", ";", "|", "`", "$(", "<(", ">(", "&>", "<<<", ">|",
+        "> ", ">> ", "< ", "<< ", "\n", "\r"
+    ];
+
+    public override async Task<ToolResult> ExecuteAsync(GitHubSkillArgs args, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(args.Command))
+        {
+            return ToolResult.Failure("Command is required. Example: 'pr list --repo owner/repo'");
+        }
+
+        // Check if gh is available
+        var ghPath = await FindGhPathAsync(ct);
+        if (ghPath == null)
+        {
+            return ToolResult.Failure("gh CLI is not installed. Please install it: https://cli.github.com/");
+        }
+
+        // Build the full command
+        var ghCommand = args.Command.Trim();
+
+        // Remove 'gh ' prefix if present
+        if (ghCommand.StartsWith("gh ", StringComparison.OrdinalIgnoreCase))
+        {
+            ghCommand = ghCommand[3..].Trim();
+        }
+
+        // Validate subcommand against whitelist
+        var subcommand = ghCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        if (subcommand is null || !AllowedSubcommands.Contains(subcommand))
+        {
+            return ToolResult.Failure($"gh subcommand '{subcommand}' is not allowed. Allowed: {string.Join(", ", AllowedSubcommands.Order())}");
+        }
+
+        // Block shell injection patterns
+        var blockedPattern = BlockedPatterns.FirstOrDefault(p => ghCommand.Contains(p));
+        if (blockedPattern is not null)
+        {
+            return ToolResult.Failure($"Command contains blocked pattern: '{blockedPattern}'");
+        }
+
+        ghCommand = $"gh {ghCommand}";
+
+        try
+        {
+            // Get config store from scoped service provider to access DB configs
+            using var scope = serviceProvider.CreateScope();
+            var configStore = scope.ServiceProvider.GetRequiredService<IConfigStore>();
+            var ghToken = configStore.Get(ConfigKeys.GitHubToken);
+
+            var result = await ExecuteGhCommandAsync(ghCommand, args.WorkingDirectory, ghToken, ct);
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            return ToolResult.Failure("Command timed out.");
+        }
+        catch (Exception ex)
+        {
+            return ToolResult.Failure($"Command failed: {ex.Message}");
+        }
+    }
+
+    private static async Task<string?> FindGhPathAsync(CancellationToken ct)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = OperatingSystem.IsWindows() ? "where" : "which",
+                Arguments = "gh",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return null;
+
+            var output = await process.StandardOutput.ReadToEndAsync(ct);
+            await process.WaitForExitAsync(ct);
+
+            return process.ExitCode == 0 ? output.Trim().Split('\n')[0] : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static async Task<ToolResult> ExecuteGhCommandAsync(
+        string command,
+        string? workingDirectory,
+        string? ghToken,
+        CancellationToken ct)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = OperatingSystem.IsWindows() ? "cmd" : "/bin/sh",
+            Arguments = OperatingSystem.IsWindows() ? $"/c {command}" : $"-c \"{command.Replace("\"", "\\\"")}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+
+        if (!string.IsNullOrWhiteSpace(workingDirectory) && Directory.Exists(workingDirectory))
+        {
+            psi.WorkingDirectory = workingDirectory;
+        }
+
+        // Set GH_TOKEN from config if available
+        if (!string.IsNullOrWhiteSpace(ghToken))
+        {
+            psi.Environment["GH_TOKEN"] = ghToken;
+        }
+
+        using var process = new Process { StartInfo = psi };
+        var outputBuilder = new StringBuilder();
+        var errorBuilder = new StringBuilder();
+
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data != null) outputBuilder.AppendLine(e.Data);
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data != null) errorBuilder.AppendLine(e.Data);
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(60)); // 60 second timeout
+
+        try
+        {
+            await process.WaitForExitAsync(timeoutCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            return ToolResult.Failure("Command timed out after 60 seconds.");
+        }
+
+        var output = outputBuilder.ToString().Trim();
+        var error = errorBuilder.ToString().Trim();
+
+        if (process.ExitCode != 0)
+        {
+            var errorMessage = !string.IsNullOrEmpty(error) ? error : output;
+
+            // Check for auth errors
+            if (errorMessage.Contains("gh auth login") || errorMessage.Contains("not logged"))
+            {
+                return ToolResult.Failure(
+                    "GitHub CLI is not authenticated. Set GH_TOKEN environment variable or run 'gh auth login'.");
+            }
+
+            return ToolResult.Failure($"Exit code {process.ExitCode}: {errorMessage}");
+        }
+
+        // Truncate if too long
+        const int maxLength = 50000;
+        if (output.Length > maxLength)
+        {
+            output = output[..maxLength] + $"\n... (truncated, total {output.Length} chars)";
+        }
+
+        return ToolResult.Success(string.IsNullOrEmpty(output) ? "(no output)" : output);
+    }
+}
+
+public record GitHubSkillArgs(
+    [property: Description("""
+        The gh CLI command to execute (without 'gh' prefix).
+        Examples:
+        - 'pr list --repo owner/repo'
+        - 'issue create --title "Bug" --body "Description"'
+        - 'pr checks 55 --repo owner/repo'
+        - 'run list --repo owner/repo --limit 5'
+        - 'api repos/owner/repo/pulls/55 --jq ".title"'
+        """)]
+    string? Command,
+
+    [property: Description("Optional working directory for the command (useful when --repo is not specified)")]
+    string? WorkingDirectory
+);

@@ -1,11 +1,12 @@
 using ErrorOr;
 
 using OpenClaw.Domain.Users.Entities;
-
+using OpenClaw.Domain.Users.Enums;
 using OpenClaw.Domain.Users.Repositories;
 
 using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security;
+using Weda.Core.Application.Security.Models;
 
 namespace OpenClaw.Contracts.Setup.Commands;
 
@@ -16,7 +17,7 @@ public record InitializeSystemResult(string Message);
 public class InitializeSystemCommandHandler(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
-    IUnitOfWork uow) 
+    IUnitOfWork uow)
     : Mediator.IRequestHandler<InitializeSystemCommand, ErrorOr<InitializeSystemResult>>
 {
     public async ValueTask<ErrorOr<InitializeSystemResult>> Handle(InitializeSystemCommand request, CancellationToken ct)
@@ -25,10 +26,14 @@ public class InitializeSystemCommandHandler(
 
         if (hasUser) return Error.Conflict("Setup.AlreadyInitialized", "System already initialized");
 
+        // First user is automatically SuperAdmin with Active status
         var userResult = User.Create(
             email: request.Email,
             passwordHash: passwordHasher.HashPassword(request.Password),
-            name: request.Name ?? "Admin");
+            name: request.Name ?? "Admin",
+            roles: [Role.SuperAdmin, Role.Admin, Role.User],
+            permissions: null,
+            status: UserStatus.Active);
 
         if (userResult.IsError)
         {
@@ -38,6 +43,6 @@ public class InitializeSystemCommandHandler(
         await userRepository.AddAsync(userResult.Value, ct);
         await uow.SaveChangesAsync(ct);
 
-        return new InitializeSystemResult("User created successfully");
+        return new InitializeSystemResult("SuperAdmin user created successfully");
     }
 }

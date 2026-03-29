@@ -7,17 +7,24 @@ using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Repositories;
 
 using Weda.Core.Application.Interfaces;
+using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Chat.Controllers;
 
 [ApiVersion("1.0")]
-public class ConversationController(IConversationRepository repository, IUnitOfWork uow) : ApiController
+public class ConversationController(
+    IConversationRepository repository,
+    ICurrentUserProvider currentUserProvider,
+    IUnitOfWork uow) : ApiController
 {
+    private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
+
     [HttpGet]
     public async Task<IActionResult> GetListAsync(CancellationToken ct)
     {
-        var conversations = await repository.GetAllAsync(ct);
+        var userId = GetUserId();
+        var conversations = await repository.GetAllByUserAsync(userId, ct);
         return Ok(conversations.Select(c => new
         {
             c.Id,
@@ -31,7 +38,7 @@ public class ConversationController(IConversationRepository repository, IUnitOfW
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
-        var conversation = await repository.GetByIdAsync(id, ct);
+        var conversation = await repository.GetByIdAndUserAsync(id, GetUserId(), ct);
         if (conversation is null) return NotFound();
         return Ok(conversation);
     }
@@ -39,7 +46,8 @@ public class ConversationController(IConversationRepository repository, IUnitOfW
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateConversationRequest? request, CancellationToken ct)
     {
-        var conversation = Conversation.Create(request?.Title);
+        var userId = GetUserId();
+        var conversation = Conversation.Create(userId, request?.Title);
         await repository.AddAsync(conversation);
         await uow.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(GetById), new { id = conversation.Id }, new { conversation.Id, conversation.Title });
@@ -48,7 +56,7 @@ public class ConversationController(IConversationRepository repository, IUnitOfW
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateTitle(Guid id, [FromBody] UpdateTitleRequest request, CancellationToken ct)
     {
-        var conversation = await repository.GetByIdAsync(id, ct);
+        var conversation = await repository.GetByIdAndUserAsync(id, GetUserId(), ct);
         if (conversation is null) return NotFound();
 
         conversation.UpdateTitle(request.Title);
@@ -60,7 +68,7 @@ public class ConversationController(IConversationRepository repository, IUnitOfW
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var conversation = await repository.GetByIdAsync(id, ct);
+        var conversation = await repository.GetByIdAndUserAsync(id, GetUserId(), ct);
         if (conversation is null) return NotFound();
         await repository.DeleteAsync(conversation, ct);
         await uow.SaveChangesAsync(ct);

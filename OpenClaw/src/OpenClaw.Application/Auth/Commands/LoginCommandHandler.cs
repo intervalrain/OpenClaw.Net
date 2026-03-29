@@ -31,6 +31,11 @@ public class LoginCommandHandler(
             return UserErrors.InvalidCredentials;
         }
 
+        if (user.Status == Domain.Users.Enums.UserStatus.Pending)
+        {
+            return UserErrors.AccountPendingApproval;
+        }
+
         if (user.Status != Domain.Users.Enums.UserStatus.Active)
         {
             return UserErrors.AccountNotActive;

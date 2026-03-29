@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Security;
 using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
@@ -24,7 +25,6 @@ using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
 using OpenClaw.Infrastructure.Skills.Persistence;
-using OpenClaw.Contracts.Configuration;
 using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure;
@@ -76,9 +76,11 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IModelProviderRepository, ModelProviderRepository>();
+        services.AddScoped<IUserModelProviderRepository, UserModelProviderRepository>();
         services.AddScoped<IChannelSettingsRepository, ChannelSettingsRepository>();
         services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
         services.AddScoped<IAppConfigRepository, AppConfigRepository>();
+        services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
 
         // configuration (chain: Database -> Environment)
         // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)
@@ -91,6 +93,16 @@ public static class WedaTemplateInfrastructureModule
             var uow = sp.GetRequiredService<IUnitOfWork>();
 
             return new DatabaseConfigStore(repository, encryption, uow, fallback: envStore);
+        });
+
+        // user configuration (per-user, encrypted)
+        services.AddScoped<IUserConfigRepository, UserConfigRepository>();
+        services.AddScoped<IUserConfigStore>(sp =>
+        {
+            var repository = sp.GetRequiredService<IUserConfigRepository>();
+            var encryption = sp.GetRequiredService<IEncryptionService>();
+            var uow = sp.GetRequiredService<IUnitOfWork>();
+            return new DatabaseUserConfigStore(repository, encryption, uow);
         });
 
         // security
@@ -118,7 +130,22 @@ public static class WedaTemplateInfrastructureModule
 
     private static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.Section));
+        var jwtSection = configuration.GetSection(JwtSettings.Section);
+        var secret = jwtSection["Secret"];
+
+        // Validate JWT secret at startup — reject placeholder or weak secrets
+        if (string.IsNullOrWhiteSpace(secret)
+            || secret.StartsWith("${")
+            || secret.Contains("super-secret")
+            || secret.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "JWT secret is not configured or is too weak. " +
+                "Set a cryptographically strong secret (>=32 chars) via environment variable 'JwtSettings__Secret' " +
+                "or the JwtSettings:Secret configuration path.");
+        }
+
+        services.Configure<JwtSettings>(jwtSection);
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 
         services

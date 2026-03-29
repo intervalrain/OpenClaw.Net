@@ -6,4 +6,6 @@ public record CreateModelProviderRequest(
     string Url,
     string ModelName,
     string? ApiKey,
+    string? Description = null,
+    bool AllowUserOverride = true,
     bool IsActive = false);

@@ -31,8 +31,8 @@ public class TelegramMessageService(
     TelegramConversationMapper mapper,
     IConversationRepository repository,
     ISlashCommandParser parser,
-    ISkillRegistry registry,
-    ISkillSettingsService settings,
+    IToolRegistry registry,
+    IToolSettingsService settings,
     IOptions<TelegramBotOptions> options,
     IUnitOfWork uow) : ITelegramMessageService
 {
@@ -162,7 +162,7 @@ public class TelegramMessageService(
             }
 
             var args = parser.ConvertToJson(command, skill);
-            var context = new SkillContext(args);
+            var context = new ToolContext(args);
             var result = await skill.ExecuteAsync(context, cancellationToken);
 
             var toolCallId = Guid.NewGuid().ToString();

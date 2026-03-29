@@ -17,6 +17,10 @@ public class ChannelSettingsConfiguration : IEntityTypeConfiguration<ChannelSett
             .HasColumnName("id")
             .ValueGeneratedNever();
 
+        builder.Property(x => x.UserId)
+            .HasColumnName("user_id")
+            .IsRequired();
+
         builder.Property(x => x.ChannelType)
             .HasColumnName("channel_type")
             .HasMaxLength(50)
@@ -49,8 +53,8 @@ public class ChannelSettingsConfiguration : IEntityTypeConfiguration<ChannelSett
         builder.Property(x => x.UpdatedAt)
             .HasColumnName("updated_at");
 
-        builder.HasIndex(x => x.ChannelType)
+        builder.HasIndex(x => new { x.UserId, x.ChannelType })
             .IsUnique()
-            .HasDatabaseName("ix_channel_settings_channel_type");
+            .HasDatabaseName("ix_channel_settings_user_id_channel_type");
     }
 }

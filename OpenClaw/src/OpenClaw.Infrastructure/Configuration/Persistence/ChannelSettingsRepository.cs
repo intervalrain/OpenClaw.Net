@@ -17,4 +17,17 @@ public class ChannelSettingsRepository(AppDbContext context)
         return await DbContext.Set<ChannelSettings>()
             .FirstOrDefaultAsync(x => x.ChannelType == channelType, cancellationToken);
     }
+
+    public async Task<ChannelSettings?> GetByUserAndChannelTypeAsync(Guid userId, string channelType, CancellationToken cancellationToken = default)
+    {
+        return await DbContext.Set<ChannelSettings>()
+            .FirstOrDefaultAsync(x => x.UserId == userId && x.ChannelType == channelType, cancellationToken);
+    }
+
+    public async Task<List<ChannelSettings>> GetAllEnabledByChannelTypeAsync(string channelType, CancellationToken cancellationToken = default)
+    {
+        return await DbContext.Set<ChannelSettings>()
+            .Where(x => x.ChannelType == channelType && x.Enabled)
+            .ToListAsync(cancellationToken);
+    }
 }

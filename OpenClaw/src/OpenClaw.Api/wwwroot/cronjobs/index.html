@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cron Jobs - OpenClaw.NET</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="cronjobs.css">
+</head>
+<body>
+    <!-- Top header injected by top-header.js -->
+
+    <div class="cronjobs-container">
+        <!-- Left Sidebar: Job List -->
+        <aside class="jobs-sidebar">
+            <div class="sidebar-header">
+                <h3>Cron Jobs</h3>
+                <button class="btn-icon" id="newJobBtn" title="New Job">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="jobs-list" id="jobsList">
+                <!-- Rendered by JS -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="jobs-main">
+            <!-- Empty state when no job selected -->
+            <div class="empty-state" id="emptyState">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 16px; opacity: 0.4;">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <h3>Select or create a cron job</h3>
+                <p>Choose a job from the sidebar or click + to create a new one.</p>
+            </div>
+
+            <!-- Job Editor (hidden until job selected) -->
+            <div class="job-editor hidden" id="jobEditor">
+                <div class="editor-columns">
+                    <!-- Left: Job Configuration -->
+                    <section class="job-config-section">
+                    <h4>Job Configuration</h4>
+
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label>Name</label>
+                            <input type="text" id="jobName" placeholder="My Cron Job">
+                        </div>
+                        <div class="form-group">
+                            <label>Wake Mode</label>
+                            <select id="jobWakeMode">
+                                <option value="Both">Both</option>
+                                <option value="Scheduled">Scheduled Only</option>
+                                <option value="Manual">Manual Only</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Schedule -->
+                    <div class="form-group">
+                        <label>Schedule</label>
+                        <div class="schedule-config" id="scheduleConfig">
+                            <div class="form-row">
+                                <select id="schedFrequency">
+                                    <option value="Daily">Daily</option>
+                                    <option value="Weekly">Weekly</option>
+                                    <option value="Monthly">Monthly</option>
+                                </select>
+                                <input type="time" id="schedTime" value="09:00">
+                                <select id="schedTimezone">
+                                    <option value="UTC">UTC</option>
+                                    <option value="Asia/Taipei">Asia/Taipei</option>
+                                    <option value="America/New_York">America/New_York</option>
+                                    <option value="America/Chicago">America/Chicago</option>
+                                    <option value="America/Los_Angeles">America/Los_Angeles</option>
+                                    <option value="Europe/London">Europe/London</option>
+                                    <option value="Europe/Berlin">Europe/Berlin</option>
+                                    <option value="Asia/Tokyo">Asia/Tokyo</option>
+                                    <option value="Asia/Shanghai">Asia/Shanghai</option>
+                                </select>
+                            </div>
+                            <!-- Weekly day selector -->
+                            <div class="form-row weekly-days hidden" id="weeklyDays">
+                                <label class="day-checkbox"><input type="checkbox" value="0"><span>Sun</span></label>
+                                <label class="day-checkbox"><input type="checkbox" value="1" checked><span>Mon</span></label>
+                                <label class="day-checkbox"><input type="checkbox" value="2" checked><span>Tue</span></label>
+                                <label class="day-checkbox"><input type="checkbox" value="3" checked><span>Wed</span></label>
+                                <label class="day-checkbox"><input type="checkbox" value="4" checked><span>Thu</span></label>
+                                <label class="day-checkbox"><input type="checkbox" value="5" checked><span>Fri</span></label>
+                                <label class="day-checkbox"><input type="checkbox" value="6"><span>Sat</span></label>
+                            </div>
+                            <!-- Monthly day selector -->
+                            <div class="form-row monthly-day hidden" id="monthlyDay">
+                                <label>Day of month</label>
+                                <input type="number" id="schedDayOfMonth" min="1" max="31" value="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Context: @skill mentions -->
+                    <div class="form-group">
+                        <label>Context <span class="hint">Use @skill-name to load skills</span></label>
+                        <div class="textarea-wrapper">
+                            <textarea id="jobContext" rows="2" placeholder="@daily-ado-report"></textarea>
+                            <div class="autocomplete-dropdown hidden" id="contextAutocomplete"></div>
+                        </div>
+                    </div>
+
+                    <!-- Content: prompt with #tool references -->
+                    <div class="form-group">
+                        <label>Content <span class="hint">Use #tool-name to reference tool instances</span></label>
+                        <div class="textarea-wrapper">
+                            <textarea id="jobContent" rows="6" placeholder="Query my work items using #sync-tasks and generate a daily report..."></textarea>
+                            <div class="autocomplete-dropdown hidden" id="contentAutocomplete"></div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="editor-actions">
+                        <button class="btn btn-secondary" id="deleteJobBtn">Delete</button>
+                        <div class="actions-right">
+                            <button class="btn btn-secondary" id="runJobBtn">Run Now</button>
+                            <button class="btn btn-primary" id="saveJobBtn">Save</button>
+                        </div>
+                    </div>
+
+                    <!-- Recent Executions -->
+                    <div class="executions-section">
+                        <h4>Recent Executions</h4>
+                        <div id="executionsList" class="executions-list"></div>
+                    </div>
+                </section>
+
+                    <!-- Right: Tool Instances -->
+                    <aside class="tool-instances-section">
+                        <div class="section-header">
+                            <h4>Tool Instances</h4>
+                            <button class="btn btn-sm btn-outline" id="newToolInstanceBtn">+ New Tool</button>
+                        </div>
+                        <div class="tool-instances-list" id="toolInstancesList"></div>
+
+                        <div class="tool-instance-editor hidden" id="toolInstanceEditor">
+                            <input type="hidden" id="tiId" value="">
+                            <div class="form-group">
+                                <label>Name</label>
+                                <input type="text" id="tiName" placeholder="e.g. sync-tasks">
+                            </div>
+                            <div class="form-group">
+                                <label>Tool</label>
+                                <select id="tiToolSelect">
+                                    <option value="">Select tool...</option>
+                                </select>
+                            </div>
+                            <div class="tool-args" id="tiArgs"></div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <input type="text" id="tiDescription" placeholder="Optional description">
+                            </div>
+                            <div class="editor-actions">
+                                <button class="btn btn-secondary btn-sm" id="cancelTiBtn">Cancel</button>
+                                <button class="btn btn-primary btn-sm" id="saveTiBtn">Save</button>
+                            </div>
+                        </div>
+                    </aside>
+                </div><!-- .editor-columns -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="cronjobs.js"></script>
+</body>
+</html>

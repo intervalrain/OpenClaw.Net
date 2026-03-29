@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
@@ -8,11 +9,12 @@ namespace OpenClaw.Application.Agents;
 
 public class AgentPipeline(
     ILlmProviderFactory llmProviderFactory,
-    IEnumerable<IAgentSkill> skills,
+    IEnumerable<IAgentTool> skills,
     AgentPipelineOptions options,
+    ISkillStore? skillStore = null,
     IReadOnlyList<IAgentMiddleware>? middlewares = null) : IAgentPipeline
 {
-    private readonly Dictionary<string, IAgentSkill> _skillMap = skills.ToDictionary(s => s.Name);
+    private readonly Dictionary<string, IAgentTool> _skillMap = skills.ToDictionary(s => s.Name);
     private readonly IReadOnlyList<IAgentMiddleware> _middlewares = middlewares ?? [];
 
     public async Task<string> ExecuteAsync(
@@ -20,13 +22,16 @@ public class AgentPipeline(
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
+        Guid? userId = null,
         CancellationToken ct = default)
     {
         var context = new AgentContext
         {
             UserInput = userInput,
             Images = images,
-            LlmProvider = await llmProviderFactory.GetProviderAsync(ct),
+            LlmProvider = userId.HasValue
+                ? await llmProviderFactory.GetProviderAsync(userId.Value, ct: ct)
+                : await llmProviderFactory.GetProviderAsync(ct),
             Skills = _skillMap.Values.ToList(),
             Options = options
         };
@@ -54,6 +59,7 @@ public class AgentPipeline(
         IReadOnlyList<ChatMessage>? history = null,
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
+        Guid? userId = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
@@ -71,14 +77,33 @@ public class AgentPipeline(
             messages.AddRange(history);
         }
 
+        // Detect @skill mentions and augment system prompt + available tools
+        var (processedInput, skillPrompt, extraTools) = ResolveSkillMentions(userInput);
+
+        if (!string.IsNullOrEmpty(skillPrompt))
+        {
+            messages.Add(new ChatMessage(ChatRole.System, skillPrompt));
+        }
+
         // Add user message with images if present
-        messages.Add(new ChatMessage(ChatRole.User, userInput, Images: images));
+        messages.Add(new ChatMessage(ChatRole.User, processedInput, Images: images));
 
         var toolDefinitions = _skillMap.Values
             .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
             .ToList();
 
-        var llmProvider = await llmProviderFactory.GetProviderAsync(ct);
+        // Add skill-specific tools that aren't already in the tool list
+        foreach (var extraTool in extraTools)
+        {
+            if (!toolDefinitions.Any(t => t.Name == extraTool.Name))
+            {
+                toolDefinitions.Add(extraTool);
+            }
+        }
+
+        var llmProvider = userId.HasValue
+            ? await llmProviderFactory.GetProviderAsync(userId.Value, ct: ct)
+            : await llmProviderFactory.GetProviderAsync(ct);
 
         for (int i = 0; i < options.MaxIterations; i++)
         {
@@ -124,6 +149,63 @@ public class AgentPipeline(
         }
 
         yield return new AgentStreamEvent(AgentStreamEventType.Error, "Max iteration reached");
+    }
+
+    /// <summary>
+    /// Detects @skill-name mentions in user input.
+    /// Returns: (cleaned input, skill system prompt, extra tool definitions)
+    /// </summary>
+    private (string input, string? skillPrompt, List<ToolDefinition> extraTools) ResolveSkillMentions(string userInput)
+    {
+        if (skillStore is null)
+        {
+            System.Console.WriteLine("[ResolveSkillMentions] skillStore is NULL");
+            return (userInput, null, []);
+        }
+
+        System.Console.WriteLine($"[ResolveSkillMentions] Available skills: {string.Join(", ", skillStore.GetAllSkills().Select(s => s.Name))}");
+
+        var matches = Regex.Matches(userInput, @"@([\w-]+)");
+        if (matches.Count == 0) return (userInput, null, []);
+
+        var skillParts = new List<string>();
+        var extraTools = new List<ToolDefinition>();
+
+        foreach (Match match in matches)
+        {
+            var skillName = match.Groups[1].Value;
+            var skill = skillStore.GetSkill(skillName);
+            if (skill is null)
+            {
+                System.Console.WriteLine($"[ResolveSkillMentions] Skill '{skillName}' not found");
+                continue;
+            }
+            System.Console.WriteLine($"[ResolveSkillMentions] Loaded skill '{skillName}' with {skill.Tools.Count} tools");
+
+            // Resolve {SKILL_DIR} in instructions
+            var instructions = skill.Instructions;
+            if (skill is SkillDefinition sd && sd.DirectoryPath is not null)
+            {
+                instructions = instructions.Replace("{SKILL_DIR}", sd.DirectoryPath);
+            }
+
+            skillParts.Add($"## Skill: {skill.Name}\n{instructions}");
+
+            // Add the skill's tools to available tools
+            foreach (var toolName in skill.Tools)
+            {
+                if (_skillMap.TryGetValue(toolName, out var tool))
+                {
+                    extraTools.Add(new ToolDefinition(tool.Name, tool.Description, tool.Parameters));
+                }
+            }
+        }
+
+        var skillPrompt = skillParts.Count > 0
+            ? "The user has requested the following skill(s). Follow their instructions carefully.\n\n" + string.Join("\n\n", skillParts)
+            : null;
+
+        return (userInput, skillPrompt, extraTools);
     }
 
     private string BuildSystemPrompt(string? language)
@@ -208,7 +290,7 @@ public class AgentPipeline(
             return $"Error: skill '{toolCall.Name}' not found.";
         }
 
-        var skillContext = new SkillContext(toolCall.Arguments);
+        var skillContext = new ToolContext(toolCall.Arguments);
         var result = await skill.ExecuteAsync(skillContext, ct);
         return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";
     }

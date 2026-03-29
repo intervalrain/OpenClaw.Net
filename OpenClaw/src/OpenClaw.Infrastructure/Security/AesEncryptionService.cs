@@ -1,17 +1,21 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using Microsoft.Extensions.Logging;
+
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Security;
 using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure.Security;
 
-public class AesEncryptionService : IEncryptionService
+public class AesEncryptionService(ILogger<AesEncryptionService> logger) : IEncryptionService
 {
-    private readonly byte[] _key = InitializeKey();
+    private byte[]? _key;
 
-    private static byte[] InitializeKey()
+    private byte[] Key => _key ??= InitializeKey();
+
+    private byte[] InitializeKey()
     {
         // Read directly from environment (encryption key should not be in DB)
         var envStore = new EnvironmentConfigStore();
@@ -19,7 +23,19 @@ public class AesEncryptionService : IEncryptionService
 
         if (string.IsNullOrEmpty(keyString))
         {
-            keyString = GenerateAndPersistKey();
+            // In development, auto-generate for convenience
+            var isDev = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+            if (isDev)
+            {
+                keyString = GenerateAndPersistKey();
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Encryption key is not configured. Set the '{ConfigKeys.EncryptionKey}' environment variable " +
+                    "with a Base64-encoded 32-byte key. Generate one with: " +
+                    "dotnet run -e \"Console.WriteLine(Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)))\"");
+            }
         }
 
         var key = Convert.FromBase64String(keyString);
@@ -32,12 +48,12 @@ public class AesEncryptionService : IEncryptionService
         return key;
     }
 
-    private static string GenerateAndPersistKey()
+    private string GenerateAndPersistKey()
     {
         var newKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
         ConfigLoader.AppendToEnvFile(ConfigKeys.EncryptionKey, newKey);
-        Console.WriteLine($"[AesEncryptionService] Generated new encryption key and saved to .env");
+        logger.LogWarning("Auto-generated encryption key (development only). For production, pre-generate and set via environment variable.");
 
         // Set for current process
         Environment.SetEnvironmentVariable(ConfigKeys.EncryptionKey, newKey);
@@ -51,7 +67,7 @@ public class AesEncryptionService : IEncryptionService
             return string.Empty;
 
         using var aes = Aes.Create();
-        aes.Key = _key;
+        aes.Key = Key;
         aes.GenerateIV();
 
         using var encryptor = aes.CreateEncryptor();
@@ -73,7 +89,7 @@ public class AesEncryptionService : IEncryptionService
         var fullCipher = Convert.FromBase64String(ciphertext);
 
         using var aes = Aes.Create();
-        aes.Key = _key;
+        aes.Key = Key;
 
         var iv = new byte[16];
         Buffer.BlockCopy(fullCipher, 0, iv, 0, iv.Length);
@@ -84,7 +100,7 @@ public class AesEncryptionService : IEncryptionService
 
         using var decryptor = aes.CreateDecryptor();
         var plaintextBytes = decryptor.TransformFinalBlock(ciphertextBytes, 0, ciphertextBytes.Length);
-        
+
         return Encoding.UTF8.GetString(plaintextBytes);
     }
 }

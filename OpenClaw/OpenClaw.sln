@@ -29,39 +29,39 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Api.IntegrationTes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Weda.Core", "src\Weda.Core\Weda.Core.csproj", "{7C60408B-3E3A-4027-9D02-1C876E16789E}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{07C2787E-EAC7-C090-1BA3-A61EC2A24D84}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WikiGenerator", "tools\WikiGenerator\WikiGenerator.csproj", "{A46624B2-EBEA-4F7B-95C3-8D8F5236BCB8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Infrastructure.Llm.Ollama", "src\OpenClaw.Infrastructure.Llm.Ollama\OpenClaw.Infrastructure.Llm.Ollama.csproj", "{3718D4E2-7591-4CB4-BA0E-D8D39B92B96B}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "skills", "skills", "{B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.FileSystem", "skills\OpenClaw.Skills.FileSystem\OpenClaw.Skills.FileSystem.csproj", "{9713C48F-F9F6-418D-A8E7-105F379DBF02}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.FileSystem", "src\tools\OpenClaw.Tools.FileSystem\OpenClaw.Tools.FileSystem.csproj", "{9713C48F-F9F6-418D-A8E7-105F379DBF02}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.Shell", "skills\OpenClaw.Skills.Shell\OpenClaw.Skills.Shell.csproj", "{76862BF6-FD39-43DD-9797-4AE8E2FD15F3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Shell", "src\tools\OpenClaw.Tools.Shell\OpenClaw.Tools.Shell.csproj", "{76862BF6-FD39-43DD-9797-4AE8E2FD15F3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.Http", "skills\OpenClaw.Skills.Http\OpenClaw.Skills.Http.csproj", "{1ABEBD8B-1524-441D-BEF4-81CBBB9BD7F0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Http", "src\tools\OpenClaw.Tools.Http\OpenClaw.Tools.Http.csproj", "{1ABEBD8B-1524-441D-BEF4-81CBBB9BD7F0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Infrastructure.Llm.OpenAI", "src\OpenClaw.Infrastructure.Llm.OpenAI\OpenClaw.Infrastructure.Llm.OpenAI.csproj", "{D431A4C6-95A9-461C-AC44-19C11FC4DBBD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Hosting", "src\OpenClaw.Hosting\OpenClaw.Hosting.csproj", "{72F53581-29F5-4B21-89E3-827A817DB2C5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.WebSearch", "skills\OpenClaw.Skills.WebSearch\OpenClaw.Skills.WebSearch.csproj", "{7122BA3A-293C-471A-8667-5E74C0FD584A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.WebSearch", "src\tools\OpenClaw.Tools.WebSearch\OpenClaw.Tools.WebSearch.csproj", "{7122BA3A-293C-471A-8667-5E74C0FD584A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.GitHub", "skills\OpenClaw.Skills.GitHub\OpenClaw.Skills.GitHub.csproj", "{2C46E906-C50E-44F6-A5BE-36A31142B0DD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.GitHub", "src\tools\OpenClaw.Tools.GitHub\OpenClaw.Tools.GitHub.csproj", "{2C46E906-C50E-44F6-A5BE-36A31142B0DD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Channels.Telegram", "src\OpenClaw.Channels.Telegram\OpenClaw.Channels.Telegram.csproj", "{DCA1ED65-59DD-4022-B509-B21B4F4460F2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.Git", "skills\OpenClaw.Skills.Git\OpenClaw.Skills.Git.csproj", "{779CBCB0-E3E6-46B4-B520-38FA51DCB0CD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Git", "src\tools\OpenClaw.Tools.Git\OpenClaw.Tools.Git.csproj", "{779CBCB0-E3E6-46B4-B520-38FA51DCB0CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.AzureDevOps", "skills\OpenClaw.Skills.AzureDevOps\OpenClaw.Skills.AzureDevOps.csproj", "{A9785161-6767-46B3-8CDD-2B7575D0E20D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.AzureDevOps", "src\tools\OpenClaw.Tools.AzureDevOps\OpenClaw.Tools.AzureDevOps.csproj", "{A9785161-6767-46B3-8CDD-2B7575D0E20D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.ImageGen", "skills\OpenClaw.Skills.ImageGen\OpenClaw.Skills.ImageGen.csproj", "{B85CD691-CBE2-440E-A1CE-C83A4D5E9B0D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.ImageGen", "src\tools\OpenClaw.Tools.ImageGen\OpenClaw.Tools.ImageGen.csproj", "{B85CD691-CBE2-440E-A1CE-C83A4D5E9B0D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.Pdf", "skills\OpenClaw.Skills.Pdf\OpenClaw.Skills.Pdf.csproj", "{D37E083D-F698-43EB-8630-F8248CCC5A96}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Pdf", "src\tools\OpenClaw.Tools.Pdf\OpenClaw.Tools.Pdf.csproj", "{D37E083D-F698-43EB-8630-F8248CCC5A96}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Skills.Tmux", "skills\OpenClaw.Skills.Tmux\OpenClaw.Skills.Tmux.csproj", "{6175CA82-8DFC-4061-8FC3-6768242AAB21}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Tmux", "src\tools\OpenClaw.Tools.Tmux\OpenClaw.Tools.Tmux.csproj", "{6175CA82-8DFC-4061-8FC3-6768242AAB21}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Notion", "src\tools\OpenClaw.Tools.Notion\OpenClaw.Tools.Notion.csproj", "{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -385,6 +385,18 @@ Global
 		{6175CA82-8DFC-4061-8FC3-6768242AAB21}.Release|x64.Build.0 = Release|Any CPU
 		{6175CA82-8DFC-4061-8FC3-6768242AAB21}.Release|x86.ActiveCfg = Release|Any CPU
 		{6175CA82-8DFC-4061-8FC3-6768242AAB21}.Release|x86.Build.0 = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x64.Build.0 = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Debug|x86.Build.0 = Debug|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x64.ActiveCfg = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x64.Build.0 = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x86.ActiveCfg = Release|Any CPU
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -401,7 +413,7 @@ Global
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890} = {1DD25606-DF8E-4B91-9335-F916B14BF596}
 		{2A315D67-B631-478A-8F67-9EE9DB03D0C5} = {1DD25606-DF8E-4B91-9335-F916B14BF596}
 		{7C60408B-3E3A-4027-9D02-1C876E16789E} = {E6C0A80B-5ADC-4138-A79D-C9C128EA163B}
-		{A46624B2-EBEA-4F7B-95C3-8D8F5236BCB8} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
+		{A46624B2-EBEA-4F7B-95C3-8D8F5236BCB8} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{3718D4E2-7591-4CB4-BA0E-D8D39B92B96B} = {E6C0A80B-5ADC-4138-A79D-C9C128EA163B}
 		{9713C48F-F9F6-418D-A8E7-105F379DBF02} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{76862BF6-FD39-43DD-9797-4AE8E2FD15F3} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
@@ -416,5 +428,6 @@ Global
 		{B85CD691-CBE2-440E-A1CE-C83A4D5E9B0D} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{D37E083D-F698-43EB-8630-F8248CCC5A96} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{6175CA82-8DFC-4061-8FC3-6768242AAB21} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
+		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 	EndGlobalSection
 EndGlobal

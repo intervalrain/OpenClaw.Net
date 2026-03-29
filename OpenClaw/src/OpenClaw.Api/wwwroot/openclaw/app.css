@@ -64,7 +64,7 @@ body {
     flex-direction: column;
     border-right: 1px solid var(--border-subtle);
     transition: width 0.2s ease, padding 0.2s ease, background 0.2s;
-    height: 100vh;
+    height: calc(100vh - 48px);
     overflow: hidden;
 }
 
@@ -369,6 +369,101 @@ body {
     visibility: visible;
 }
 
+/* Top Header Navigation - Always dark for consistent branding */
+.top-header {
+    background: #1a1a2e;
+    border-bottom: 1px solid #333;
+    padding: 0 16px;
+    flex-shrink: 0;
+}
+
+.top-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 48px;
+}
+
+.top-nav .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #a0a0a0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.top-nav .nav-link:hover {
+    background: #2a2a3e;
+    color: #fff;
+}
+
+.top-nav .nav-link.active {
+    background: #2a2a3e;
+    color: #fff;
+}
+
+.top-nav .nav-link svg {
+    flex-shrink: 0;
+}
+
+.top-nav .home-link {
+    padding: 8px 10px;
+}
+
+.top-nav .nav-spacer {
+    flex: 1;
+}
+
+.top-nav .nav-user-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.top-nav .user-name {
+    color: #a0a0a0;
+    font-size: 0.875rem;
+}
+
+.top-nav .logout-link {
+    color: #888;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.top-nav .logout-link:hover {
+    color: #e74c3c;
+}
+
+.top-nav .theme-toggle {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    color: #a0a0a0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.top-nav .theme-toggle:hover {
+    background: #2a2a3e;
+    color: #fff;
+}
+
+.top-nav .theme-toggle .icon-sun,
+.top-nav .theme-toggle .icon-moon {
+    width: 18px;
+    height: 18px;
+}
+
 /* Content */
 .content {
     flex: 1;
@@ -376,7 +471,7 @@ body {
     flex-direction: column;
     background: var(--bg-primary);
     transition: background 0.2s;
-    height: 100vh;
+    height: calc(100vh - 48px);
     overflow: hidden;
 }
 
@@ -697,6 +792,15 @@ body {
     background: var(--bg-tertiary);
     color: var(--text-muted);
     cursor: not-allowed;
+}
+
+#send-btn.stop-mode {
+    background: #dc3545;
+    color: #fff;
+}
+
+#send-btn.stop-mode:hover {
+    background: #c82333;
 }
 
 /* Autocomplete Dropdown */
@@ -1063,6 +1167,50 @@ body {
     padding: 12px;
 }
 
+.section-divider {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.provider-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.provider-badge.global {
+    background: var(--accent);
+    color: #fff;
+}
+
+.provider-badge.custom {
+    background: var(--bg-primary);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+}
+
+.model-item-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-style: italic;
+}
+
+.model-item-btn.add-global {
+    color: var(--accent);
+}
+
+.model-item-btn.add-global:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
 /* Add Model Modal specific */
 .setting-group input[type="text"],
 .setting-group input[type="password"] {
@@ -1173,6 +1321,11 @@ body {
 .skill-item-description {
     font-size: 0.8rem;
     color: var(--text-muted);
+    white-space: pre-wrap;
+    cursor: pointer;
+}
+
+.skill-item-description.collapsed {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1402,6 +1555,19 @@ body {
     padding: 16px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+}
+
+.channel-header:hover {
+    background: var(--bg-tertiary);
+}
+
+.channel-card.collapsed .channel-body {
+    display: none;
+}
+
+.channel-card.collapsed .channel-header {
+    border-bottom: none;
 }
 
 .channel-info {
@@ -1687,6 +1853,16 @@ body {
     color: var(--text-muted);
 }
 
+.config-item-value {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
 .config-item-actions {
     display: flex;
     gap: 4px;
@@ -1742,5 +1918,412 @@ body {
 
     .config-value-input {
         flex: 1 1 auto;
+    }
+}
+
+/* ==================== Toast Notifications ==================== */
+.toast-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    max-width: 360px;
+    min-width: 280px;
+    pointer-events: auto;
+    animation: toastSlideIn 0.3s ease-out;
+}
+
+.toast.toast-exit {
+    animation: toastSlideOut 0.2s ease-in forwards;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toastSlideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.toast-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}
+
+.toast-icon.success {
+    color: #22c55e;
+}
+
+.toast-icon.error {
+    color: #ef4444;
+}
+
+.toast-icon.warning {
+    color: #f59e0b;
+}
+
+.toast-icon.info {
+    color: #3b82f6;
+}
+
+.toast-icon.approval {
+    color: #f59e0b;
+}
+
+.toast-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.toast-title {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.toast-message {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.toast-close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+}
+
+.toast-close:hover {
+    color: var(--text-primary);
+}
+
+.toast-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.toast-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+
+.toast-btn.approve {
+    background: #22c55e;
+    color: white;
+}
+
+.toast-btn.approve:hover {
+    background: #16a34a;
+}
+
+.toast-btn.reject {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.toast-btn.reject:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* ==================== Cron Job Drawer ==================== */
+.cronjob-drawer {
+    position: fixed;
+    top: 0;
+    right: -360px;
+    width: 360px;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    z-index: 1500;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s ease;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.cronjob-drawer.open {
+    right: 0;
+}
+
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.drawer-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.drawer-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.drawer-close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.cronjob-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cronjob-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 12px;
+    transition: border-color 0.15s;
+    cursor: pointer;
+}
+
+.cronjob-card:hover {
+    border-color: var(--border-color);
+}
+
+.cronjob-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.cronjob-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cronjob-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cronjob-status-dot.active {
+    background: #22c55e;
+}
+
+.cronjob-status-dot.inactive {
+    background: var(--text-muted);
+}
+
+.cronjob-card-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.cronjob-card-status {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.cronjob-card-status.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.cronjob-card-status.inactive {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.cronjob-card-schedule {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    line-height: 1.4;
+    font-family: monospace;
+}
+
+.cronjob-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.cronjob-run-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--accent);
+    color: var(--bg-secondary);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: opacity 0.15s;
+}
+
+.cronjob-run-btn:hover {
+    opacity: 0.9;
+}
+
+.cronjob-run-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cronjob-run-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Drawer Footer */
+.drawer-footer {
+    border-top: 1px solid var(--border-subtle);
+    padding: 12px 16px;
+}
+
+.drawer-footer-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.drawer-footer-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Cron Job Toggle Button */
+.cronjob-toggle-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    background: var(--accent);
+    color: var(--bg-secondary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: transform 0.15s, opacity 0.15s;
+    z-index: 1400;
+}
+
+.cronjob-toggle-btn:hover {
+    transform: scale(1.05);
+}
+
+.cronjob-toggle-btn.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Drawer overlay for mobile */
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1400;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.drawer-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Responsive Drawer */
+@media (max-width: 600px) {
+    .cronjob-drawer {
+        width: 100%;
+        right: -100%;
+    }
+
+    .cronjob-toggle-btn {
+        bottom: 16px;
+        right: 16px;
     }
 }

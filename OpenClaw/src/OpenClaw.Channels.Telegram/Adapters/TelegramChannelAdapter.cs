@@ -9,6 +9,7 @@ using OpenClaw.Contracts.Security;
 using OpenClaw.Domain.Configuration.Repositories;
 
 using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -25,6 +26,9 @@ public class TelegramChannelAdapter(
 {
     private TelegramBotClient? _client;
     private TelegramBotOptions? _options;
+    private CancellationTokenSource? _pollingCts;
+    private int _conflictCount;
+    private const int MaxConflictRetries = 3;
 
     public string Name => "telegram";
     public string DisplayName => "Telegram Bot";
@@ -107,24 +111,41 @@ public class TelegramChannelAdapter(
             var repository = scope.ServiceProvider.GetRequiredService<IChannelSettingsRepository>();
             var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
 
-            var settings = await repository.GetByChannelTypeAsync("telegram", ct);
+            // Load all enabled Telegram channel settings across users
+            var allSettings = await repository.GetAllEnabledByChannelTypeAsync("telegram", ct);
 
-            if (settings is null || string.IsNullOrEmpty(settings.EncryptedBotToken))
+            if (allSettings.Count == 0)
             {
-                logger.LogInformation("No Telegram settings in database, using appsettings fallback");
+                logger.LogInformation("No enabled Telegram settings in database, using appsettings fallback");
                 return fallbackOptions.Value;
             }
 
-            var botToken = encryption.Decrypt(settings.EncryptedBotToken);
+            // Use the first config that has a bot token for the system bot
+            var primary = allSettings.FirstOrDefault(s => !string.IsNullOrEmpty(s.EncryptedBotToken));
+            if (primary is null)
+            {
+                logger.LogInformation("No Telegram settings with bot token found, using appsettings fallback");
+                return fallbackOptions.Value;
+            }
 
-            logger.LogInformation("Loaded Telegram settings from database");
+            var botToken = encryption.Decrypt(primary.EncryptedBotToken!);
+
+            // Aggregate allowed user IDs from all enabled user configs
+            var allAllowedUserIds = allSettings
+                .SelectMany(s => s.GetAllowedUserIdsList())
+                .Distinct()
+                .ToArray();
+
+            logger.LogInformation("Loaded Telegram settings from database ({Count} user config(s), {AllowedCount} allowed IDs)",
+                allSettings.Count, allAllowedUserIds.Length);
+
             return new TelegramBotOptions
             {
-                Enabled = settings.Enabled,
+                Enabled = true,
                 BotToken = botToken,
-                WebhookUrl = settings.WebhookUrl,
-                SecretToken = settings.SecretToken,
-                AllowedUserIds = settings.GetAllowedUserIdsList().ToArray()
+                WebhookUrl = primary.WebhookUrl,
+                SecretToken = primary.SecretToken,
+                AllowedUserIds = allAllowedUserIds
             };
         }
         catch (Exception ex)
@@ -143,6 +164,9 @@ public class TelegramChannelAdapter(
         await client.DeleteWebhook(cancellationToken: stoppingToken);
         await client.DropPendingUpdates(cancellationToken: stoppingToken);
 
+        // Create a linked token source so we can cancel polling on conflict
+        _pollingCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+
         client.OnError += OnError;
         client.OnMessage += OnMessage;
         client.OnUpdate += OnUpdate;
@@ -152,11 +176,11 @@ public class TelegramChannelAdapter(
         // Keep alive until cancellation
         try
         {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            await Task.Delay(Timeout.Infinite, _pollingCts.Token);
         }
         catch (OperationCanceledException)
         {
-            // Normal shutdown
+            // Normal shutdown or conflict-triggered shutdown
         }
     }
 
@@ -207,6 +231,49 @@ public class TelegramChannelAdapter(
 
     private Task OnError(Exception ex, HandleErrorSource source)
     {
+        // Check for 409 Conflict - another bot instance is running
+        if (ex is ApiRequestException apiEx && apiEx.ErrorCode == 409)
+        {
+            _conflictCount++;
+
+            if (_conflictCount >= MaxConflictRetries)
+            {
+                // Only log and stop once
+                if (Status != ChannelAdapterStatus.Disabled)
+                {
+                    logger.LogWarning(
+                        "Telegram bot conflict detected {Count}/{Max} times (409). " +
+                        "Circuit breaker triggered: This instance will stop polling and yield to the other instance.",
+                        _conflictCount, MaxConflictRetries);
+
+                    Status = ChannelAdapterStatus.Disabled;
+
+                    // Unsubscribe from events to stop polling
+                    if (_client is not null)
+                    {
+                        _client.OnError -= OnError;
+                        _client.OnMessage -= OnMessage;
+                        _client.OnUpdate -= OnUpdate;
+                    }
+
+                    // Cancel the keep-alive task
+                    _pollingCts?.Cancel();
+                }
+            }
+            else
+            {
+                logger.LogWarning(
+                    "Telegram bot conflict detected {Count}/{Max} (409): Another instance may be polling. " +
+                    "Retrying... Will stop after {Max} consecutive conflicts.",
+                    _conflictCount, MaxConflictRetries, MaxConflictRetries);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        // Reset conflict count on other errors (not a persistent conflict)
+        _conflictCount = 0;
+
         logger.LogError(ex, "Telegram bot error from {Source}", source);
         return Task.CompletedTask;
     }

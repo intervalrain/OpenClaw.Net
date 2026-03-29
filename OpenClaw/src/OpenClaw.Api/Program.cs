@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Serilog;
 using Weda.Core;
@@ -13,6 +14,8 @@ using OpenClaw.Infrastructure;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Hosting;
 using OpenClaw.Hosting.Observability;
+using OpenClaw.Api.Security;
+using OpenClaw.Application.CronJobs;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,11 +23,33 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Host.UseSerilog((context, configuration) =>
         configuration.ReadFrom.Configuration(context.Configuration));
 
+    // Security services
+    builder.Services.AddSingleton<LoginRateLimiter>();
+
+    // CORS — restrict to configured origins
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                ?? (builder.Environment.IsDevelopment()
+                    ? ["http://localhost:5000", "https://localhost:5001"]
+                    : []);
+
+            policy.WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        });
+    });
+
     builder.Services
         .AddOpenClaw(builder.Configuration)
         .AddOpenClawTelemetry(builder.Configuration)
         .AddApplication()
         .AddInfrastructure(builder.Configuration)
+        // Background scheduler services
+        .AddHostedService<CronJobSchedulerService>()
         .AddWedaCore<IAssemblyMarker, IContractsMarker, IApplicationMarker>(
             builder.Configuration,
             services => services.AddMediator(options =>
@@ -53,19 +78,27 @@ var builder = WebApplication.CreateBuilder(args);
 
                 nats.AddKeyValueCache();
                 nats.AddObjectStore();
-                nats.Use<AuditLoggingMiddleware>();
+                nats.Use<Weda.Core.Infrastructure.Messaging.Nats.Middleware.AuditLoggingMiddleware>();
             }
         );
 }
 
 var app = builder.Build();
 {
-    // Enable static files for organization chart UI
-    app.UseStaticFiles();
-    app.UseDefaultFiles();
+    // Security headers (CSP, X-Frame-Options, HSTS, etc.)
+    app.UseMiddleware<SecurityHeadersMiddleware>();
 
-    // Ensure database and seed in development
-    if (app.Environment.IsDevelopment())
+    // CORS
+    app.UseCors();
+
+    // Audit logging for security-critical operations
+    app.UseMiddleware<OpenClaw.Api.Security.AuditLoggingMiddleware>();
+
+    // Enable static files (UseDefaultFiles must come before UseStaticFiles)
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+
+    // Auto-migrate database and seed
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -73,20 +106,58 @@ var app = builder.Build();
 
         try
         {
-            // Try EnsureCreated first (idempotent if schema exists)
-            var created = dbContext.Database.EnsureCreated();
-            if (created)
-                logger.LogInformation("Database created");
-            else
-                logger.LogInformation("Database already exists");
+            // Detect legacy databases created with EnsureCreated (no migration history table).
+            // If tables exist but __EFMigrationsHistory doesn't, baseline all existing migrations
+            // so Migrate() won't try to re-create existing schema.
+            var conn = dbContext.Database.GetDbConnection();
+            await conn.OpenAsync();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '__EFMigrationsHistory')";
+                var historyExists = (bool)(await cmd.ExecuteScalarAsync())!;
+
+                if (!historyExists)
+                {
+                    // Check if this is an existing database (has our tables) or a fresh one
+                    cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'Users')";
+                    var isExistingDb = (bool)(await cmd.ExecuteScalarAsync())!;
+
+                    if (isExistingDb)
+                    {
+                        logger.LogInformation("Legacy database detected (created with EnsureCreated). Baselining migration history...");
+                        cmd.CommandText = """
+                            CREATE TABLE "__EFMigrationsHistory" (
+                                "MigrationId" varchar(150) NOT NULL PRIMARY KEY,
+                                "ProductVersion" varchar(32) NOT NULL
+                            );
+                        """;
+                        await cmd.ExecuteNonQueryAsync();
+
+                        // Mark all known migrations as applied
+                        var applied = dbContext.Database.GetMigrations();
+                        foreach (var migration in applied)
+                        {
+                            cmd.CommandText = $"""INSERT INTO "__EFMigrationsHistory" VALUES ('{migration}', '10.0.0')""";
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                        logger.LogInformation("Baselined {Count} migration(s)", applied.Count());
+                    }
+                }
+            }
+
+            var pending = dbContext.Database.GetPendingMigrations().ToList();
+            if (pending.Count > 0)
+            {
+                logger.LogInformation("Applying {Count} pending migration(s): {Migrations}",
+                    pending.Count, string.Join(", ", pending));
+            }
+            dbContext.Database.Migrate();
+            logger.LogInformation("Database migration completed");
         }
         catch (Exception ex)
         {
-            // Schema mismatch or corruption, recreate
-            logger.LogWarning(ex, "Database schema issue, recreating...");
-            dbContext.Database.EnsureDeleted();
-            dbContext.Database.EnsureCreated();
-            logger.LogInformation("Database recreated successfully");
+            logger.LogError(ex, "Database migration failed");
+            throw;
         }
 
         var seeder = scope.ServiceProvider.GetRequiredService<AppDbContextSeeder>();

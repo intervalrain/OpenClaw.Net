@@ -4,23 +4,12 @@
     box-sizing: border-box;
 }
 
-:root {
-    --primary-color: #3498db;
-    --primary-hover: #2980b9;
-    --text-color: #333;
-    --text-muted: #666;
-    --bg-color: #f5f7fa;
-    --card-bg: #fff;
-    --border-color: #e1e5e9;
-    --error-color: #e74c3c;
-    --success-color: #27ae60;
-}
-
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     background: var(--bg-color);
     color: var(--text-color);
     min-height: 100vh;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .container {
@@ -51,6 +40,37 @@ body {
 .logo .subtitle {
     font-size: 0.9rem;
     color: var(--text-muted);
+}
+
+/* Page Header (used when top-header is present) */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    margin-bottom: 20px;
+}
+
+.page-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 4px;
+}
+
+.page-header .subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.page-header .page-title {
+    display: flex;
+    flex-direction: column;
+}
+
+.page-header .page-actions {
+    display: flex;
+    gap: 10px;
 }
 
 .user-area {
@@ -113,7 +133,7 @@ body {
 }
 
 .btn-secondary:hover {
-    background: #f8f9fa;
+    background: var(--bg-tertiary);
 }
 
 .btn-block {
@@ -145,7 +165,7 @@ body {
 
 .card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
     border-color: var(--primary-color);
 }
 
@@ -254,6 +274,7 @@ body {
 
 .modal-header h2 {
     font-size: 1.4rem;
+    color: var(--text-color);
 }
 
 .close-btn {
@@ -279,6 +300,7 @@ body {
     display: block;
     margin-bottom: 8px;
     font-weight: 500;
+    color: var(--text-color);
 }
 
 .form-group input {
@@ -288,6 +310,8 @@ body {
     border-radius: 6px;
     font-size: 1rem;
     transition: border-color 0.2s ease;
+    background: var(--card-bg);
+    color: var(--text-color);
 }
 
 .form-group input:focus {
@@ -300,6 +324,20 @@ body {
     font-size: 0.9rem;
     margin-bottom: 16px;
     min-height: 20px;
+}
+
+/* Loading */
+.loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
 }
 
 /* Responsive */

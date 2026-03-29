@@ -37,7 +37,12 @@ namespace OpenClaw.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Conversations", (string)null);
                 });
@@ -146,6 +151,10 @@ namespace OpenClaw.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.Property<string>("WebhookUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -153,9 +162,9 @@ namespace OpenClaw.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ChannelType")
+                    b.HasIndex("UserId", "ChannelType")
                         .IsUnique()
-                        .HasDatabaseName("ix_channel_settings_channel_type");
+                        .HasDatabaseName("ix_channel_settings_user_id_channel_type");
 
                     b.ToTable("channel_settings", (string)null);
                 });
@@ -166,9 +175,20 @@ namespace OpenClaw.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AllowUserOverride")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("allow_user_override");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
 
                     b.Property<string>("EncryptedApiKey")
                         .HasMaxLength(1000)
@@ -213,6 +233,241 @@ namespace OpenClaw.Infrastructure.Migrations
                         .HasDatabaseName("ix_model_providers_is_active");
 
                     b.ToTable("model_providers", (string)null);
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.Configuration.Entities.UserModelProvider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EncryptedApiKey")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("encrypted_api_key");
+
+                    b.Property<Guid?>("GlobalModelProviderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_model_provider_id");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("model_name");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("url");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GlobalModelProviderId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_model_providers_user_id");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_model_providers_user_id_name");
+
+                    b.ToTable("user_model_providers", (string)null);
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.CronJobs.Entities.CronJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<string>("ContextJson")
+                        .HasColumnType("text")
+                        .HasColumnName("context_json");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime?>("LastScheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_scheduled_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ScheduleJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("schedule_json");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("WakeMode")
+                        .HasColumnType("integer")
+                        .HasColumnName("wake_mode");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_cron_jobs_created_by_user_id");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_cron_jobs_is_active");
+
+                    b.ToTable("cron_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.CronJobs.Entities.CronJobExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("CronJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cron_job_id");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<string>("OutputText")
+                        .HasColumnType("text")
+                        .HasColumnName("output_text");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("ToolCallsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("tool_calls_json");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("integer")
+                        .HasColumnName("trigger");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CronJobId")
+                        .HasDatabaseName("ix_cron_job_executions_cron_job_id");
+
+                    b.ToTable("cron_job_executions", (string)null);
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.CronJobs.Entities.ToolInstance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ArgsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("args_json");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ToolName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("tool_name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_tool_instances_created_by_user_id");
+
+                    b.HasIndex("Name", "CreatedByUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tool_instances_name_user_id");
+
+                    b.ToTable("tool_instances", (string)null);
                 });
 
             modelBuilder.Entity("OpenClaw.Domain.Skills.Entities.SkillSetting", b =>
@@ -275,13 +530,15 @@ namespace OpenClaw.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Active");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("WorkspacePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("_permissions")
                         .IsRequired()
@@ -303,6 +560,87 @@ namespace OpenClaw.Infrastructure.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
+            modelBuilder.Entity("OpenClaw.Domain.Users.Entities.UserConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsSecret")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_secret");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("text")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_configs_user_id_key");
+
+                    b.ToTable("user_configs", (string)null);
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.Users.Entities.UserPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("text")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_preferences_user_id");
+
+                    b.HasIndex("UserId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("uq_user_preferences_user_key");
+
+                    b.ToTable("user_preferences", (string)null);
+                });
+
             modelBuilder.Entity("OpenClaw.Domain.Chat.Entities.ConversationMessage", b =>
                 {
                     b.HasOne("OpenClaw.Domain.Chat.Entities.Conversation", null)
@@ -312,9 +650,33 @@ namespace OpenClaw.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("OpenClaw.Domain.Configuration.Entities.UserModelProvider", b =>
+                {
+                    b.HasOne("OpenClaw.Domain.Configuration.Entities.ModelProvider", null)
+                        .WithMany()
+                        .HasForeignKey("GlobalModelProviderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.CronJobs.Entities.CronJobExecution", b =>
+                {
+                    b.HasOne("OpenClaw.Domain.CronJobs.Entities.CronJob", "CronJob")
+                        .WithMany("Executions")
+                        .HasForeignKey("CronJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CronJob");
+                });
+
             modelBuilder.Entity("OpenClaw.Domain.Chat.Entities.Conversation", b =>
                 {
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("OpenClaw.Domain.CronJobs.Entities.CronJob", b =>
+                {
+                    b.Navigation("Executions");
                 });
 #pragma warning restore 612, 618
         }

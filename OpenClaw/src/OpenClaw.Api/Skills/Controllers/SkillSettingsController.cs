@@ -8,7 +8,7 @@ using Weda.Core.Presentation;
 namespace OpenClaw.Api.Skills.Controllers;
 
 [ApiVersion("1.0")]
-public class SkillSettingsController(ISkillSettingsService skillSettingsService) : ApiController
+public class SkillSettingsController(IToolSettingsService skillSettingsService) : ApiController
 {
     [HttpGet]
     public async Task<IActionResult> GetList(CancellationToken ct)

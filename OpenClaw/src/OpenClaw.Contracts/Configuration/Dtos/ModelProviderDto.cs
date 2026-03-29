@@ -7,5 +7,7 @@ public record ModelProviderDto(
     string Url,
     string ModelName,
     string? ApiKeyMasked,
+    string? Description,
+    bool AllowUserOverride,
     bool IsActive,
     DateTime CreatedAt);

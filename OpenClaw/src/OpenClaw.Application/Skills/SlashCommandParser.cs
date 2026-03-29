@@ -11,7 +11,7 @@ public record SlashCommand(string SkillName, string RawArguments);
 public interface ISlashCommandParser
 {
     bool TryParse(string input, out SlashCommand? command);
-    string ConvertToJson(SlashCommand command, IAgentSkill skill);
+    string ConvertToJson(SlashCommand command, IAgentTool skill);
 }
 
 public partial class SlashCommandParser : ISlashCommandParser
@@ -37,7 +37,7 @@ public partial class SlashCommandParser : ISlashCommandParser
         return true;
     }
 
-    public string ConvertToJson(SlashCommand command, IAgentSkill skill)
+    public string ConvertToJson(SlashCommand command, IAgentTool skill)
     {
         if (string.IsNullOrWhiteSpace(command.RawArguments))
             return "{}";
@@ -46,21 +46,25 @@ public partial class SlashCommandParser : ISlashCommandParser
         if (command.RawArguments.StartsWith('{'))
             return command.RawArguments;
 
-        // Try to parse key:value or key=value pairs
-        var keyValueArgs = ParseKeyValueArguments(command.RawArguments);
+        // Parse the arguments: first non-key=value token is positional, rest are key=value pairs
+        var (positionalArg, keyValueArgs) = ParseArgumentsWithPositional(command.RawArguments);
+
+        // Get first required parameter name from skill for positional argument
+        if (!string.IsNullOrEmpty(positionalArg) && skill.Parameters is ToolParameters toolParams)
+        {
+            // Use first required parameter, or first parameter if no required ones
+            var firstParam = toolParams.Required?.FirstOrDefault()
+                ?? toolParams.Properties?.Keys.FirstOrDefault();
+
+            if (firstParam != null && !keyValueArgs.ContainsKey(firstParam))
+            {
+                keyValueArgs[firstParam] = positionalArg;
+            }
+        }
+
         if (keyValueArgs.Count > 0)
         {
             return JsonSerializer.Serialize(keyValueArgs);
-        }
-
-        // Get first parameter name from skill
-        if (skill.Parameters is ToolParameters toolParams && toolParams.Properties?.Count > 0)
-        {
-            var firstParam = toolParams.Properties.Keys.First();
-            return JsonSerializer.Serialize(new Dictionary<string, string>
-            {
-                [firstParam] = command.RawArguments
-            });
         }
 
         // Fallback: use "input" as default parameter name
@@ -73,18 +77,40 @@ public partial class SlashCommandParser : ISlashCommandParser
     [GeneratedRegex(@"(\w+)\s*[:=]\s*([^\s,]+|""[^""]*""|'[^']*')", RegexOptions.Compiled)]
     private static partial Regex KeyValueRegex();
 
-    private static Dictionary<string, string> ParseKeyValueArguments(string arguments)
+    private static (string? positional, Dictionary<string, string> keyValue) ParseArgumentsWithPositional(string arguments)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var keyValueResult = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var matches = KeyValueRegex().Matches(arguments);
 
+        // Track which parts are key=value pairs
+        var keyValueSpans = new List<(int Start, int End)>();
         foreach (Match match in matches)
         {
             var key = match.Groups[1].Value;
             var value = match.Groups[2].Value.Trim('"', '\'');
-            result[key] = value;
+            keyValueResult[key] = value;
+            keyValueSpans.Add((match.Index, match.Index + match.Length));
         }
 
-        return result;
+        // Find positional argument (text before first key=value, not part of any key=value)
+        string? positional = null;
+        var trimmedArgs = arguments.Trim();
+
+        if (keyValueSpans.Count > 0)
+        {
+            // Get text before first key=value match
+            var firstKeyValueStart = keyValueSpans.Min(s => s.Start);
+            if (firstKeyValueStart > 0)
+            {
+                positional = trimmedArgs[..firstKeyValueStart].Trim();
+            }
+        }
+        else
+        {
+            // No key=value pairs, entire string is positional
+            positional = trimmedArgs;
+        }
+
+        return (positional, keyValueResult);
     }
 }

@@ -5,17 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenClaw.NET</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/top-header.css">
     <link rel="stylesheet" href="/openclaw/app.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
     <!-- Marked.js for Markdown -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js" integrity="sha384-H+hy9ULve6xfxRkWIh/YOtvDdpXgV2fmAGQkIDTxIgZwNoaoBal14Di2YTMR6MzR" crossorigin="anonymous"></script>
+    <!-- DOMPurify for XSS sanitization -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js" integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu" crossorigin="anonymous"></script>
     <!-- KaTeX for LaTeX -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
     <!-- highlight.js for code syntax -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-theme">
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-theme" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
 </head>
 <body>
+    <!-- Top header will be injected by top-header.js -->
     <div id="app">
         <nav class="sidebar">
             <!-- Sidebar Header -->
@@ -141,7 +146,14 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
                         </svg>
-                        <span>Skills</span>
+                        <span>Tools</span>
+                    </button>
+                    <button class="settings-tab" data-tab="preferences">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"/>
+                            <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                        <span>Preferences</span>
                     </button>
                     <button class="settings-tab" data-tab="channels">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -184,24 +196,53 @@
 
                     <!-- Models Tab -->
                     <div class="settings-panel" data-panel="models">
-                        <h4>Model Providers</h4>
+                        <h4>My Model Providers</h4>
+                        <p class="setting-hint">Select your default model provider for chat and cron jobs.</p>
                         <div id="model-list" class="model-list">
-                            <!-- Models will be rendered here -->
+                            <!-- User's model providers will be rendered here -->
                         </div>
                         <button id="add-model-btn" class="btn btn-outline add-model-btn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M12 5v14M5 12h14"/>
                             </svg>
-                            Add Model Provider
+                            Add Custom Provider
                         </button>
+
+                        <h4 class="section-divider">Available Global Providers</h4>
+                        <p class="setting-hint">Shared providers managed by your administrator. Click + to add to your list.</p>
+                        <div id="available-provider-list" class="model-list">
+                            <!-- Available global providers will be rendered here -->
+                        </div>
                     </div>
 
-                    <!-- Skills Tab -->
+                    <!-- Tools Tab -->
                     <div class="settings-panel" data-panel="skills">
-                        <h4>Skills</h4>
-                        <p class="setting-hint">Use <code>/skill_name args</code> to directly invoke a skill</p>
+                        <h4>Tools</h4>
+                        <p class="setting-hint">Use <code>/tool_name args</code> to directly invoke a tool</p>
                         <div id="skills-list" class="skills-list">
-                            <!-- Skills will be rendered here -->
+                            <!-- Tools will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Preferences Tab -->
+                    <div class="settings-panel" data-panel="preferences">
+                        <h4>Preferences</h4>
+                        <p class="setting-hint">Personal preferences that can be set via chat or this UI</p>
+
+                        <!-- Add Preference Form -->
+                        <div class="config-add-row">
+                            <input type="text" id="pref-new-key" placeholder="key (e.g., ado.assignedTo)" class="config-input-key">
+                            <input type="text" id="pref-new-value" placeholder="value" class="config-input-value">
+                            <button class="config-add-btn" id="add-pref-btn" title="Add Preference">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Preference List -->
+                        <div id="preference-list" class="config-list">
+                            <!-- Preferences will be rendered here -->
                         </div>
                     </div>
 
@@ -211,8 +252,8 @@
                         <p class="setting-hint">Configure messaging channels to receive messages from external platforms</p>
 
                         <!-- Telegram Channel -->
-                        <div class="channel-card" id="telegram-channel">
-                            <div class="channel-header">
+                        <div class="channel-card collapsed" id="telegram-channel">
+                            <div class="channel-header" id="telegram-channel-header">
                                 <div class="channel-info">
                                     <svg class="channel-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -222,7 +263,7 @@
                                         <div class="channel-status" id="telegram-status">Not configured</div>
                                     </div>
                                 </div>
-                                <label class="toggle-switch">
+                                <label class="toggle-switch" id="telegram-toggle-label">
                                     <input type="checkbox" id="telegram-enabled">
                                     <span class="toggle-slider"></span>
                                 </label>
@@ -260,8 +301,8 @@
 
                     <!-- Configs Tab -->
                     <div class="settings-panel" data-panel="configs">
-                        <h4>Config Management</h4>
-                        <p class="setting-hint">Manage encrypted secrets (API keys, tokens). All values are encrypted at rest.</p>
+                        <h4>My Configs</h4>
+                        <p class="setting-hint">Manage your personal encrypted secrets (API keys, tokens). All values are encrypted at rest.</p>
 
                         <!-- Add Config Form - Single Line -->
                         <div class="config-add-row">
@@ -359,7 +400,48 @@
         </div>
     </div>
 
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Cron Job Drawer -->
+    <div id="cronjob-drawer" class="cronjob-drawer">
+        <div class="drawer-header">
+            <h3>Cron Jobs</h3>
+            <button id="drawer-close-btn" class="drawer-close-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="drawer-content">
+            <div id="cronjobDrawerList" class="cronjob-list">
+                <!-- Cron job items will be loaded here -->
+            </div>
+        </div>
+        <div class="drawer-footer">
+            <a href="/cronjobs/index.html" class="drawer-footer-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                Open Editor
+            </a>
+        </div>
+    </div>
+
+    <!-- Cron Job Toggle Button -->
+    <button id="cronjob-toggle-btn" class="cronjob-toggle-btn" title="Open Cron Jobs">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+        </svg>
+    </button>
+
     <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="/js/approval.js"></script>
     <script src="/openclaw/app.js"></script>
 </body>
 </html>

@@ -7,10 +7,10 @@ using Weda.Core.Application.Interfaces;
 
 namespace OpenClaw.Application.Skills;
 
-public class SkillSettingsService(
-    ISkillRegistry registry,
+public class ToolSettingsService(
+    IToolRegistry registry,
     ISkillSettingRepository repository,
-    IUnitOfWork uow) : ISkillSettingsService
+    IUnitOfWork uow) : IToolSettingsService
 {
     public async Task<List<SkillSettingDto>> GetListAsync(CancellationToken ct = default)
     {
@@ -41,7 +41,7 @@ public class SkillSettingsService(
         await SetEnabledAsync(skillName, false, ct);
     }
 
-    public async Task<List<IAgentSkill>> GetEnabledSkillsAsync(CancellationToken ct = default)
+    public async Task<List<IAgentTool>> GetEnabledSkillsAsync(CancellationToken ct = default)
     {
         var skills = registry.GetAllSkills();
         var settings = await repository.GetAllAsync(ct);

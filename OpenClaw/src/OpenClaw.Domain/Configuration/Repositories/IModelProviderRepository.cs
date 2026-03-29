@@ -6,4 +6,5 @@ namespace OpenClaw.Domain.Configuration.Repositories;
 public interface IModelProviderRepository : IRepository<ModelProvider, Guid>
 {
     Task<ModelProvider?> GetActiveAsync(CancellationToken cancellationToken = default);
+    Task<List<ModelProvider>> GetAllActiveAsync(CancellationToken cancellationToken = default);
 }

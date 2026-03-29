@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 
 using OpenClaw.Application.Agents;
 using OpenClaw.Application.Agents.Middlewares;
+using OpenClaw.Application.CronJobs;
 using OpenClaw.Application.Llm;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
@@ -13,6 +14,7 @@ using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
 using OpenClaw.Channels.Telegram.Extensions;
+using OpenClaw.Domain.CronJobs.Repositories;
 using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Llm.Ollama;
 using OpenClaw.Infrastructure.Llm.OpenAI;
@@ -33,12 +35,20 @@ public static class ServiceCollectionExtensions
         // Logging
         services.AddLogging(builder => builder.AddSerilog());
 
-        // HttpClient with SSL validation bypass (for local/dev scenarios)
-        services.AddHttpClient("SkipSslValidation")
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            });
+        // HttpClient for local/dev scenarios — SSL bypass only when ASPNETCORE_ENVIRONMENT=Development
+        var isDev = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
+        if (isDev)
+        {
+            services.AddHttpClient("SkipSslValidation")
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                });
+        }
+        else
+        {
+            services.AddHttpClient("SkipSslValidation");
+        }
 
         // Middlewares
         services.AddSingleton<LoggingMiddleware>();
@@ -76,21 +86,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILlmProviderFactory, LlmProviderFactory>();
 
         // skills
-        services.AddSkillsFromAssemblies();
-        services.AddScoped<ISkillSettingsService, SkillSettingsService>();
+        services.AddSkillsFromAssemblies(configuration);
+        services.AddScoped<IToolSettingsService, ToolSettingsService>();
         services.AddSingleton<ISlashCommandParser, SlashCommandParser>();
-        // services.AddSingleton<IAgentSkill>(ReadFileSkill.Default);
-        // services.AddSingleton<IAgentSkill>(WriteFileSkill.Default);
-        // services.AddSingleton<IAgentSkill>(ListDirectorySkill.Default);
-        // services.AddSingleton<IAgentSkill>(ExecuteCommandSkill.Default);
-        // services.AddSingleton<IAgentSkill>(HttpRequestSkill.Default);
-        // services.AddSingleton<IAgentSkill>(WebSearchSkill.Default);
+        // services.AddSingleton<IAgentTool>(ReadFileSkill.Default);
+        // services.AddSingleton<IAgentTool>(WriteFileSkill.Default);
+        // services.AddSingleton<IAgentTool>(ListDirectorySkill.Default);
+        // services.AddSingleton<IAgentTool>(ExecuteCommandSkill.Default);
+        // services.AddSingleton<IAgentTool>(HttpRequestSkill.Default);
+        // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
 
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>
         {
             var llmProviderFactory = sp.GetRequiredService<ILlmProviderFactory>();
-            var skills = sp.GetServices<IAgentSkill>();
+            var skills = sp.GetServices<IAgentTool>();
             var options = sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value;
 
             var pipeline = new AgentPipelineBuilder(sp)
@@ -106,17 +116,23 @@ public static class ServiceCollectionExtensions
         // Channels
         services.AddTelegramChannel(configuration);
 
+        // Cron Jobs
+        services.AddSingleton<ICronJobExecutor, CronJobExecutor>();
+        services.AddScoped<ICronJobRepository, OpenClaw.Infrastructure.CronJobs.Persistence.CronJobRepository>();
+        services.AddScoped<ICronJobExecutionRepository, OpenClaw.Infrastructure.CronJobs.Persistence.CronJobExecutionRepository>();
+        services.AddScoped<IToolInstanceRepository, OpenClaw.Infrastructure.CronJobs.Persistence.ToolInstanceRepository>();
+
         return services;
     }
 
-    private static IServiceCollection AddSkillsFromAssemblies(this IServiceCollection services)
+    private static IServiceCollection AddSkillsFromAssemblies(this IServiceCollection services, IConfiguration configuration)
     {
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => a.FullName?.StartsWith("OpenClaw.Skills") == true)
+            .Where(a => a.FullName?.StartsWith("OpenClaw.Tools") == true)
             .ToList();
 
         var basePath = AppDomain.CurrentDomain.BaseDirectory;
-        var skillDlls = Directory.GetFiles(basePath, "OpenClaw.Skills.*.dll");
+        var skillDlls = Directory.GetFiles(basePath, "OpenClaw.Tools.*.dll");
         
         foreach (var dll in skillDlls)
         {
@@ -127,28 +143,67 @@ public static class ServiceCollectionExtensions
             }
         }
 
-        var skillTypes = assemblies
-            .SelectMany(a => a.GetTypes())
-            .Where(t => typeof(IAgentSkill).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
-        
+        var allTypes = assemblies.SelectMany(a => a.GetTypes()).ToList();
+
+        // Register skill dependencies (classes in skill assemblies that are not skills themselves)
+        // Exclude: records (Args, Result types), interfaces, abstract classes
+        var skillDependencyTypes = allTypes
+            .Where(t => !typeof(IAgentTool).IsAssignableFrom(t)
+                && !t.IsInterface && !t.IsAbstract
+                && !IsRecordType(t)  // Exclude records (Args, Result, etc.)
+                && t.GetConstructors().Any(c => c.GetParameters().Length > 0));
+
+        foreach (var depType in skillDependencyTypes)
+        {
+            if (!services.Any(s => s.ServiceType == depType))
+            {
+                services.AddSingleton(depType);
+            }
+        }
+
+        // Register skills
+        var skillTypes = allTypes
+            .Where(t => typeof(IAgentTool).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+
         foreach (var skillType in skillTypes)
         {
             var defaultProperty = skillType.GetProperty("Default", BindingFlags.Public | BindingFlags.Static);
 
-            if (defaultProperty != null && typeof(IAgentSkill).IsAssignableFrom(defaultProperty.PropertyType))
+            if (defaultProperty != null && typeof(IAgentTool).IsAssignableFrom(defaultProperty.PropertyType))
             {
-                if (defaultProperty.GetValue(null) is IAgentSkill skillInstance)
+                if (defaultProperty.GetValue(null) is IAgentTool skillInstance)
                 {
-                    services.AddSingleton<IAgentSkill>(skillInstance);
+                    services.AddSingleton<IAgentTool>(skillInstance);
                     continue;
                 }
             }
 
-            services.AddSingleton(typeof(IAgentSkill), skillType);
+            services.AddSingleton(typeof(IAgentTool), skillType);
         }
 
-        services.AddSingleton<ISkillRegistry, SkillRegistry>();
+        services.AddSingleton<IToolRegistry, ToolRegistry>();
 
-        return services;   
+        // Register Markdown Skill store
+        var skillsDir = configuration["Skills:Directory"] ?? "skills";
+        if (!Path.IsPathRooted(skillsDir))
+        {
+            // Relative paths resolve from the content root (where the .csproj is)
+            skillsDir = Path.GetFullPath(skillsDir, Directory.GetCurrentDirectory());
+        }
+        services.AddSingleton<ISkillStore>(sp =>
+        {
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FileSkillStore>>();
+            var store = new FileSkillStore(skillsDir, logger);
+            store.ReloadAsync().GetAwaiter().GetResult();
+            return store;
+        });
+
+        return services;
+    }
+
+    private static bool IsRecordType(Type type)
+    {
+        // Records have a compiler-generated <Clone>$ method
+        return type.GetMethod("<Clone>$") != null;
     }
 }
