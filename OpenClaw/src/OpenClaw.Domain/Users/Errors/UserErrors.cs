@@ -58,7 +58,21 @@ public static class UserErrors
 
     public static readonly Error CannotRemoveOwnSuperAdmin = Error.Validation(
         code: "User.CannotRemoveOwnSuperAdmin",
-        description: "You cannot remove your own SuperAdmin role.");
+        description: "SuperAdmin role cannot be revoked. It is assigned at system setup only.");
+
+    public static readonly Error CannotAssignSuperAdmin = Error.Validation(
+        code: "User.CannotAssignSuperAdmin",
+        description: "SuperAdmin role cannot be assigned. It is granted at system setup only.");
+
+    public static readonly Error CannotBanAdminOrSuperAdmin = Error.Validation(
+        code: "User.CannotBanAdminOrSuperAdmin",
+        description: "Cannot ban users with Admin or SuperAdmin roles.");
+
+    public static Error AccountBanned(string? reason) => Error.Forbidden(
+        code: "User.AccountBanned",
+        description: reason is not null
+            ? $"Your account has been banned. Reason: {reason}"
+            : "Your account has been banned.");
 
     public static readonly Error AccountNotActive = Error.Unauthorized(
         code: "User.AccountNotActive",

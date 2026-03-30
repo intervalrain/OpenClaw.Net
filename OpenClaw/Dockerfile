@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution and project files
@@ -53,7 +53,7 @@ WORKDIR /src/src/OpenClaw.Api
 RUN dotnet publish "OpenClaw.Api.csproj" --no-restore -c Release -o /app/publish
 
 # Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
 # Install GitHub CLI and Python3 (for skill scripts)
 RUN apt-get update && apt-get install -y curl python3 \

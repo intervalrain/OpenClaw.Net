@@ -94,6 +94,8 @@ function initEventDelegation() {
         if (action === 'approve') approveUser(id);
         else if (action === 'reject') rejectUser(id);
         else if (action === 'manage') showUserDetails(id);
+        else if (action === 'ban-prompt') banUserPrompt(id);
+        else if (action === 'unban') unbanUser(id);
     });
 
     // Provider list actions
@@ -150,12 +152,23 @@ function renderPendingUsers() {
     pendingUserList.innerHTML = pendingUsers.map(user => renderUserCard(user, true)).join('');
 }
 
-// Render all users with filter
+// Role priority for sorting: SuperAdmin > Admin > User
+function getRolePriority(user) {
+    const roles = user.roles || [];
+    if (roles.includes('SuperAdmin')) return 0;
+    if (roles.includes('Admin')) return 1;
+    return 2;
+}
+
+// Render all users with filter, sorted by role hierarchy
 function renderAllUsers() {
     const filterStatus = statusFilter.value;
-    const filteredUsers = filterStatus
+    let filteredUsers = filterStatus
         ? allUsers.filter(u => u.status === filterStatus)
         : allUsers;
+
+    // Sort: SuperAdmin first, then Admin, then User
+    filteredUsers = [...filteredUsers].sort((a, b) => getRolePriority(a) - getRolePriority(b));
 
     if (filteredUsers.length === 0) {
         allUserList.innerHTML = `
@@ -190,6 +203,9 @@ function renderUserCard(user, isPendingView) {
         ? new Date(user.createdAt).toLocaleDateString()
         : '';
 
+    const isAdminOrAbove = roles.some(r => r === 'SuperAdmin' || r === 'Admin');
+    const isBanned = user.status === 'Banned';
+
     let actions = '';
     if (isPendingView) {
         actions = `
@@ -200,11 +216,19 @@ function renderUserCard(user, isPendingView) {
                 Reject
             </button>
         `;
+    } else if (isBanned) {
+        actions = `
+            <button class="btn btn-success btn-sm" data-action="unban" data-id="${user.id}">Unban</button>
+            <button class="btn btn-outline btn-sm" data-action="manage" data-id="${user.id}">Details</button>
+        `;
+    } else if (!isAdminOrAbove) {
+        actions = `
+            <button class="btn btn-outline btn-sm" data-action="manage" data-id="${user.id}">Manage</button>
+            <button class="btn btn-danger btn-sm" data-action="ban-prompt" data-id="${user.id}">Ban</button>
+        `;
     } else {
         actions = `
-            <button class="btn btn-outline btn-sm" data-action="manage" data-id="${user.id}">
-                Manage
-            </button>
+            <button class="btn btn-outline btn-sm" data-action="manage" data-id="${user.id}">Details</button>
         `;
     }
 
@@ -219,6 +243,7 @@ function renderUserCard(user, isPendingView) {
                         <span class="status-badge ${statusClass}">${user.status}</span>
                         ${roleBadges}
                     </div>
+                    ${isBanned && user.banReason ? `<div class="ban-reason">Reason: ${escapeHtml(user.banReason)}</div>` : ''}
                 </div>
             </div>
             <div class="user-card-actions">
@@ -269,6 +294,52 @@ async function rejectUser(userId) {
     }
 }
 
+// Ban user with reason
+async function banUserPrompt(userId) {
+    const reason = prompt('Enter ban reason:');
+    if (!reason || !reason.trim()) return;
+
+    try {
+        const response = await authFetch(`${API_BASE}/${userId}/ban`, {
+            method: 'POST',
+            body: JSON.stringify({ reason: reason.trim() })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || error.title || 'Failed to ban user');
+        }
+
+        await loadUsers();
+        showToast('User banned', 'success');
+    } catch (error) {
+        console.error('Error banning user:', error);
+        showToast(error.message, 'error');
+    }
+}
+
+// Unban user
+async function unbanUser(userId) {
+    if (!confirm('Unban this user? They will be restored to Active status.')) return;
+
+    try {
+        const response = await authFetch(`${API_BASE}/${userId}/unban`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || error.title || 'Failed to unban user');
+        }
+
+        await loadUsers();
+        showToast('User unbanned', 'success');
+    } catch (error) {
+        console.error('Error unbanning user:', error);
+        showToast(error.message, 'error');
+    }
+}
+
 // Show user details modal
 function showUserDetails(userId) {
     selectedUser = allUsers.find(u => u.id === userId);
@@ -279,8 +350,9 @@ function showUserDetails(userId) {
 
     document.getElementById('modalTitle').textContent = selectedUser.name;
 
-    const roles = ['User', 'Admin', 'SuperAdmin'];
     const userRoles = selectedUser.roles || [];
+    const isSuperAdminTarget = userRoles.includes('SuperAdmin');
+    const isAdminTarget = userRoles.includes('Admin');
 
     document.getElementById('modalBody').innerHTML = `
         <div class="user-detail">
@@ -290,7 +362,7 @@ function showUserDetails(userId) {
         <div class="user-detail">
             <label>Status</label>
             <div class="value">
-                <select id="userStatusSelect" ${isSelf ? 'disabled' : ''}>
+                <select id="userStatusSelect" ${isSelf || isSuperAdminTarget ? 'disabled' : ''}>
                     <option value="Active" ${selectedUser.status === 'Active' ? 'selected' : ''}>Active</option>
                     <option value="Inactive" ${selectedUser.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
                     <option value="Locked" ${selectedUser.status === 'Locked' ? 'selected' : ''}>Locked</option>
@@ -299,15 +371,14 @@ function showUserDetails(userId) {
         </div>
         <div class="user-detail">
             <label>Roles</label>
-            <div class="role-select">
-                ${roles.map(role => `
-                    <label class="role-checkbox ${userRoles.includes(role) ? 'checked' : ''}" ${isSelf && role === 'SuperAdmin' ? 'title="Cannot remove own SuperAdmin role"' : ''}>
-                        <input type="checkbox" value="${role}"
-                            ${userRoles.includes(role) ? 'checked' : ''}
-                            ${isSelf && role === 'SuperAdmin' ? 'disabled' : ''}>
-                        ${role}
+            ${isSuperAdminTarget
+                ? '<div class="text-muted">SuperAdmin (assigned at system setup)</div>'
+                : `<div class="role-select">
+                    <label class="role-checkbox ${isAdminTarget ? 'checked' : ''}">
+                        <input type="checkbox" value="Admin" ${isAdminTarget ? 'checked' : ''}>
+                        Admin
                     </label>
-                `).join('')}
+                </div>`}
             </div>
         </div>
         ${selectedUser.createdAt ? `
@@ -331,15 +402,18 @@ function showUserDetails(userId) {
         });
     });
 
+    const canModify = !isSelf && !isSuperAdminTarget;
     const footer = document.getElementById('modalFooter');
     footer.innerHTML = `
-        ${!isSelf ? `<button class="btn btn-danger" id="modalDeleteBtn">Delete</button>` : ''}
+        ${canModify ? `<button class="btn btn-danger" id="modalDeleteBtn">Delete</button>` : ''}
         <button class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
-        <button class="btn btn-primary" id="modalSaveBtn">Save Changes</button>
+        ${canModify ? `<button class="btn btn-primary" id="modalSaveBtn">Save Changes</button>` : ''}
     `;
-    if (!isSelf) document.getElementById('modalDeleteBtn').addEventListener('click', showDeleteModal);
+    if (canModify) {
+        document.getElementById('modalDeleteBtn').addEventListener('click', showDeleteModal);
+        document.getElementById('modalSaveBtn').addEventListener('click', saveUserChanges);
+    }
     document.getElementById('modalCancelBtn').addEventListener('click', closeUserModal);
-    document.getElementById('modalSaveBtn').addEventListener('click', saveUserChanges);
 
     userModal.classList.add('active');
 }
@@ -349,8 +423,9 @@ async function saveUserChanges() {
     if (!selectedUser) return;
 
     const newStatus = document.getElementById('userStatusSelect').value;
-    const newRoles = Array.from(document.querySelectorAll('.role-checkbox input:checked'))
-        .map(cb => cb.value);
+    // Build roles: always "User" as base, optionally "Admin" if checked
+    const isAdminChecked = document.querySelector('.role-checkbox input[value="Admin"]')?.checked ?? false;
+    const newRoles = isAdminChecked ? ['User', 'Admin'] : ['User'];
 
     try {
         // Update status if changed

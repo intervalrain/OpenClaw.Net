@@ -2,6 +2,9 @@ namespace Weda.Core.Application.Security.Models;
 
 public static class Permission
 {
+    // Platform access
+    public const string OpenClaw = "OpenClaw";
+
     // Employee permissions
     public const string EmployeeRead = "Employee.Read";
     public const string EmployeeWrite = "Employee.Write";

@@ -6,8 +6,6 @@ using OpenClaw.Domain.Users.Enums;
 using OpenClaw.Domain.Users.Errors;
 using OpenClaw.Domain.Users.ValueObjects;
 
-using Microsoft.AspNetCore.Mvc.Diagnostics;
-
 namespace OpenClaw.Domain.Users.Entities;
 
 public class User : AggregateRoot<Guid>
@@ -16,6 +14,7 @@ public class User : AggregateRoot<Guid>
     public PasswordHash PasswordHash { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public UserStatus Status { get; private set; }
+    public string? BanReason { get; private set; }
     public string? RefreshToken { get; private set; }
     public DateTime? RefreshTokenExpiresAt { get; private set; }
     public string? WorkspacePath { get; private set; }
@@ -65,7 +64,7 @@ public class User : AggregateRoot<Guid>
         };
 
         user._roles.AddRange(roles ?? [Role.User]);
-        user._permissions.AddRange(permissions ?? []);
+        user._permissions.AddRange(permissions ?? [Permission.OpenClaw]);
 
         return user;
     }
@@ -109,6 +108,31 @@ public class User : AggregateRoot<Guid>
     public void UpdateStatus(UserStatus newStatus)
     {
         Status = newStatus;
+        if (newStatus != UserStatus.Banned)
+            BanReason = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public ErrorOr<Success> Ban(string reason, IReadOnlyList<string> targetRoles)
+    {
+        if (targetRoles.Contains(Role.SuperAdmin) || targetRoles.Contains(Role.Admin))
+            return UserErrors.CannotBanAdminOrSuperAdmin;
+
+        Status = UserStatus.Banned;
+        BanReason = reason;
+        _permissions.Remove(Permission.OpenClaw);
+        RefreshToken = null;
+        RefreshTokenExpiresAt = null;
+        UpdatedAt = DateTime.UtcNow;
+        return Result.Success;
+    }
+
+    public void Unban()
+    {
+        Status = UserStatus.Active;
+        BanReason = null;
+        if (!_permissions.Contains(Permission.OpenClaw))
+            _permissions.Add(Permission.OpenClaw);
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -119,10 +143,12 @@ public class User : AggregateRoot<Guid>
             return UserErrors.OnlySuperAdminCanChangeRoles;
         }
 
-        // Prevent removing own SuperAdmin role
-        if (Id == currentUserId &&
-            _roles.Contains(Role.SuperAdmin) &&
-            !newRoles.Contains(Role.SuperAdmin))
+        // SuperAdmin is assigned at system setup only — cannot be granted or revoked via API
+        if (newRoles.Contains(Role.SuperAdmin) && !_roles.Contains(Role.SuperAdmin))
+        {
+            return UserErrors.CannotAssignSuperAdmin;
+        }
+        if (_roles.Contains(Role.SuperAdmin) && !newRoles.Contains(Role.SuperAdmin))
         {
             return UserErrors.CannotRemoveOwnSuperAdmin;
         }

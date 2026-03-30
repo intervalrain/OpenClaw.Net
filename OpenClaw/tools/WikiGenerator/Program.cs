@@ -117,7 +117,7 @@ public class WikiGenerator(string wikiDir, string outputDir)
                 <link rel="stylesheet" href="../wiki.css">
                 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-                <script>hljs.highlightAll();</script>
+                <script src="/wiki/hljs-init.js"></script>
             </head>
             <body>
                 <article class="markdown-body">

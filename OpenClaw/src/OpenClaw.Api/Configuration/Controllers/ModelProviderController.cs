@@ -101,12 +101,6 @@ public class ModelProviderController(
         var provider = await repository.GetByIdAsync(id, ct);
         if (provider is null) return NotFound();
 
-        if (provider.IsActive) return Ok();
-        var deactivatedProvider = await repository.GetActiveAsync(ct);
-        if (deactivatedProvider != null)
-        {
-            deactivatedProvider.Deactivate();
-        }
         provider.Activate();
         await uow.SaveChangesAsync(ct);
 
