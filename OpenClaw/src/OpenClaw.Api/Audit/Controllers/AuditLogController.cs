@@ -10,7 +10,7 @@ namespace OpenClaw.Api.Audit.Controllers;
 [Authorize(Policy = "SuperAdminOnly")]
 public class AuditLogController(IAuditLogRepository repository) : ApiController
 {
-    [HttpGet("audit-log")]
+    [HttpGet]
     public async Task<IActionResult> Query(
         [FromQuery] Guid? userId,
         [FromQuery] string? action,
@@ -39,7 +39,7 @@ public class AuditLogController(IAuditLogRepository repository) : ApiController
         }));
     }
 
-    [HttpDelete("audit-log/cleanup")]
+    [HttpDelete("cleanup")]
     public async Task<IActionResult> Cleanup(
         [FromQuery] int retentionDays = 90,
         CancellationToken ct = default)
