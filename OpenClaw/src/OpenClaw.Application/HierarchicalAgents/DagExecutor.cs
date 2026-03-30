@@ -14,6 +14,15 @@ public class DagExecutor(
         AgentExecutionOptions options,
         CancellationToken ct = default)
     {
+        return await ExecuteAsync(graph, options, timeline: null, ct);
+    }
+
+    public async Task<DagExecutionResult> ExecuteAsync(
+        TaskGraph graph,
+        AgentExecutionOptions options,
+        AgentExecutionTimeline? timeline,
+        CancellationToken ct = default)
+    {
         // Validate
         var errors = TaskGraphValidator.Validate(graph);
         if (errors.Count > 0)
@@ -44,7 +53,7 @@ public class DagExecutor(
             var readyNodes = graph.Nodes.Where(n => n.Status == TaskNodeStatus.Ready).ToList();
 
             // Execute all ready nodes in parallel
-            var tasks = readyNodes.Select(node => ExecuteNodeAsync(node, graph, nodeMap, options, ct));
+            var tasks = readyNodes.Select(node => ExecuteNodeAsync(node, graph, nodeMap, options, timeline, ct));
             await Task.WhenAll(tasks);
 
             // After execution, check downstream nodes for readiness
@@ -71,7 +80,7 @@ public class DagExecutor(
             // Mark downstream of failed nodes as Skipped
             foreach (var failedNode in readyNodes.Where(n => n.Status == TaskNodeStatus.Failed))
             {
-                SkipDownstream(graph, failedNode.Id, nodeMap);
+                SkipDownstream(graph, failedNode.Id, nodeMap, timeline);
             }
         }
 
@@ -92,15 +101,18 @@ public class DagExecutor(
         TaskGraph graph,
         Dictionary<string, TaskNode> nodeMap,
         AgentExecutionOptions options,
+        AgentExecutionTimeline? timeline,
         CancellationToken ct)
     {
         node.Status = TaskNodeStatus.Running;
+        timeline?.Record(node.AgentName, AgentTimelineEventType.Started, $"Node '{node.Id}'");
 
         var agent = agentRegistry.GetAgent(node.AgentName);
         if (agent is null)
         {
             node.Status = TaskNodeStatus.Failed;
             node.ErrorMessage = $"Agent '{node.AgentName}' not found in registry.";
+            timeline?.Record(node.AgentName, AgentTimelineEventType.Failed, node.ErrorMessage);
             logger.LogWarning("DAG node '{NodeId}': agent '{AgentName}' not found", node.Id, node.AgentName);
             return;
         }
@@ -121,12 +133,15 @@ public class DagExecutor(
                 node.Status = TaskNodeStatus.Completed;
                 node.Output = result.Output;
                 node.TokensUsed = result.TokensUsed;
+                timeline?.Record(node.AgentName, AgentTimelineEventType.Completed,
+                    $"Node '{node.Id}', tokens={result.TokensUsed}");
                 logger.LogInformation("DAG node '{NodeId}' completed successfully", node.Id);
             }
             else
             {
                 node.Status = TaskNodeStatus.Failed;
                 node.ErrorMessage = result.ErrorMessage;
+                timeline?.Record(node.AgentName, AgentTimelineEventType.Failed, result.ErrorMessage);
                 logger.LogWarning("DAG node '{NodeId}' failed: {Error}", node.Id, result.ErrorMessage);
             }
         }
@@ -134,11 +149,13 @@ public class DagExecutor(
         {
             node.Status = TaskNodeStatus.Failed;
             node.ErrorMessage = "Execution was cancelled.";
+            timeline?.Record(node.AgentName, AgentTimelineEventType.Failed, "Cancelled");
         }
         catch (Exception ex)
         {
             node.Status = TaskNodeStatus.Failed;
             node.ErrorMessage = ex.Message;
+            timeline?.Record(node.AgentName, AgentTimelineEventType.Failed, ex.Message);
             logger.LogError(ex, "DAG node '{NodeId}' threw an exception", node.Id);
         }
     }
@@ -230,7 +247,8 @@ public class DagExecutor(
     private static void SkipDownstream(
         TaskGraph graph,
         string failedNodeId,
-        Dictionary<string, TaskNode> nodeMap)
+        Dictionary<string, TaskNode> nodeMap,
+        AgentExecutionTimeline? timeline = null)
     {
         var toSkip = new Queue<string>();
         foreach (var downId in TaskGraphValidator.GetDownstreamNodes(graph, failedNodeId))
@@ -244,6 +262,7 @@ public class DagExecutor(
             {
                 node.Status = TaskNodeStatus.Skipped;
                 node.ErrorMessage = $"Skipped due to upstream failure of '{failedNodeId}'.";
+                timeline?.Record(node.AgentName, AgentTimelineEventType.Skipped, node.ErrorMessage);
 
                 foreach (var furtherDown in TaskGraphValidator.GetDownstreamNodes(graph, id))
                     toSkip.Enqueue(furtherDown);

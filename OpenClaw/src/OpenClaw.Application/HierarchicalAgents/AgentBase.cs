@@ -18,9 +18,16 @@ public abstract class AgentBase : IAgent
 
     public async Task<AgentResult> ExecuteAsync(AgentExecutionContext context, CancellationToken ct = default)
     {
+        // Safety: depth check
         if (context.Depth >= context.Options.MaxDepth)
             return AgentResult.Failed($"Max agent depth ({context.Options.MaxDepth}) exceeded.");
 
+        // Safety: budget check
+        if (context.Options.BudgetLimit.HasValue && context.TokensUsed >= context.Options.BudgetLimit.Value)
+            return AgentResult.Failed(
+                $"Token budget exhausted ({context.TokensUsed:N0}/{context.Options.BudgetLimit.Value:N0}).");
+
+        // Safety: timeout
         using var cts = context.Options.Timeout.HasValue
             ? CancellationTokenSource.CreateLinkedTokenSource(ct)
             : null;
@@ -32,7 +39,12 @@ public abstract class AgentBase : IAgent
 
         try
         {
-            return await ExecuteCoreAsync(context, token);
+            var result = await ExecuteCoreAsync(context, token);
+
+            // Track token usage in context
+            context.AddTokensUsed(result.TokensUsed);
+
+            return result;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested && !ct.IsCancellationRequested)
         {
