@@ -60,6 +60,35 @@ public class ChannelSettingsController(
         var userId = GetUserId();
         var settings = await repository.GetByUserAndChannelTypeAsync(userId, TelegramChannelType, ct);
 
+        // If enabling, validate the bot token first
+        if (request.Enabled)
+        {
+            var tokenToValidate = request.BotToken;
+
+            // If no new token provided, try to decrypt existing one
+            if (string.IsNullOrEmpty(tokenToValidate) && settings?.EncryptedBotToken is not null)
+            {
+                try { tokenToValidate = encryption.Decrypt(settings.EncryptedBotToken); }
+                catch { tokenToValidate = null; }
+            }
+
+            if (string.IsNullOrWhiteSpace(tokenToValidate))
+                return BadRequest(new { success = false, message = "A valid bot token is required to enable the channel." });
+
+            // Validate against Telegram API
+            try
+            {
+                var client = httpClientFactory.CreateClient();
+                var response = await client.GetAsync($"https://api.telegram.org/bot{tokenToValidate}/getMe", ct);
+                if (!response.IsSuccessStatusCode)
+                    return BadRequest(new { success = false, message = "Bot token validation failed. Cannot enable channel with an invalid token." });
+            }
+            catch (HttpRequestException ex)
+            {
+                return BadRequest(new { success = false, message = $"Bot token validation failed: {ex.Message}" });
+            }
+        }
+
         var encryptedToken = string.IsNullOrEmpty(request.BotToken)
             ? null
             : encryption.Encrypt(request.BotToken);
