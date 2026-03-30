@@ -898,24 +898,16 @@ async function loadAuditLogs() {
     }
 }
 
-/** Format timestamp as relative time (e.g. "3m ago", "2h ago") or absolute if older than 24h */
+/** Format timestamp as absolute time: YYYY-MM-DD HH:mm:ss */
 function formatAuditTime(timestamp) {
-    const now = Date.now();
-    const t = new Date(timestamp).getTime();
-    const diff = now - t;
-
-    if (diff < 0) return 'just now';
-    if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-
-    // Older than 24h: show date + time
     const d = new Date(timestamp);
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const mins = String(d.getMinutes()).padStart(2, '0');
-    return `${month}-${day} ${hours}:${mins}`;
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, '0');
+    const D = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${Y}-${M}-${D} ${h}:${m}:${s}`;
 }
 
 function renderAuditLogs() {
