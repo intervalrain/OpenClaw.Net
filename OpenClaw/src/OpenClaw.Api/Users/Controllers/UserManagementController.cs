@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Weda.Core.Application.Security.Models;
 using Weda.Core.Presentation;
 
+using OpenClaw.Api.Security;
 using OpenClaw.Contracts.Users.Commands;
 using OpenClaw.Contracts.Users.Queries;
 using OpenClaw.Contracts.Users.Requests;
@@ -102,7 +103,11 @@ public class UserManagementController(ISender _mediator) : ApiController
         var command = new BanUserCommand(userId, request.Reason);
         var result = await _mediator.Send(command);
 
-        return result.Match(_ => Ok(new { message = "User banned" }), Problem);
+        return result.Match(_ =>
+        {
+            BanCheckMiddleware.InvalidateUser(userId);
+            return Ok(new { message = "User banned" });
+        }, Problem);
     }
 
     /// <summary>
@@ -114,7 +119,11 @@ public class UserManagementController(ISender _mediator) : ApiController
         var command = new UnbanUserCommand(userId);
         var result = await _mediator.Send(command);
 
-        return result.Match(_ => Ok(new { message = "User unbanned" }), Problem);
+        return result.Match(_ =>
+        {
+            BanCheckMiddleware.InvalidateUser(userId);
+            return Ok(new { message = "User unbanned" });
+        }, Problem);
     }
 
     /// <summary>

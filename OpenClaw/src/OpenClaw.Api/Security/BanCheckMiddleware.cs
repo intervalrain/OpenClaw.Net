@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 using OpenClaw.Domain.Users.Enums;
@@ -7,32 +8,34 @@ namespace OpenClaw.Api.Security;
 
 /// <summary>
 /// Checks if the authenticated user is banned on every request.
-/// Since JWT tokens are stateless, this middleware provides real-time ban enforcement
-/// by querying the database for user status. Banned users receive 403 with ban reason.
+/// Uses in-memory cache with short TTL to avoid hitting DB on every request.
+/// Cache is immediately invalidated when a ban/unban action occurs.
 /// </summary>
 public class BanCheckMiddleware(RequestDelegate next)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
+    // Cache: userId → (isBanned, banReason, expiresAt)
+    private static readonly ConcurrentDictionary<Guid, BanCacheEntry> _cache = new();
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
+
     public async Task InvokeAsync(HttpContext context)
     {
-        // Only check authenticated users
         if (context.User.Identity?.IsAuthenticated == true)
         {
             var userIdClaim = context.User.FindFirst("id")?.Value;
             if (Guid.TryParse(userIdClaim, out var userId))
             {
-                var userRepository = context.RequestServices.GetRequiredService<IUserRepository>();
-                var user = await userRepository.GetByIdAsync(userId);
+                var entry = await GetOrRefreshCacheAsync(userId, context.RequestServices);
 
-                if (user?.Status == UserStatus.Banned)
+                if (entry.IsBanned)
                 {
                     context.Response.StatusCode = 403;
                     context.Response.ContentType = "application/json";
                     await context.Response.WriteAsync(JsonSerializer.Serialize(new
                     {
                         code = "User.AccountBanned",
-                        reason = user.BanReason ?? "Your account has been banned.",
+                        reason = entry.BanReason ?? "Your account has been banned.",
                         banned = true
                     }, JsonOptions));
                     return;
@@ -42,4 +45,33 @@ public class BanCheckMiddleware(RequestDelegate next)
 
         await next(context);
     }
+
+    private static async Task<BanCacheEntry> GetOrRefreshCacheAsync(Guid userId, IServiceProvider services)
+    {
+        if (_cache.TryGetValue(userId, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
+        {
+            return cached;
+        }
+
+        var userRepository = services.GetRequiredService<IUserRepository>();
+        var user = await userRepository.GetByIdAsync(userId);
+
+        var entry = new BanCacheEntry(
+            IsBanned: user?.Status == UserStatus.Banned,
+            BanReason: user?.BanReason,
+            ExpiresAt: DateTime.UtcNow.Add(CacheTtl));
+
+        _cache[userId] = entry;
+        return entry;
+    }
+
+    /// <summary>
+    /// Immediately invalidate cache for a user (call after ban/unban).
+    /// </summary>
+    public static void InvalidateUser(Guid userId)
+    {
+        _cache.TryRemove(userId, out _);
+    }
+
+    private record BanCacheEntry(bool IsBanned, string? BanReason, DateTime ExpiresAt);
 }
