@@ -2,12 +2,13 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Domain.Audit.Repositories;
+using Weda.Core.Application.Security.Models;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.Audit.Controllers;
 
 [ApiVersion("1.0")]
-[Authorize(Policy = "SuperAdminOnly")]
+[Authorize(Policy = Policy.SuperAdminOnly)]
 public class AuditLogController(IAuditLogRepository repository) : ApiController
 {
     [HttpGet]
