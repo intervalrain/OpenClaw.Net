@@ -117,12 +117,19 @@ var app = builder.Build();
         }
         catch (Exception ex)
         {
-            // If migration fails due to schema conflict (e.g. legacy DB created with EnsureCreated),
-            // drop and recreate the database from scratch using migrations.
-            logger.LogWarning(ex, "Migration failed, dropping and recreating database...");
-            dbContext.Database.EnsureDeleted();
-            dbContext.Database.Migrate();
-            logger.LogInformation("Database recreated successfully via migrations");
+            var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+            if (env.IsDevelopment())
+            {
+                logger.LogWarning(ex, "Migration failed in Development, dropping and recreating database...");
+                dbContext.Database.EnsureDeleted();
+                dbContext.Database.Migrate();
+                logger.LogInformation("Database recreated successfully via migrations");
+            }
+            else
+            {
+                logger.LogError(ex, "Database migration failed. Manual intervention required — do NOT drop production data.");
+                throw;
+            }
         }
 
         var seeder = scope.ServiceProvider.GetRequiredService<AppDbContextSeeder>();
