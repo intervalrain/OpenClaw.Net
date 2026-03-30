@@ -94,6 +94,30 @@ public class UserManagementController(ISender _mediator) : ApiController
     }
 
     /// <summary>
+    /// Ban a user with a reason. Cannot ban Admin or SuperAdmin.
+    /// </summary>
+    [HttpPost("{userId:guid}/ban")]
+    public async Task<IActionResult> BanUser(Guid userId, [FromBody] BanUserRequest request)
+    {
+        var command = new BanUserCommand(userId, request.Reason);
+        var result = await _mediator.Send(command);
+
+        return result.Match(_ => Ok(new { message = "User banned" }), Problem);
+    }
+
+    /// <summary>
+    /// Unban a user, restoring Active status.
+    /// </summary>
+    [HttpPost("{userId:guid}/unban")]
+    public async Task<IActionResult> UnbanUser(Guid userId)
+    {
+        var command = new UnbanUserCommand(userId);
+        var result = await _mediator.Send(command);
+
+        return result.Match(_ => Ok(new { message = "User unbanned" }), Problem);
+    }
+
+    /// <summary>
     /// Delete a user.
     /// </summary>
     [HttpDelete("{userId:guid}")]
@@ -107,3 +131,4 @@ public class UserManagementController(ISender _mediator) : ApiController
 }
 
 public record UpdateUserStatusRequest(string Status);
+public record BanUserRequest(string Reason);

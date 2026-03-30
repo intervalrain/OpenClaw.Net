@@ -64,6 +64,10 @@ public static class UserErrors
         code: "User.CannotAssignSuperAdmin",
         description: "SuperAdmin role cannot be assigned. It is granted at system setup only.");
 
+    public static readonly Error CannotBanAdminOrSuperAdmin = Error.Validation(
+        code: "User.CannotBanAdminOrSuperAdmin",
+        description: "Cannot ban users with Admin or SuperAdmin roles.");
+
     public static readonly Error AccountNotActive = Error.Unauthorized(
         code: "User.AccountNotActive",
         description: "This account is not active. Please wait for admin approval.");

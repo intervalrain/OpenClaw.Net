@@ -179,6 +179,18 @@
     color: #383d41;
 }
 
+.status-badge.banned {
+    background: #2c2c2c;
+    color: #f87171;
+}
+
+.ban-reason {
+    font-size: 0.75rem;
+    color: #f87171;
+    margin-top: 4px;
+    font-style: italic;
+}
+
 .role-badge {
     padding: 0.2rem 0.6rem;
     border-radius: 4px;

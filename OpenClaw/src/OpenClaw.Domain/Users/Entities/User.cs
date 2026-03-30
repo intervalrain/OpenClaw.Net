@@ -16,6 +16,7 @@ public class User : AggregateRoot<Guid>
     public PasswordHash PasswordHash { get; private set; } = null!;
     public string Name { get; private set; } = null!;
     public UserStatus Status { get; private set; }
+    public string? BanReason { get; private set; }
     public string? RefreshToken { get; private set; }
     public DateTime? RefreshTokenExpiresAt { get; private set; }
     public string? WorkspacePath { get; private set; }
@@ -109,6 +110,28 @@ public class User : AggregateRoot<Guid>
     public void UpdateStatus(UserStatus newStatus)
     {
         Status = newStatus;
+        if (newStatus != UserStatus.Banned)
+            BanReason = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public ErrorOr<Success> Ban(string reason, IReadOnlyList<string> targetRoles)
+    {
+        if (targetRoles.Contains(Role.SuperAdmin) || targetRoles.Contains(Role.Admin))
+            return UserErrors.CannotBanAdminOrSuperAdmin;
+
+        Status = UserStatus.Banned;
+        BanReason = reason;
+        RefreshToken = null;
+        RefreshTokenExpiresAt = null;
+        UpdatedAt = DateTime.UtcNow;
+        return Result.Success;
+    }
+
+    public void Unban()
+    {
+        Status = UserStatus.Active;
+        BanReason = null;
         UpdatedAt = DateTime.UtcNow;
     }
 

@@ -13,12 +13,12 @@ public enum UserStatus
     Active,
 
     /// <summary>
-    /// User is inactive (disabled by admin)
+    /// User is locked (too many failed login attempts, auto-recoverable)
     /// </summary>
-    Inactive,
+    Locked,
 
     /// <summary>
-    /// User is locked (too many failed login attempts)
+    /// User is banned by admin (with reason, manual unban required)
     /// </summary>
-    Locked
+    Banned
 }

@@ -72,6 +72,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(2000)
             .IsRequired();
 
+        builder.Property(u => u.BanReason)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(u => u.CreatedAt)
             .IsRequired();
 

@@ -5,6 +5,7 @@ public record UserDto(
     string Email,
     string Name,
     string Status,
+    string? BanReason,
     List<string> Roles,
     List<string> Permissions,
     string? WorkspacePath,
