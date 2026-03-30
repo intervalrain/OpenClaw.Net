@@ -106,41 +106,43 @@ var app = builder.Build();
 
         try
         {
-            // Detect legacy databases created with EnsureCreated (no migration history table).
-            // If tables exist but __EFMigrationsHistory doesn't, baseline all existing migrations
-            // so Migrate() won't try to re-create existing schema.
+            // Detect databases where schema exists but migration history is missing or incomplete.
+            // This can happen with EnsureCreated, partial migrations, or volume reuse across deploys.
             var conn = dbContext.Database.GetDbConnection();
             await conn.OpenAsync();
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '__EFMigrationsHistory')";
-                var historyExists = (bool)(await cmd.ExecuteScalarAsync())!;
+                // Check if our application tables exist (i.e. schema is already in place)
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'app_configs')";
+                var schemaExists = (bool)(await cmd.ExecuteScalarAsync())!;
 
-                if (!historyExists)
+                if (schemaExists)
                 {
-                    // Check if this is an existing database (has our tables) or a fresh one
-                    cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'Users')";
-                    var isExistingDb = (bool)(await cmd.ExecuteScalarAsync())!;
+                    // Ensure __EFMigrationsHistory table exists
+                    cmd.CommandText = """
+                        CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+                            "MigrationId" varchar(150) NOT NULL PRIMARY KEY,
+                            "ProductVersion" varchar(32) NOT NULL
+                        );
+                    """;
+                    await cmd.ExecuteNonQueryAsync();
 
-                    if (isExistingDb)
+                    // Baseline any migrations whose tables already exist in the database
+                    var allMigrations = dbContext.Database.GetMigrations().ToList();
+                    var appliedMigrations = (await dbContext.Database.GetAppliedMigrationsAsync()).ToHashSet();
+                    var missing = allMigrations.Except(appliedMigrations).ToList();
+
+                    if (missing.Count > 0)
                     {
-                        logger.LogInformation("Legacy database detected (created with EnsureCreated). Baselining migration history...");
-                        cmd.CommandText = """
-                            CREATE TABLE "__EFMigrationsHistory" (
-                                "MigrationId" varchar(150) NOT NULL PRIMARY KEY,
-                                "ProductVersion" varchar(32) NOT NULL
-                            );
-                        """;
-                        await cmd.ExecuteNonQueryAsync();
-
-                        // Mark all known migrations as applied
-                        var applied = dbContext.Database.GetMigrations();
-                        foreach (var migration in applied)
+                        // Only baseline the InitialCreate migration (which creates all base tables).
+                        // Later migrations should run normally to apply incremental schema changes.
+                        var initialMigration = missing.FirstOrDefault(m => m.Contains("InitialCreate"));
+                        if (initialMigration != null)
                         {
-                            cmd.CommandText = $"""INSERT INTO "__EFMigrationsHistory" VALUES ('{migration}', '10.0.0')""";
+                            cmd.CommandText = $"""INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion") VALUES ('{initialMigration}', '10.0.0') ON CONFLICT DO NOTHING""";
                             await cmd.ExecuteNonQueryAsync();
+                            logger.LogInformation("Baselined InitialCreate migration: {Migration}", initialMigration);
                         }
-                        logger.LogInformation("Baselined {Count} migration(s)", applied.Count());
                     }
                 }
             }

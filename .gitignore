@@ -510,3 +510,6 @@ docs/**/.*
 .claude
 **/.env
 **/docs/.*
+
+# Docker runtime data
+**/.data/
