@@ -28,33 +28,28 @@ public class ReadFileSkill : AgentToolBase<ReadFileArgs>
     public override string Name => "read_file";
     public override string Description => "Read the contents of a file at the specified path. Sensitive files (.env, credentials, secrets, keys) are blocked for security.";
 
-    public override async Task<ToolResult> ExecuteAsync(ReadFileArgs args, CancellationToken ct)
+    public override async Task<ToolResult> ExecuteAsync(ReadFileArgs args, ToolContext context, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(args.Path))
-        {
             return ToolResult.Failure("Path is required.");
-        }
 
-        // Path traversal protection
-        var pathError = PathSecurity.ValidatePath(args.Path);
+        var userId = context.UserId ?? Guid.Empty;
+        var resolvedPath = PathSecurity.ResolveUserPath(args.Path, userId, context.IsSuperAdmin);
+
+        // Workspace boundary check
+        var pathError = PathSecurity.ValidatePath(resolvedPath, userId, context.IsSuperAdmin);
         if (pathError is not null)
-        {
             return ToolResult.Failure(pathError);
-        }
 
-        if (!File.Exists(args.Path))
-        {
+        if (!File.Exists(resolvedPath))
             return ToolResult.Failure($"File not found: {args.Path}");
-        }
 
-        // Check if file is sensitive (using the resolved full path's filename)
-        var fileName = Path.GetFileName(Path.GetFullPath(args.Path));
+        // Check if file is sensitive
+        var fileName = Path.GetFileName(resolvedPath);
         if (IsSensitiveFile(fileName))
-        {
             return ToolResult.Failure($"Access denied: '{fileName}' is a sensitive file and cannot be read for security reasons.");
-        }
 
-        var content = await File.ReadAllTextAsync(args.Path, ct);
+        var content = await File.ReadAllTextAsync(resolvedPath, ct);
         return ToolResult.Success(content);
     }
 

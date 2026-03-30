@@ -20,34 +20,33 @@ public class WriteFileSkill : AgentToolBase<WriteFileArgs>
     public override string Name => "write_file";
     public override string Description => "Write content to a file at the specified path. Creates the file if it doesn't exist.";
 
-    public override async Task<ToolResult> ExecuteAsync(WriteFileArgs args, CancellationToken ct)
+    public override async Task<ToolResult> ExecuteAsync(WriteFileArgs args, ToolContext context, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(args.Path))
-        {
             return ToolResult.Failure("Path is required.");
-        }
 
-        // Path traversal protection
-        var pathError = PathSecurity.ValidatePath(args.Path);
+        var userId = context.UserId ?? Guid.Empty;
+        var resolvedPath = PathSecurity.ResolveUserPath(args.Path, userId, context.IsSuperAdmin);
+
+        // Workspace boundary check
+        var pathError = PathSecurity.ValidatePath(resolvedPath, userId, context.IsSuperAdmin);
         if (pathError is not null)
-        {
             return ToolResult.Failure(pathError);
-        }
+
+        // Block writing to shared workspace (read-only for non-SuperAdmin)
+        if (!context.IsSuperAdmin && PathSecurity.IsSharedPath(resolvedPath))
+            return ToolResult.Failure("The shared workspace is read-only.");
 
         // Block writing to sensitive files
-        var fileName = Path.GetFileName(Path.GetFullPath(args.Path));
+        var fileName = Path.GetFileName(resolvedPath);
         if (SensitiveFileNames.Contains(fileName))
-        {
             return ToolResult.Failure($"Writing to '{fileName}' is not allowed for security reasons.");
-        }
 
-        var directory = Path.GetDirectoryName(args.Path);
+        var directory = Path.GetDirectoryName(resolvedPath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-        {
             Directory.CreateDirectory(directory);
-        }
 
-        await File.WriteAllTextAsync(args.Path, args.Content ?? "", ct);
+        await File.WriteAllTextAsync(resolvedPath, args.Content ?? "", ct);
         return ToolResult.Success($"File written successfully: {args.Path}");
     }
 }

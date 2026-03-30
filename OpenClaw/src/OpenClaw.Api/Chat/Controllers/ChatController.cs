@@ -103,8 +103,13 @@ public class ChatController(
                 }
 
                 // Execute skill first
+                var currentUser = currentUserProvider.GetCurrentUser();
                 var jsonArgs = slashCommandParser.ConvertToJson(command, skill);
-                var skillContext = new ToolContext(jsonArgs);
+                var skillContext = new ToolContext(jsonArgs)
+                {
+                    UserId = currentUser.Id,
+                    IsSuperAdmin = currentUser.Roles.Contains("SuperAdmin")
+                };
                 var skillResult = await skill.ExecuteAsync(skillContext, ct);
 
                 if (!skillResult.IsSuccess)

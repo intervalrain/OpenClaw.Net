@@ -31,13 +31,4 @@ public class CronJobExecutionRepository(AppDbContext context)
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<CronJobExecution>> GetRecentAsync(
-        int limit = 20, int offset = 0, CancellationToken ct = default)
-    {
-        return await DbContext.Set<CronJobExecution>()
-            .OrderByDescending(x => x.StartedAt)
-            .Skip(offset)
-            .Take(limit)
-            .ToListAsync(ct);
-    }
 }

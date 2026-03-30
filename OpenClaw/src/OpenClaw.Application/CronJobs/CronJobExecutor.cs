@@ -116,7 +116,11 @@ public class CronJobExecutor(
                 string toolResult;
                 if (toolMap.TryGetValue(toolCall.Name, out var tool))
                 {
-                    var result = await tool.ExecuteAsync(new ToolContext(toolCall.Arguments));
+                    var result = await tool.ExecuteAsync(new ToolContext(toolCall.Arguments)
+                    {
+                        UserId = userId,
+                        IsSuperAdmin = false // CronJobs run as the owning user, never as SuperAdmin
+                    });
                     toolResult = result.IsSuccess ? result.Output ?? "" : $"Error: {result.Error}";
                 }
                 else

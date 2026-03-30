@@ -164,6 +164,12 @@ var app = builder.Build();
         await seeder.SeedAsync();
     }
 
+    // Ensure workspace directories exist
+    var workspaceBasePath = Environment.GetEnvironmentVariable("OPENCLAW_WORKSPACE_PATH")
+        ?? Path.Combine(AppContext.BaseDirectory, "workspace");
+    Directory.CreateDirectory(Path.Combine(workspaceBasePath, "shared"));
+    app.Logger.LogInformation("Workspace base path: {WorkspacePath}", workspaceBasePath);
+
     app.UseWedaCore<AppDbContext>(options =>
     {
         options.EnsureDatabaseCreated = false; // Already done above

@@ -47,12 +47,10 @@ public class ExecuteCommandSkill(
     public override string Name => "execute_command";
     public override string Description => "Execute a shell command. Only allowed commands can be executed. Dangerous patterns are blocked";
 
-    public override async Task<ToolResult> ExecuteAsync(ExecuteCommandArgs args, CancellationToken ct)
+    public override async Task<ToolResult> ExecuteAsync(ExecuteCommandArgs args, ToolContext context, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(args.Command))
-        {
             return ToolResult.Failure("Command is required.");
-        }
 
         // Normalize whitespace to prevent bypass via extra spaces (e.g., "rm   -rf")
         var normalizedCommand = System.Text.RegularExpressions.Regex.Replace(
@@ -62,21 +60,34 @@ public class ExecuteCommandSkill(
             normalizedCommand.Contains(p, StringComparison.OrdinalIgnoreCase));
 
         if (blockedPattern is not null)
-        {
             return ToolResult.Failure($"Command contains blocked pattern: '{blockedPattern}'");
-        }
 
         // Check allowed commands
         var commandName = normalizedCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 
         if (!_allowedCommands.Contains(commandName))
-        {
             return ToolResult.Failure($"Command '{commandName}' is not allowed. Allowed: {string.Join(", ", _allowedCommands)}");
+
+        // Resolve working directory to user's workspace
+        var userId = context.UserId ?? Guid.Empty;
+        string workingDirectory;
+        if (args.WorkingDirectory is not null)
+        {
+            workingDirectory = OpenClaw.Tools.FileSystem.PathSecurity.ResolveUserPath(
+                args.WorkingDirectory, userId, context.IsSuperAdmin);
+            var pathError = OpenClaw.Tools.FileSystem.PathSecurity.ValidatePath(
+                workingDirectory, userId, context.IsSuperAdmin);
+            if (pathError is not null)
+                return ToolResult.Failure(pathError);
+        }
+        else
+        {
+            workingDirectory = OpenClaw.Tools.FileSystem.PathSecurity.GetUserWorkspacePath(userId);
         }
 
         try
         {
-            var result = await RunCommandAsync(args.Command, args.WorkingDirectory, ct);
+            var result = await RunCommandAsync(args.Command, workingDirectory, ct);
             return ToolResult.Success(result);
         }
         catch (OperationCanceledException)
@@ -89,7 +100,7 @@ public class ExecuteCommandSkill(
         }
     }
 
-    private async Task<string> RunCommandAsync(string command, string? workingDirectory, CancellationToken ct)
+    private async Task<string> RunCommandAsync(string command, string workingDirectory, CancellationToken ct)
     {
         var isWindows = OperatingSystem.IsWindows();
         var shell = isWindows ? "cmd.exe" : "/bin/bash";
@@ -101,7 +112,7 @@ public class ExecuteCommandSkill(
             {
                 FileName = shell,
                 Arguments = shellArgs,
-                WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
+                WorkingDirectory = workingDirectory,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
