@@ -279,8 +279,10 @@ function showUserDetails(userId) {
 
     document.getElementById('modalTitle').textContent = selectedUser.name;
 
-    const roles = ['User', 'Admin', 'SuperAdmin'];
+    // SuperAdmin is assigned at setup time only, not manageable via UI
+    const assignableRoles = ['User', 'Admin'];
     const userRoles = selectedUser.roles || [];
+    const isSuperAdminTarget = userRoles.includes('SuperAdmin');
 
     document.getElementById('modalBody').innerHTML = `
         <div class="user-detail">
@@ -290,7 +292,7 @@ function showUserDetails(userId) {
         <div class="user-detail">
             <label>Status</label>
             <div class="value">
-                <select id="userStatusSelect" ${isSelf ? 'disabled' : ''}>
+                <select id="userStatusSelect" ${isSelf || isSuperAdminTarget ? 'disabled' : ''}>
                     <option value="Active" ${selectedUser.status === 'Active' ? 'selected' : ''}>Active</option>
                     <option value="Inactive" ${selectedUser.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
                     <option value="Locked" ${selectedUser.status === 'Locked' ? 'selected' : ''}>Locked</option>
@@ -299,12 +301,13 @@ function showUserDetails(userId) {
         </div>
         <div class="user-detail">
             <label>Roles</label>
+            ${isSuperAdminTarget ? '<div class="text-muted">SuperAdmin (assigned at system setup, not editable)</div>' : ''}
             <div class="role-select">
-                ${roles.map(role => `
-                    <label class="role-checkbox ${userRoles.includes(role) ? 'checked' : ''}" ${isSelf && role === 'SuperAdmin' ? 'title="Cannot remove own SuperAdmin role"' : ''}>
+                ${assignableRoles.map(role => `
+                    <label class="role-checkbox ${userRoles.includes(role) ? 'checked' : ''}" ${isSuperAdminTarget ? 'style="pointer-events:none;opacity:0.5"' : ''}>
                         <input type="checkbox" value="${role}"
                             ${userRoles.includes(role) ? 'checked' : ''}
-                            ${isSelf && role === 'SuperAdmin' ? 'disabled' : ''}>
+                            ${isSuperAdminTarget ? 'disabled' : ''}>
                         ${role}
                     </label>
                 `).join('')}
@@ -331,15 +334,18 @@ function showUserDetails(userId) {
         });
     });
 
+    const canModify = !isSelf && !isSuperAdminTarget;
     const footer = document.getElementById('modalFooter');
     footer.innerHTML = `
-        ${!isSelf ? `<button class="btn btn-danger" id="modalDeleteBtn">Delete</button>` : ''}
+        ${canModify ? `<button class="btn btn-danger" id="modalDeleteBtn">Delete</button>` : ''}
         <button class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
-        <button class="btn btn-primary" id="modalSaveBtn">Save Changes</button>
+        ${canModify ? `<button class="btn btn-primary" id="modalSaveBtn">Save Changes</button>` : ''}
     `;
-    if (!isSelf) document.getElementById('modalDeleteBtn').addEventListener('click', showDeleteModal);
+    if (canModify) {
+        document.getElementById('modalDeleteBtn').addEventListener('click', showDeleteModal);
+        document.getElementById('modalSaveBtn').addEventListener('click', saveUserChanges);
+    }
     document.getElementById('modalCancelBtn').addEventListener('click', closeUserModal);
-    document.getElementById('modalSaveBtn').addEventListener('click', saveUserChanges);
 
     userModal.classList.add('active');
 }

@@ -119,10 +119,12 @@ public class User : AggregateRoot<Guid>
             return UserErrors.OnlySuperAdminCanChangeRoles;
         }
 
-        // Prevent removing own SuperAdmin role
-        if (Id == currentUserId &&
-            _roles.Contains(Role.SuperAdmin) &&
-            !newRoles.Contains(Role.SuperAdmin))
+        // SuperAdmin is assigned at system setup only — cannot be granted or revoked via API
+        if (newRoles.Contains(Role.SuperAdmin) && !_roles.Contains(Role.SuperAdmin))
+        {
+            return UserErrors.CannotAssignSuperAdmin;
+        }
+        if (_roles.Contains(Role.SuperAdmin) && !newRoles.Contains(Role.SuperAdmin))
         {
             return UserErrors.CannotRemoveOwnSuperAdmin;
         }
