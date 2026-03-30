@@ -4,7 +4,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OpenClaw.Domain.Chat.Entities;
+using OpenClaw.Domain.Configuration.Entities;
 using OpenClaw.Domain.CronJobs.Entities;
+using OpenClaw.Domain.Users.Entities;
+using Weda.Core.Application.Security.Models;
 using Weda.Core.Infrastructure.Persistence;
 
 namespace OpenClaw.Infrastructure.Common.Persistence;
@@ -22,13 +25,21 @@ public class AppDbContext : WedaDbContext
     }
 
     /// <summary>
-    /// Current user ID resolved from JWT claims. Used by EF Core global query filters
-    /// to automatically scope user-owned entities. Returns Guid.Empty if no user context.
+    /// Current user ID resolved from JWT claims. Returns Guid.Empty only when no HTTP context
+    /// (e.g. background services). Never used as a "bypass" — see IsSuperAdmin for admin access.
     /// </summary>
     private Guid CurrentUserId =>
         Guid.TryParse(_httpContextAccessor.HttpContext?.User?.FindFirstValue("id"), out var id)
             ? id
             : Guid.Empty;
+
+    /// <summary>
+    /// Whether the current user has SuperAdmin role. SuperAdmin bypasses query filters
+    /// to see all users' data. Background services (no HTTP context) also bypass.
+    /// </summary>
+    private bool IsSuperAdmin =>
+        _httpContextAccessor.HttpContext is null ||
+        (_httpContextAccessor.HttpContext.User?.IsInRole(Role.SuperAdmin) ?? false);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,16 +47,28 @@ public class AppDbContext : WedaDbContext
         base.OnModelCreating(modelBuilder);
 
         // Global query filters for multi-tenant isolation.
-        // These automatically add WHERE UserId = @currentUserId to all queries.
-        // Use .IgnoreQueryFilters() for admin/system queries that need to bypass.
+        // SuperAdmin and background services bypass filters.
+        // Regular users only see their own data.
         modelBuilder.Entity<Conversation>()
-            .HasQueryFilter(e => CurrentUserId == Guid.Empty || e.UserId == CurrentUserId);
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
 
         modelBuilder.Entity<CronJob>()
-            .HasQueryFilter(e => CurrentUserId == Guid.Empty || e.CreatedByUserId == CurrentUserId);
+            .HasQueryFilter(e => IsSuperAdmin || e.CreatedByUserId == CurrentUserId);
 
         modelBuilder.Entity<ToolInstance>()
-            .HasQueryFilter(e => CurrentUserId == Guid.Empty || e.CreatedByUserId == CurrentUserId);
+            .HasQueryFilter(e => IsSuperAdmin || e.CreatedByUserId == CurrentUserId);
+
+        modelBuilder.Entity<UserModelProvider>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
+
+        modelBuilder.Entity<UserConfig>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
+
+        modelBuilder.Entity<UserPreference>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
+
+        modelBuilder.Entity<ChannelSettings>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

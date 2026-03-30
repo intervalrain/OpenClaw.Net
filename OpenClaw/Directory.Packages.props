@@ -39,6 +39,7 @@
     <PackageVersion Include="Riok.Mapperly" Version="4.2.1" />
     <PackageVersion Include="Mediator.Abstractions" Version="3.1.0-preview.14" />
     <PackageVersion Include="Mediator.SourceGenerator" Version="3.1.0-preview.14" />
+    <PackageVersion Include="Scriban" Version="7.0.6" />
     <PackageVersion Include="FluentValidation" Version="11.11.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
     <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.0" />

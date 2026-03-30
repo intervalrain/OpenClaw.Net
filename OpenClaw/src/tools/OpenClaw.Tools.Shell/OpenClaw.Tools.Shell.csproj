@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\OpenClaw.Contracts\OpenClaw.Contracts.csproj" />
+    <ProjectReference Include="..\OpenClaw.Tools.FileSystem\OpenClaw.Tools.FileSystem.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -19,6 +19,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Riok.Mapperly" />
+    <!-- Override Scriban transitive dependency from Mediator.SourceGenerator to fix CVE (GHSA-5wr9-m6jw-xx44) -->
+    <PackageReference Include="Scriban" />
   </ItemGroup>
 
 </Project>

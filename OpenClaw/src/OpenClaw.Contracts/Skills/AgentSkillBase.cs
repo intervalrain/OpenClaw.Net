@@ -26,7 +26,7 @@ public abstract class AgentToolBase<TArgs> : IAgentTool where TArgs : class
                 return ToolResult.Failure("Failed to parse arguments.");
             }
 
-            return await ExecuteAsync(args, ct);
+            return await ExecuteAsync(args, context, ct);
         }
         catch (JsonException ex)
         {
@@ -38,7 +38,15 @@ public abstract class AgentToolBase<TArgs> : IAgentTool where TArgs : class
         }
     }
 
-    public abstract Task<ToolResult> ExecuteAsync(TArgs args, CancellationToken ct);
+    /// <summary>
+    /// Override this to access user context (userId, isSuperAdmin).
+    /// Default implementation delegates to the args-only overload for backward compatibility.
+    /// </summary>
+    public virtual Task<ToolResult> ExecuteAsync(TArgs args, ToolContext context, CancellationToken ct)
+        => ExecuteAsync(args, ct);
+
+    public virtual Task<ToolResult> ExecuteAsync(TArgs args, CancellationToken ct)
+        => throw new NotImplementedException($"Tool must override either ExecuteAsync(TArgs, ToolContext, CancellationToken) or ExecuteAsync(TArgs, CancellationToken)");
 
     private static ToolParameters GenerateToolParameters()
     {
