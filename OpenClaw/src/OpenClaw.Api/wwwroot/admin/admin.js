@@ -876,11 +876,19 @@ async function loadAuditLogs() {
 
     const params = new URLSearchParams({ limit: auditLimit, offset: auditOffset });
     if (action) params.set('action', action);
-    if (fromDate) params.set('from', new Date(fromDate).toISOString());
-    if (toDate) params.set('to', new Date(toDate + 'T23:59:59').toISOString());
+
+    // Default: last 1 hour if no date filter set
+    if (fromDate) {
+        params.set('from', new Date(fromDate).toISOString());
+    } else {
+        params.set('from', new Date(Date.now() - 60 * 60 * 1000).toISOString());
+    }
+    if (toDate) {
+        params.set('to', new Date(toDate).toISOString());
+    }
 
     try {
-        const res = await fetch(`${AUDIT_API}?${params}`, { headers: authHeaders() });
+        const res = await authFetch(`${AUDIT_API}?${params}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         auditLogs = await res.json();
         renderAuditLogs();
@@ -888,6 +896,26 @@ async function loadAuditLogs() {
         document.getElementById('auditLogBody').innerHTML =
             `<tr><td colspan="7" style="text-align:center; color: var(--text-secondary);">Failed to load audit logs</td></tr>`;
     }
+}
+
+/** Format timestamp as relative time (e.g. "3m ago", "2h ago") or absolute if older than 24h */
+function formatAuditTime(timestamp) {
+    const now = Date.now();
+    const t = new Date(timestamp).getTime();
+    const diff = now - t;
+
+    if (diff < 0) return 'just now';
+    if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+
+    // Older than 24h: show date + time
+    const d = new Date(timestamp);
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${month}-${day} ${hours}:${mins}`;
 }
 
 function renderAuditLogs() {
@@ -905,10 +933,11 @@ function renderAuditLogs() {
     }
 
     body.innerHTML = auditLogs.map(log => {
-        const time = new Date(log.timestamp).toLocaleString();
+        const relTime = formatAuditTime(log.timestamp);
+        const fullTime = new Date(log.timestamp).toLocaleString();
         const statusClass = log.statusCode >= 400 ? 'audit-status-error' : 'audit-status-ok';
         return `<tr>
-            <td class="audit-time">${time}</td>
+            <td class="audit-time" title="${fullTime}">${relTime}</td>
             <td><span class="audit-action-badge">${log.action}</span></td>
             <td>${log.userEmail || log.userId || 'anonymous'}</td>
             <td><span class="audit-method audit-method-${log.httpMethod.toLowerCase()}">${log.httpMethod}</span></td>
