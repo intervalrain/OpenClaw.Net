@@ -104,6 +104,55 @@ var app = builder.Build();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
+        // Detect corrupted state: __EFMigrationsHistory says InitialCreate ran but tables are missing.
+        // This happens when a legacy DB (created via EnsureCreated) was incorrectly baselined.
+        // Fix: drop everything and let Migrate() rebuild from scratch.
+        var conn = dbContext.Database.GetDbConnection();
+        await conn.OpenAsync();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_name = '__EFMigrationsHistory'
+                )
+            """;
+            var historyExists = (bool)(await cmd.ExecuteScalarAsync())!;
+
+            if (historyExists)
+            {
+                // Check if a required table from InitialCreate is actually present
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cron_jobs')";
+                var schemaValid = (bool)(await cmd.ExecuteScalarAsync())!;
+
+                if (!schemaValid)
+                {
+                    logger.LogWarning("Corrupted migration state detected (history exists but schema incomplete). Rebuilding database...");
+                    await conn.CloseAsync();
+                    dbContext.Database.EnsureDeleted();
+                    dbContext.Database.EnsureCreated();
+                    await conn.OpenAsync();
+
+                    // Seed __EFMigrationsHistory so future Migrate() calls work correctly
+                    using var seedCmd = conn.CreateCommand();
+                    seedCmd.CommandText = """
+                        CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+                            "MigrationId" varchar(150) NOT NULL PRIMARY KEY,
+                            "ProductVersion" varchar(32) NOT NULL
+                        );
+                    """;
+                    await seedCmd.ExecuteNonQueryAsync();
+
+                    foreach (var migration in dbContext.Database.GetMigrations())
+                    {
+                        seedCmd.CommandText = $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ('{migration}', '9.0.0') ON CONFLICT DO NOTHING";
+                        await seedCmd.ExecuteNonQueryAsync();
+                    }
+                    logger.LogInformation("Database rebuilt and migration history seeded");
+                }
+            }
+        }
+
         var pending = dbContext.Database.GetPendingMigrations().ToList();
         if (pending.Count > 0)
         {
