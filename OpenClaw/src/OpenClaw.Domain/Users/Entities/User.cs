@@ -66,7 +66,7 @@ public class User : AggregateRoot<Guid>
         };
 
         user._roles.AddRange(roles ?? [Role.User]);
-        user._permissions.AddRange(permissions ?? []);
+        user._permissions.AddRange(permissions ?? [Permission.OpenClaw]);
 
         return user;
     }
@@ -122,6 +122,7 @@ public class User : AggregateRoot<Guid>
 
         Status = UserStatus.Banned;
         BanReason = reason;
+        _permissions.Remove(Permission.OpenClaw);
         RefreshToken = null;
         RefreshTokenExpiresAt = null;
         UpdatedAt = DateTime.UtcNow;
@@ -132,6 +133,8 @@ public class User : AggregateRoot<Guid>
     {
         Status = UserStatus.Active;
         BanReason = null;
+        if (!_permissions.Contains(Permission.OpenClaw))
+            _permissions.Add(Permission.OpenClaw);
         UpdatedAt = DateTime.UtcNow;
     }
 

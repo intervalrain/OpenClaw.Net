@@ -99,6 +99,18 @@ async function authFetch(url, options = {}) {
 
     let response = await fetch(url, options);
 
+    // Handle 403 Banned - redirect to banned page
+    if (response.status === 403) {
+        try {
+            const body = await response.clone().json();
+            if (body.banned) {
+                clearAuth();
+                window.location.href = '/banned.html?reason=' + encodeURIComponent(body.reason || '');
+                return response;
+            }
+        } catch { /* not a ban response, continue */ }
+    }
+
     // Handle 401 Unauthorized - try to refresh token
     if (response.status === 401) {
         const refreshed = await refreshAccessToken();
@@ -112,7 +124,6 @@ async function authFetch(url, options = {}) {
             if (typeof showLoginModal === 'function') {
                 showLoginModal(() => window.location.reload());
             } else {
-                // Fallback to main page (which will show login modal)
                 window.location.href = '/openclaw/index.html';
             }
         }

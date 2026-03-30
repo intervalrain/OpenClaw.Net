@@ -68,6 +68,12 @@ public static class UserErrors
         code: "User.CannotBanAdminOrSuperAdmin",
         description: "Cannot ban users with Admin or SuperAdmin roles.");
 
+    public static Error AccountBanned(string? reason) => Error.Forbidden(
+        code: "User.AccountBanned",
+        description: reason is not null
+            ? $"Your account has been banned. Reason: {reason}"
+            : "Your account has been banned.");
+
     public static readonly Error AccountNotActive = Error.Unauthorized(
         code: "User.AccountNotActive",
         description: "This account is not active. Please wait for admin approval.");

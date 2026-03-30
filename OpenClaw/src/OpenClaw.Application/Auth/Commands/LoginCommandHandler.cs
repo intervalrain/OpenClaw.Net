@@ -36,6 +36,11 @@ public class LoginCommandHandler(
             return UserErrors.AccountPendingApproval;
         }
 
+        if (user.Status == Domain.Users.Enums.UserStatus.Banned)
+        {
+            return UserErrors.AccountBanned(user.BanReason);
+        }
+
         if (user.Status != Domain.Users.Enums.UserStatus.Active)
         {
             return UserErrors.AccountNotActive;

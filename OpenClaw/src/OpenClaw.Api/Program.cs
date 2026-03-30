@@ -166,11 +166,14 @@ var app = builder.Build();
 
     app.UseWedaCore<AppDbContext>(options =>
     {
-        options.EnsureDatabaseCreated = false; // Already done above
+        options.EnsureDatabaseCreated = false;
         options.SwaggerEndpointUrl = "/swagger/v1/swagger.json";
         options.SwaggerEndpointName = "OpenClaw.NET API V1";
         options.RoutePrefix = "swagger";
     });
+
+    // Real-time ban enforcement (after auth, checks DB on every authenticated request)
+    app.UseMiddleware<OpenClaw.Api.Security.BanCheckMiddleware>();
 
     app.Run();
 }
