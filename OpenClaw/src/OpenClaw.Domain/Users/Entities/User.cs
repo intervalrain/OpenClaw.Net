@@ -6,8 +6,6 @@ using OpenClaw.Domain.Users.Enums;
 using OpenClaw.Domain.Users.Errors;
 using OpenClaw.Domain.Users.ValueObjects;
 
-using Microsoft.AspNetCore.Mvc.Diagnostics;
-
 namespace OpenClaw.Domain.Users.Entities;
 
 public class User : AggregateRoot<Guid>

@@ -1286,7 +1286,8 @@ async function saveTelegramSettings() {
         });
 
         if (!res.ok) {
-            throw new Error('Failed to save Telegram settings');
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.message || body?.detail || 'Failed to save Telegram settings');
         }
 
         telegramSettings = await res.json();
@@ -1294,7 +1295,7 @@ async function saveTelegramSettings() {
         return true;
     } catch (e) {
         console.error('Failed to save Telegram settings:', e);
-        alert('Failed to save Telegram settings');
+        alert(e.message);
         return false;
     }
 }
@@ -1307,9 +1308,12 @@ function initTelegramChannel() {
 
     const enabledToggle = document.getElementById('telegram-enabled');
     if (enabledToggle) {
-        enabledToggle.addEventListener('change', () => {
-            // Auto-save when toggling
-            saveTelegramSettings();
+        enabledToggle.addEventListener('change', async () => {
+            const success = await saveTelegramSettings();
+            if (!success) {
+                // Revert toggle on failure
+                enabledToggle.checked = !enabledToggle.checked;
+            }
         });
     }
 }
