@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenClaw.Application.AgentActivities;
 using OpenClaw.Contracts.CronJobs;
+using OpenClaw.Contracts.HierarchicalAgents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Domain.AgentActivities;
@@ -55,7 +56,6 @@ public class CronJobExecutor(
         await executionRepo.AddAsync(execution, ct);
         await uow.SaveChangesAsync(ct);
 
-        // Run in background — ExecuteCoreAsync creates its own scope
         _ = Task.Run(async () =>
         {
             try
@@ -90,8 +90,6 @@ public class CronJobExecutor(
     {
         using var scope = scopeFactory.CreateScope();
 
-        // Set up synthetic HttpContext so ICurrentUserProvider and EF query filters
-        // work correctly in background execution (no real HTTP request exists).
         if (userId.HasValue)
         {
             var httpContextAccessor = scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>();
@@ -102,7 +100,7 @@ public class CronJobExecutor(
         var toolInstanceRepo = scope.ServiceProvider.GetRequiredService<IToolInstanceRepository>();
         var toolRegistry = scope.ServiceProvider.GetRequiredService<IToolRegistry>();
         var skillStore = scope.ServiceProvider.GetRequiredService<ISkillStore>();
-        var llmProviderFactory = scope.ServiceProvider.GetRequiredService<ILlmProviderFactory>();
+        var executionEngine = scope.ServiceProvider.GetRequiredService<IExecutionEngine>();
         var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
         var execution = await executionRepo.GetByIdAsync(executionId)
@@ -111,7 +109,6 @@ public class CronJobExecutor(
         execution.Start();
         await uow.SaveChangesAsync();
 
-        // Resolve user name for activity tracking
         var userName = "System";
         if (userId.HasValue)
         {
@@ -125,133 +122,38 @@ public class CronJobExecutor(
             ActivityType.CronJob, ActivityStatus.Started,
             job.Id.ToString(), job.Name);
 
-        // 1. Build system prompt from @skill references in context
         var systemPrompt = BuildSystemPrompt(job.ContextJson, skillStore);
 
-        // 2. Build available tools from #tool-instance references in content
-        var (toolDefs, toolMap, instanceArgs, processedContent) = await BuildToolsAsync(
+        var (toolNames, processedContent) = await BuildToolNamesAsync(
             job.Content, userId, toolInstanceRepo, toolRegistry);
 
-        // 3. Also register tools declared by referenced @skills
-        RegisterSkillTools(job.ContextJson, skillStore, toolRegistry, toolDefs, toolMap);
-
-        // 4. Call LLM (use per-user provider if userId is available)
-        var llmProvider = userId.HasValue
-            ? await llmProviderFactory.GetProviderAsync(userId.Value)
-            : await llmProviderFactory.GetProviderAsync();
-        var messages = new List<ChatMessage>
+        var result = await executionEngine.ExecuteAsync(new ExecutionRequest
         {
-            new(ChatRole.System, systemPrompt),
-            new(ChatRole.User, processedContent)
-        };
+            Content = processedContent,
+            SystemPrompt = systemPrompt,
+            UserId = userId,
+            WorkspaceId = job.WorkspaceId,
+            ToolNames = toolNames
+        });
 
-        var toolCallLog = new List<object>();
-
-        // Tool-use loop
-        const int maxIterations = 10;
-        for (var i = 0; i < maxIterations; i++)
+        if (result.IsSuccess)
         {
-            var response = await llmProvider.ChatAsync(messages, toolDefs);
+            execution.Complete(result.Output, result.ToolCallsJson);
+            await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Content, Content: result.Output));
 
-            if (!response.HasToolCalls)
-            {
-                var output = response.Content ?? "";
-                await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Content, Content: output));
-                execution.Complete(output, JsonSerializer.Serialize(toolCallLog));
-                await uow.SaveChangesAsync();
-                await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Completed));
-
-                await activityTracker.TrackAsync(
-                    userId ?? Guid.Empty, userName,
-                    ActivityType.CronJob, ActivityStatus.Completed,
-                    job.Id.ToString(), job.Name);
-                return;
-            }
-
-            messages.Add(new ChatMessage(ChatRole.Assistant, response.Content, ToolCalls: response.ToolCalls));
-
-            foreach (var toolCall in response.ToolCalls!)
-            {
-                await activityTracker.TrackAsync(
-                    userId ?? Guid.Empty, userName,
-                    ActivityType.ToolExecution, ActivityStatus.ToolExecuting,
-                    job.Id.ToString(), job.Name, toolCall.Name);
-
-                // Merge pre-filled tool instance args with LLM-provided args
-                var mergedArgs = MergeToolArgs(instanceArgs, toolCall.Name, toolCall.Arguments);
-
-                await EmitAsync(streamWriter, new CronJobStreamEvent(
-                    CronJobStreamEventType.ToolCall, ToolName: toolCall.Name, Arguments: mergedArgs));
-
-                string toolResult;
-                if (toolMap.TryGetValue(toolCall.Name, out var tool))
-                {
-                    var result = await tool.ExecuteAsync(new ToolContext(mergedArgs)
-                    {
-                        UserId = userId,
-                        WorkspaceId = job.WorkspaceId,
-                        IsSuperAdmin = false
-                    });
-                    toolResult = result.IsSuccess ? result.Output ?? "" : $"Error: {result.Error}";
-                }
-                else
-                {
-                    toolResult = $"Error: Tool '{toolCall.Name}' not available";
-                }
-
-                await EmitAsync(streamWriter, new CronJobStreamEvent(
-                    CronJobStreamEventType.ToolResult, ToolName: toolCall.Name, Content: toolResult));
-
-                await activityTracker.TrackAsync(
-                    userId ?? Guid.Empty, userName,
-                    ActivityType.ToolExecution, ActivityStatus.Completed,
-                    job.Id.ToString(), job.Name, toolCall.Name);
-
-                toolCallLog.Add(new { tool = toolCall.Name, args = mergedArgs, result = toolResult });
-                messages.Add(new ChatMessage(ChatRole.Tool, toolResult, toolCall.Id));
-            }
+            await activityTracker.TrackAsync(
+                userId ?? Guid.Empty, userName,
+                ActivityType.CronJob, ActivityStatus.Completed,
+                job.Id.ToString(), job.Name);
+        }
+        else
+        {
+            execution.Fail(result.ErrorMessage);
+            await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Failed, Content: result.ErrorMessage));
         }
 
-        var lastContent = messages.LastOrDefault(m => m.Role == ChatRole.Assistant)?.Content
-            ?? "Max iterations reached";
-        await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Content, Content: lastContent));
-        execution.Complete(lastContent, JsonSerializer.Serialize(toolCallLog));
         await uow.SaveChangesAsync();
         await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Completed));
-    }
-
-    /// <summary>
-    /// Merges pre-filled tool instance args with LLM-provided args.
-    /// Instance args act as defaults; LLM args override them.
-    /// </summary>
-    /// <summary>
-    /// Merges pre-filled tool instance args with LLM-provided args.
-    /// LLM args serve as defaults; tool instance args (user-configured) take precedence.
-    /// </summary>
-    private static string MergeToolArgs(Dictionary<string, string> instanceArgs, string toolName, string? llmArgs)
-    {
-        if (!instanceArgs.TryGetValue(toolName, out var prefilledJson))
-            return llmArgs ?? "{}";
-
-        try
-        {
-            var llmParsed = !string.IsNullOrEmpty(llmArgs)
-                ? JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(llmArgs) ?? []
-                : new Dictionary<string, JsonElement>();
-            var prefilled = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(prefilledJson) ?? [];
-
-            // Start with LLM args, then tool instance args override
-            foreach (var (key, value) in prefilled)
-            {
-                llmParsed[key] = value;
-            }
-
-            return JsonSerializer.Serialize(llmParsed);
-        }
-        catch
-        {
-            return prefilledJson;
-        }
     }
 
     private static async Task EmitAsync(ChannelWriter<CronJobStreamEvent>? writer, CronJobStreamEvent evt)
@@ -295,62 +197,19 @@ public class CronJobExecutor(
                 }
             }
         }
-        catch
-        {
-            // Invalid JSON — do NOT inject raw contextJson into the prompt
-        }
+        catch { }
 
         return string.Join("\n\n", parts);
     }
 
-    private static void RegisterSkillTools(
-        string? contextJson,
-        ISkillStore skillStore,
-        IToolRegistry toolRegistry,
-        List<ToolDefinition> toolDefs,
-        Dictionary<string, IAgentTool> toolMap)
-    {
-        if (string.IsNullOrEmpty(contextJson)) return;
-
-        try
-        {
-            var skillNames = JsonSerializer.Deserialize<List<string>>(contextJson) ?? [];
-            foreach (var skillName in skillNames)
-            {
-                if (!Regex.IsMatch(skillName, @"^[\w\-]+$")) continue;
-
-                var skill = skillStore.GetSkill(skillName);
-                if (skill is null) continue;
-
-                foreach (var toolName in skill.Tools)
-                {
-                    if (toolMap.ContainsKey(toolName)) continue;
-
-                    var tool = toolRegistry.GetSkill(toolName);
-                    if (tool is null) continue;
-
-                    toolDefs.Add(new ToolDefinition(tool.Name, tool.Description, tool.Parameters));
-                    toolMap[tool.Name] = tool;
-                }
-            }
-        }
-        catch
-        {
-            // Invalid JSON — skip
-        }
-    }
-
-    private static async Task<(List<ToolDefinition> defs, Dictionary<string, IAgentTool> map,
-        Dictionary<string, string> instanceArgs, string content)> BuildToolsAsync(
+    private static async Task<(List<string> toolNames, string content)> BuildToolNamesAsync(
         string content,
         Guid? userId,
         IToolInstanceRepository toolInstanceRepo,
         IToolRegistry toolRegistry)
     {
-        var toolDefs = new List<ToolDefinition>();
-        var toolMap = new Dictionary<string, IAgentTool>(StringComparer.OrdinalIgnoreCase);
-        // Pre-filled args from tool instances, keyed by tool name
-        var instanceArgs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var toolNames = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var matches = Regex.Matches(content, @"#([\w-]+)");
         foreach (Match match in matches)
@@ -363,27 +222,21 @@ public class CronJobExecutor(
                 if (instance is not null)
                 {
                     var tool = toolRegistry.GetSkill(instance.ToolName);
-                    if (tool is not null && !toolMap.ContainsKey(tool.Name))
+                    if (tool is not null && seen.Add(tool.Name))
                     {
-                        toolDefs.Add(new ToolDefinition(tool.Name, tool.Description, tool.Parameters));
-                        toolMap[tool.Name] = tool;
-                        if (!string.IsNullOrEmpty(instance.ArgsJson))
-                        {
-                            instanceArgs[tool.Name] = instance.ArgsJson;
-                        }
+                        toolNames.Add(tool.Name);
                     }
                 }
             }
 
             var directTool = toolRegistry.GetSkill(instanceName);
-            if (directTool is not null && !toolMap.ContainsKey(directTool.Name))
+            if (directTool is not null && seen.Add(directTool.Name))
             {
-                toolDefs.Add(new ToolDefinition(directTool.Name, directTool.Description, directTool.Parameters));
-                toolMap[directTool.Name] = directTool;
+                toolNames.Add(directTool.Name);
             }
         }
 
-        return (toolDefs, toolMap, instanceArgs, content);
+        return (toolNames, content);
     }
 
     private static HttpContext CreateSyntheticHttpContext(Guid userId)

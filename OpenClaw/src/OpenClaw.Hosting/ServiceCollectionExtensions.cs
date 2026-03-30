@@ -118,8 +118,10 @@ public static class ServiceCollectionExtensions
             return pipeline;
         });
 
-        // Hierarchical Agent Registry
+        // Hierarchical Agent Architecture
         services.AddAgentRegistry();
+        services.AddScoped<IExecutionEngine, SimpleExecutionEngine>();
+        services.AddScoped<IDagExecutor, DagExecutor>();
 
         // Channels
         services.AddTelegramChannel(configuration);
