@@ -3,53 +3,106 @@
 .page-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
     border-bottom: 1px solid var(--border-color);
 }
 
 .page-title h1 {
     margin: 0;
-    font-size: 1.75rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
 }
 
 .page-title .subtitle {
-    margin: 0.25rem 0 0;
+    margin: 0.35rem 0 0;
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+}
+
+/* Dashboard Summary Cards */
+.dashboard-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+
+.summary-card:hover {
+    border-color: var(--primary-color);
+}
+
+.summary-card .summary-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1;
+}
+
+.summary-card .summary-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summary-card.highlight {
+    border-color: var(--warning-color);
+    background: var(--status-warning-bg);
+}
+
+.summary-card.highlight .summary-value {
+    color: var(--warning-color);
 }
 
 /* Tabs */
 .tabs {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.25rem;
     margin-bottom: 1.5rem;
-    border-bottom: 2px solid var(--border-color);
+    padding: 0.25rem;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    overflow-x: auto;
 }
 
 .tab {
-    padding: 0.75rem 1.5rem;
+    padding: 0.6rem 1.25rem;
     background: none;
     border: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+    font-weight: 500;
     color: var(--text-muted);
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    white-space: nowrap;
 }
 
 .tab:hover {
     color: var(--text-color);
+    background: var(--bg-tertiary);
 }
 
 .tab.active {
-    color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
+    color: var(--text-color);
+    background: var(--card-bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
 .badge {
@@ -102,16 +155,17 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1.25rem;
+    padding: 0.85rem 1.25rem;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    transition: all 0.2s ease;
+    border-radius: 10px;
+    transition: all 0.15s ease;
 }
 
 .user-card:hover {
     border-color: var(--primary-color);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-1px);
 }
 
 .user-card-info {
@@ -218,11 +272,11 @@
 .btn {
     padding: 0.5rem 1rem;
     border: none;
-    border-radius: 6px;
-    font-size: 0.875rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 }
 
 .btn-sm {
@@ -519,27 +573,35 @@
 /* Audit Log Table */
 .audit-log-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.85rem;
 }
 
 .audit-log-table th {
     text-align: left;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 2px solid var(--border);
-    color: var(--text-secondary);
+    padding: 0.6rem 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-muted);
     font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     white-space: nowrap;
 }
 
 .audit-log-table td {
-    padding: 0.4rem 0.75rem;
-    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
     vertical-align: middle;
 }
 
+.audit-log-table tbody tr {
+    transition: background 0.1s;
+}
+
 .audit-log-table tbody tr:hover {
-    background: var(--bg-hover, rgba(0,0,0,0.03));
+    background: var(--bg-tertiary);
 }
 
 .audit-time {

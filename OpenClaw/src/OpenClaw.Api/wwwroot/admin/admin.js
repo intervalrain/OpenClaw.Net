@@ -127,11 +127,34 @@ async function loadUsers() {
 
         renderPendingUsers();
         renderAllUsers();
+        updateDashboardSummary();
     } catch (error) {
         console.error('Error loading users:', error);
         pendingUserList.innerHTML = '<div class="empty-state"><p>Failed to load users</p></div>';
         allUserList.innerHTML = '<div class="empty-state"><p>Failed to load users</p></div>';
     }
+}
+
+function updateDashboardSummary() {
+    const total = allUsers.length;
+    const active = allUsers.filter(u => u.status === 'Active').length;
+    const pending = pendingUsers.length;
+    const banned = allUsers.filter(u => u.status === 'Banned').length;
+    const providers = globalProviders.length;
+
+    const setVal = (id, val) => {
+        const el = document.querySelector(`#${id} .summary-value`);
+        if (el) el.textContent = val;
+    };
+    setVal('summaryTotal', total);
+    setVal('summaryActive', active);
+    setVal('summaryPending', pending);
+    setVal('summaryBanned', banned);
+    setVal('summaryProviders', providers);
+
+    // Hide highlight if no pending
+    const pendingCard = document.getElementById('summaryPending');
+    if (pendingCard) pendingCard.classList.toggle('highlight', pending > 0);
 }
 
 // Render pending users
@@ -555,6 +578,7 @@ async function loadGlobalProviders() {
         globalProviders = [];
     }
     renderProviderList();
+    updateDashboardSummary();
 }
 
 function renderProviderList() {

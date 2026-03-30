@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Application Settings - OpenClaw</title>
-    <link rel="icon" type="image/svg+xml" href="/faviocn.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.png">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/home.css">
     <link rel="stylesheet" href="/css/top-header.css">
@@ -23,6 +23,30 @@
         </div>
 
         <main class="main-content">
+            <!-- Dashboard Summary -->
+            <div class="dashboard-summary" id="dashboardSummary">
+                <div class="summary-card" id="summaryTotal">
+                    <div class="summary-value">-</div>
+                    <div class="summary-label">Total Users</div>
+                </div>
+                <div class="summary-card" id="summaryActive">
+                    <div class="summary-value">-</div>
+                    <div class="summary-label">Active</div>
+                </div>
+                <div class="summary-card highlight" id="summaryPending">
+                    <div class="summary-value">-</div>
+                    <div class="summary-label">Pending</div>
+                </div>
+                <div class="summary-card" id="summaryBanned">
+                    <div class="summary-value">-</div>
+                    <div class="summary-label">Banned</div>
+                </div>
+                <div class="summary-card" id="summaryProviders">
+                    <div class="summary-value">-</div>
+                    <div class="summary-label">Providers</div>
+                </div>
+            </div>
+
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab active" data-tab="pending">
