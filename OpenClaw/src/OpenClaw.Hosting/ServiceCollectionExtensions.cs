@@ -119,9 +119,11 @@ public static class ServiceCollectionExtensions
         });
 
         // Hierarchical Agent Architecture
+        services.AddSingleton<IAgent, PioneerAgent>();
         services.AddAgentRegistry();
         services.AddScoped<IExecutionEngine, SimpleExecutionEngine>();
         services.AddScoped<IDagExecutor, DagExecutor>();
+        services.AddScoped<DagExecutionEngine>();
 
         // Channels
         services.AddTelegramChannel(configuration);
