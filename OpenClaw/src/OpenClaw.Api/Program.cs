@@ -104,61 +104,63 @@ var app = builder.Build();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        try
+        // Detect corrupted state: __EFMigrationsHistory says InitialCreate ran but tables are missing.
+        // This happens when a legacy DB (created via EnsureCreated) was incorrectly baselined.
+        // Fix: drop everything and let Migrate() rebuild from scratch.
+        var conn = dbContext.Database.GetDbConnection();
+        await conn.OpenAsync();
+        using (var cmd = conn.CreateCommand())
         {
-            // Detect legacy databases created with EnsureCreated (no migration history table).
-            // If tables exist but __EFMigrationsHistory doesn't, baseline all existing migrations
-            // so Migrate() won't try to re-create existing schema.
-            var conn = dbContext.Database.GetDbConnection();
-            await conn.OpenAsync();
-            using (var cmd = conn.CreateCommand())
+            cmd.CommandText = """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_name = '__EFMigrationsHistory'
+                )
+            """;
+            var historyExists = (bool)(await cmd.ExecuteScalarAsync())!;
+
+            if (historyExists)
             {
-                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '__EFMigrationsHistory')";
-                var historyExists = (bool)(await cmd.ExecuteScalarAsync())!;
+                // Check if a required table from InitialCreate is actually present
+                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cron_jobs')";
+                var schemaValid = (bool)(await cmd.ExecuteScalarAsync())!;
 
-                if (!historyExists)
+                if (!schemaValid)
                 {
-                    // Check if this is an existing database (has our tables) or a fresh one
-                    cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'Users')";
-                    var isExistingDb = (bool)(await cmd.ExecuteScalarAsync())!;
+                    logger.LogWarning("Corrupted migration state detected (history exists but schema incomplete). Rebuilding database...");
+                    await conn.CloseAsync();
+                    dbContext.Database.EnsureDeleted();
+                    dbContext.Database.EnsureCreated();
+                    await conn.OpenAsync();
 
-                    if (isExistingDb)
+                    // Seed __EFMigrationsHistory so future Migrate() calls work correctly
+                    using var seedCmd = conn.CreateCommand();
+                    seedCmd.CommandText = """
+                        CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+                            "MigrationId" varchar(150) NOT NULL PRIMARY KEY,
+                            "ProductVersion" varchar(32) NOT NULL
+                        );
+                    """;
+                    await seedCmd.ExecuteNonQueryAsync();
+
+                    foreach (var migration in dbContext.Database.GetMigrations())
                     {
-                        logger.LogInformation("Legacy database detected (created with EnsureCreated). Baselining migration history...");
-                        cmd.CommandText = """
-                            CREATE TABLE "__EFMigrationsHistory" (
-                                "MigrationId" varchar(150) NOT NULL PRIMARY KEY,
-                                "ProductVersion" varchar(32) NOT NULL
-                            );
-                        """;
-                        await cmd.ExecuteNonQueryAsync();
-
-                        // Mark all known migrations as applied
-                        var applied = dbContext.Database.GetMigrations();
-                        foreach (var migration in applied)
-                        {
-                            cmd.CommandText = $"""INSERT INTO "__EFMigrationsHistory" VALUES ('{migration}', '10.0.0')""";
-                            await cmd.ExecuteNonQueryAsync();
-                        }
-                        logger.LogInformation("Baselined {Count} migration(s)", applied.Count());
+                        seedCmd.CommandText = $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ('{migration}', '9.0.0') ON CONFLICT DO NOTHING";
+                        await seedCmd.ExecuteNonQueryAsync();
                     }
+                    logger.LogInformation("Database rebuilt and migration history seeded");
                 }
             }
+        }
 
-            var pending = dbContext.Database.GetPendingMigrations().ToList();
-            if (pending.Count > 0)
-            {
-                logger.LogInformation("Applying {Count} pending migration(s): {Migrations}",
-                    pending.Count, string.Join(", ", pending));
-            }
-            dbContext.Database.Migrate();
-            logger.LogInformation("Database migration completed");
-        }
-        catch (Exception ex)
+        var pending = dbContext.Database.GetPendingMigrations().ToList();
+        if (pending.Count > 0)
         {
-            logger.LogError(ex, "Database migration failed");
-            throw;
+            logger.LogInformation("Applying {Count} pending migration(s): {Migrations}",
+                pending.Count, string.Join(", ", pending));
         }
+        dbContext.Database.Migrate();
+        logger.LogInformation("Database migration completed");
 
         var seeder = scope.ServiceProvider.GetRequiredService<AppDbContextSeeder>();
         await seeder.SeedAsync();

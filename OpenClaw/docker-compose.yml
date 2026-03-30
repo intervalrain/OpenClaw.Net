@@ -18,9 +18,8 @@ services:
       - OPENCLAW_ENCRYPTION_KEY=${OPENCLAW_ENCRYPTION_KEY}
       - JwtSettings__Secret=${JWT_SECRET}
       - AllowedHosts=*
-      - OPENCLAW_WORKSPACE_PATH=/app/workspace
     volumes:
-      - ${HOME}/.openclaw-net/workspace:/app/workspace
+      - ./.data/workspace:/app/workspace
     depends_on:
       postgres:
         condition: service_healthy
