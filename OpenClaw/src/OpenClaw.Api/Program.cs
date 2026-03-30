@@ -92,9 +92,6 @@ var app = builder.Build();
     // CORS
     app.UseCors();
 
-    // Audit logging for security-critical operations
-    app.UseMiddleware<OpenClaw.Api.Security.AuditLoggingMiddleware>();
-
     // Enable static files (UseDefaultFiles must come before UseStaticFiles)
     app.UseDefaultFiles();
     app.UseStaticFiles();
@@ -180,6 +177,9 @@ var app = builder.Build();
         options.SwaggerEndpointName = "OpenClaw.NET API V1";
         options.RoutePrefix = "swagger";
     });
+
+    // Audit logging (after auth so context.User is populated)
+    app.UseMiddleware<OpenClaw.Api.Security.AuditLoggingMiddleware>();
 
     // Real-time ban enforcement (after auth, checks DB on every authenticated request)
     app.UseMiddleware<OpenClaw.Api.Security.BanCheckMiddleware>();
