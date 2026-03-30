@@ -8,9 +8,11 @@ using OpenClaw.Application.AgentActivities;
 using OpenClaw.Application.Agents;
 using OpenClaw.Application.Agents.Middlewares;
 using OpenClaw.Application.CronJobs;
+using OpenClaw.Application.HierarchicalAgents;
 using OpenClaw.Application.Llm;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
+using OpenClaw.Contracts.HierarchicalAgents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
@@ -116,6 +118,9 @@ public static class ServiceCollectionExtensions
             return pipeline;
         });
 
+        // Hierarchical Agent Registry
+        services.AddAgentRegistry();
+
         // Channels
         services.AddTelegramChannel(configuration);
 
@@ -204,6 +209,26 @@ public static class ServiceCollectionExtensions
             var store = new FileSkillStore(skillsDir, logger);
             store.ReloadAsync().GetAwaiter().GetResult();
             return store;
+        });
+
+        return services;
+    }
+
+    private static IServiceCollection AddAgentRegistry(this IServiceCollection services)
+    {
+        services.AddSingleton<IAgentRegistry>(sp =>
+        {
+            // Collect explicitly registered IAgent instances
+            var agents = sp.GetServices<IAgent>().ToList();
+
+            // Wrap all IAgentTool instances as ToolAgents for backward compatibility
+            var tools = sp.GetServices<IAgentTool>();
+            foreach (var tool in tools)
+            {
+                agents.Add(new ToolAgent(tool));
+            }
+
+            return new AgentRegistry(agents);
         });
 
         return services;
