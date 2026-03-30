@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Application Settings - OpenClaw</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/faviocn.png">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/home.css">
     <link rel="stylesheet" href="/css/top-header.css">
@@ -32,6 +32,7 @@
                 <button class="tab" data-tab="all">All Users</button>
                 <button class="tab" data-tab="providers">Model Providers</button>
                 <button class="tab" data-tab="appconfig">App Config</button>
+                <button class="tab" data-tab="auditlog">Audit Log</button>
             </div>
 
             <!-- Pending Users Tab -->
@@ -68,6 +69,56 @@
                 </div>
                 <div class="user-list" id="appConfigList">
                     <div class="loading">Loading configuration...</div>
+                </div>
+            </section>
+
+            <!-- Audit Log Tab -->
+            <section class="tab-content" id="auditlogTab">
+                <div class="filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                    <select id="auditActionFilter">
+                        <option value="">All Actions</option>
+                        <option value="auth.login">Login</option>
+                        <option value="auth.register">Register</option>
+                        <option value="user.ban">Ban User</option>
+                        <option value="user.unban">Unban User</option>
+                        <option value="user.approve">Approve User</option>
+                        <option value="user.role_change">Role Change</option>
+                        <option value="user.delete">Delete User</option>
+                        <option value="config.post">Config Create</option>
+                        <option value="config.put">Config Update</option>
+                        <option value="config.delete">Config Delete</option>
+                        <option value="provider.post">Provider Create</option>
+                        <option value="cronjob.execute">CronJob Execute</option>
+                        <option value="setup">Setup</option>
+                    </select>
+                    <input type="date" id="auditDateFrom" title="From date">
+                    <input type="date" id="auditDateTo" title="To date">
+                    <button class="btn btn-primary btn-sm" id="auditSearchBtn">Search</button>
+                    <button class="btn btn-secondary btn-sm" id="auditClearBtn">Clear</button>
+                    <span style="margin-left: auto; font-size: 0.85rem; color: var(--text-secondary);" id="auditResultCount"></span>
+                </div>
+                <div class="audit-log-table-wrapper" style="overflow-x: auto; margin-top: 0.75rem;">
+                    <table class="audit-log-table" id="auditLogTable">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>User</th>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th>Status</th>
+                                <th>IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditLogBody">
+                            <tr><td colspan="7" class="loading">Loading audit logs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                    <button class="btn btn-secondary btn-sm" id="auditPrevBtn" disabled>Previous</button>
+                    <span id="auditPageInfo" style="line-height: 2rem; font-size: 0.85rem;"></span>
+                    <button class="btn btn-secondary btn-sm" id="auditNextBtn">Next</button>
                 </div>
             </section>
 

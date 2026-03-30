@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Security;
+using OpenClaw.Domain.Audit.Repositories;
 using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
 using OpenClaw.Domain.Users.Repositories;
@@ -21,6 +22,7 @@ using OpenClaw.Infrastructure.Security.TokenValidation;
 using OpenClaw.Infrastructure.Services;
 using OpenClaw.Infrastructure.Users.Persistence;
 using OpenClaw.Infrastructure.Chat.Persistence;
+using OpenClaw.Infrastructure.Audit.Persistence;
 using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
@@ -81,6 +83,7 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<ISkillSettingRepository, SkillSettingRepository>();
         services.AddScoped<IAppConfigRepository, AppConfigRepository>();
         services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
         // configuration (chain: Database -> Environment)
         // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)

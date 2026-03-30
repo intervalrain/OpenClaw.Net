@@ -48,8 +48,9 @@ var builder = WebApplication.CreateBuilder(args);
         .AddOpenClawTelemetry(builder.Configuration)
         .AddApplication()
         .AddInfrastructure(builder.Configuration)
-        // Background scheduler services
+        // Background services
         .AddHostedService<CronJobSchedulerService>()
+        .AddHostedService<OpenClaw.Api.Audit.AuditLogCleanupService>()
         .AddWedaCore<IAssemblyMarker, IContractsMarker, IApplicationMarker>(
             builder.Configuration,
             services => services.AddMediator(options =>

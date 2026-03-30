@@ -3,6 +3,7 @@
 const API_BASE = '/api/v1/user-management';
 const PROVIDER_API = '/api/v1/model-provider';
 const APP_CONFIG_API = '/api/v1/app-config';
+const AUDIT_API = '/api/v1/audit-log';
 
 // State
 let allUsers = [];
@@ -839,4 +840,96 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// No global scope exposure needed — all handlers use event delegation or addEventListener
+// ===== Audit Log Tab =====
+let auditLogs = [];
+let auditOffset = 0;
+const auditLimit = 50;
+
+async function loadAuditLogs() {
+    const action = document.getElementById('auditActionFilter')?.value || '';
+    const fromDate = document.getElementById('auditDateFrom')?.value || '';
+    const toDate = document.getElementById('auditDateTo')?.value || '';
+
+    const params = new URLSearchParams({ limit: auditLimit, offset: auditOffset });
+    if (action) params.set('action', action);
+    if (fromDate) params.set('from', new Date(fromDate).toISOString());
+    if (toDate) params.set('to', new Date(toDate + 'T23:59:59').toISOString());
+
+    try {
+        const res = await fetch(`${AUDIT_API}?${params}`, { headers: authHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        auditLogs = await res.json();
+        renderAuditLogs();
+    } catch (e) {
+        document.getElementById('auditLogBody').innerHTML =
+            `<tr><td colspan="7" style="text-align:center; color: var(--text-secondary);">Failed to load audit logs</td></tr>`;
+    }
+}
+
+function renderAuditLogs() {
+    const body = document.getElementById('auditLogBody');
+    const countEl = document.getElementById('auditResultCount');
+    const pageInfo = document.getElementById('auditPageInfo');
+
+    if (!auditLogs.length) {
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-secondary);">No audit logs found</td></tr>';
+        countEl.textContent = '';
+        pageInfo.textContent = '';
+        document.getElementById('auditPrevBtn').disabled = true;
+        document.getElementById('auditNextBtn').disabled = true;
+        return;
+    }
+
+    body.innerHTML = auditLogs.map(log => {
+        const time = new Date(log.timestamp).toLocaleString();
+        const statusClass = log.statusCode >= 400 ? 'audit-status-error' : 'audit-status-ok';
+        return `<tr>
+            <td class="audit-time">${time}</td>
+            <td><span class="audit-action-badge">${log.action}</span></td>
+            <td>${log.userEmail || log.userId || 'anonymous'}</td>
+            <td><span class="audit-method audit-method-${log.httpMethod.toLowerCase()}">${log.httpMethod}</span></td>
+            <td class="audit-path" title="${log.path}">${log.path.length > 40 ? log.path.substring(0, 40) + '...' : log.path}</td>
+            <td><span class="${statusClass}">${log.statusCode}</span></td>
+            <td class="audit-ip">${log.ipAddress || '-'}</td>
+        </tr>`;
+    }).join('');
+
+    const page = Math.floor(auditOffset / auditLimit) + 1;
+    pageInfo.textContent = `Page ${page}`;
+    countEl.textContent = auditLogs.length === auditLimit ? `${auditLimit}+ results` : `${auditLogs.length} results`;
+    document.getElementById('auditPrevBtn').disabled = auditOffset === 0;
+    document.getElementById('auditNextBtn').disabled = auditLogs.length < auditLimit;
+}
+
+// Audit log event listeners
+document.getElementById('auditSearchBtn')?.addEventListener('click', () => {
+    auditOffset = 0;
+    loadAuditLogs();
+});
+
+document.getElementById('auditClearBtn')?.addEventListener('click', () => {
+    document.getElementById('auditActionFilter').value = '';
+    document.getElementById('auditDateFrom').value = '';
+    document.getElementById('auditDateTo').value = '';
+    auditOffset = 0;
+    loadAuditLogs();
+});
+
+document.getElementById('auditPrevBtn')?.addEventListener('click', () => {
+    auditOffset = Math.max(0, auditOffset - auditLimit);
+    loadAuditLogs();
+});
+
+document.getElementById('auditNextBtn')?.addEventListener('click', () => {
+    auditOffset += auditLimit;
+    loadAuditLogs();
+});
+
+// Load audit logs when tab is activated
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        if (tab.dataset.tab === 'auditlog' && auditLogs.length === 0) {
+            loadAuditLogs();
+        }
+    });
+});
