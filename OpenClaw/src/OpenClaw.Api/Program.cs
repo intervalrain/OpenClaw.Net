@@ -106,47 +106,6 @@ var app = builder.Build();
 
         try
         {
-            // Detect databases where schema exists but migration history is missing or incomplete.
-            // This can happen with EnsureCreated, partial migrations, or volume reuse across deploys.
-            var conn = dbContext.Database.GetDbConnection();
-            await conn.OpenAsync();
-            using (var cmd = conn.CreateCommand())
-            {
-                // Check if our application tables exist (i.e. schema is already in place)
-                cmd.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'app_configs')";
-                var schemaExists = (bool)(await cmd.ExecuteScalarAsync())!;
-
-                if (schemaExists)
-                {
-                    // Ensure __EFMigrationsHistory table exists
-                    cmd.CommandText = """
-                        CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
-                            "MigrationId" varchar(150) NOT NULL PRIMARY KEY,
-                            "ProductVersion" varchar(32) NOT NULL
-                        );
-                    """;
-                    await cmd.ExecuteNonQueryAsync();
-
-                    // Baseline any migrations whose tables already exist in the database
-                    var allMigrations = dbContext.Database.GetMigrations().ToList();
-                    var appliedMigrations = (await dbContext.Database.GetAppliedMigrationsAsync()).ToHashSet();
-                    var missing = allMigrations.Except(appliedMigrations).ToList();
-
-                    if (missing.Count > 0)
-                    {
-                        // Only baseline the InitialCreate migration (which creates all base tables).
-                        // Later migrations should run normally to apply incremental schema changes.
-                        var initialMigration = missing.FirstOrDefault(m => m.Contains("InitialCreate"));
-                        if (initialMigration != null)
-                        {
-                            cmd.CommandText = $"""INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion") VALUES ('{initialMigration}', '10.0.0') ON CONFLICT DO NOTHING""";
-                            await cmd.ExecuteNonQueryAsync();
-                            logger.LogInformation("Baselined InitialCreate migration: {Migration}", initialMigration);
-                        }
-                    }
-                }
-            }
-
             var pending = dbContext.Database.GetPendingMigrations().ToList();
             if (pending.Count > 0)
             {
@@ -158,8 +117,12 @@ var app = builder.Build();
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Database migration failed");
-            throw;
+            // If migration fails due to schema conflict (e.g. legacy DB created with EnsureCreated),
+            // drop and recreate the database from scratch using migrations.
+            logger.LogWarning(ex, "Migration failed, dropping and recreating database...");
+            dbContext.Database.EnsureDeleted();
+            dbContext.Database.Migrate();
+            logger.LogInformation("Database recreated successfully via migrations");
         }
 
         var seeder = scope.ServiceProvider.GetRequiredService<AppDbContextSeeder>();
