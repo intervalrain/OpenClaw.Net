@@ -104,33 +104,14 @@ var app = builder.Build();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-        try
+        var pending = dbContext.Database.GetPendingMigrations().ToList();
+        if (pending.Count > 0)
         {
-            var pending = dbContext.Database.GetPendingMigrations().ToList();
-            if (pending.Count > 0)
-            {
-                logger.LogInformation("Applying {Count} pending migration(s): {Migrations}",
-                    pending.Count, string.Join(", ", pending));
-            }
-            dbContext.Database.Migrate();
-            logger.LogInformation("Database migration completed");
+            logger.LogInformation("Applying {Count} pending migration(s): {Migrations}",
+                pending.Count, string.Join(", ", pending));
         }
-        catch (Exception ex)
-        {
-            var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
-            if (env.IsDevelopment())
-            {
-                logger.LogWarning(ex, "Migration failed in Development, dropping and recreating database...");
-                dbContext.Database.EnsureDeleted();
-                dbContext.Database.Migrate();
-                logger.LogInformation("Database recreated successfully via migrations");
-            }
-            else
-            {
-                logger.LogError(ex, "Database migration failed. Manual intervention required — do NOT drop production data.");
-                throw;
-            }
-        }
+        dbContext.Database.Migrate();
+        logger.LogInformation("Database migration completed");
 
         var seeder = scope.ServiceProvider.GetRequiredService<AppDbContextSeeder>();
         await seeder.SeedAsync();
