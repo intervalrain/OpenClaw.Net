@@ -118,6 +118,20 @@ public static class ServiceCollectionExtensions
             return pipeline;
         });
 
+        // Agent definition files (AGENT.md)
+        var agentsDir = configuration["Agents:Directory"] ?? "agents";
+        if (!Path.IsPathRooted(agentsDir))
+        {
+            agentsDir = Path.GetFullPath(agentsDir, Directory.GetCurrentDirectory());
+        }
+        services.AddSingleton<IAgentStore>(sp =>
+        {
+            var agentStoreLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FileAgentStore>>();
+            var store = new FileAgentStore(agentsDir, agentStoreLogger);
+            store.ReloadAsync().GetAwaiter().GetResult();
+            return store;
+        });
+
         // Hierarchical Agent Architecture
         services.AddSingleton<IAgent, PioneerAgent>();
         services.AddAgentRegistry();
@@ -230,6 +244,16 @@ public static class ServiceCollectionExtensions
             foreach (var tool in tools)
             {
                 agents.Add(new ToolAgent(tool));
+            }
+
+            // Load file-defined agents from AGENT.md files
+            var agentStore = sp.GetService<IAgentStore>();
+            if (agentStore is not null)
+            {
+                foreach (var definition in agentStore.GetAllAgents())
+                {
+                    agents.Add(new FileDefinedAgent(definition));
+                }
             }
 
             return new AgentRegistry(agents);
