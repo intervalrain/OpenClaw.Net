@@ -25,18 +25,18 @@ public abstract class LlmAgent : AgentBase
         var providerFactory = context.Services.GetRequiredService<ILlmProviderFactory>();
         var toolRegistry = context.Services.GetRequiredService<IToolRegistry>();
 
-        var provider = PreferredProvider is not null
-            ? await providerFactory.GetProviderAsync(ct)
-            : await providerFactory.GetProviderAsync(ct);
+        var provider = await ResolveProviderAsync(providerFactory, context, ct);
 
         var tools = ResolveTools(toolRegistry);
         var toolDefinitions = tools
             .Select(t => new ToolDefinition(t.Name, t.Description, t.Parameters))
             .ToList();
 
+        var enrichedPrompt = await PreferenceInjector.EnrichWithPreferencesAsync(SystemPrompt, context, ct);
+
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, SystemPrompt),
+            new(ChatRole.System, enrichedPrompt),
             new(ChatRole.User, context.Input.RootElement.ToString())
         };
 
@@ -78,6 +78,20 @@ public abstract class LlmAgent : AgentBase
         }
 
         return AgentResult.Failed($"Max iterations ({context.Options.MaxIterations}) reached.");
+    }
+
+    /// <summary>
+    /// Resolves the LLM provider based on PreferredProvider and UserId.
+    /// Priority: PreferredProvider with UserId > UserId default > global default.
+    /// </summary>
+    protected async Task<ILlmProvider> ResolveProviderAsync(
+        ILlmProviderFactory factory, AgentExecutionContext context, CancellationToken ct)
+    {
+        if (context.UserId.HasValue)
+            return await factory.GetProviderAsync(context.UserId.Value, PreferredProvider, ct);
+
+        // No user context — fall back to global provider
+        return await factory.GetProviderAsync(ct);
     }
 
     private List<IAgentTool> ResolveTools(IToolRegistry registry)

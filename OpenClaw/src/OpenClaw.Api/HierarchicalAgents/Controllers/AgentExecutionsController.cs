@@ -3,6 +3,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Application.HierarchicalAgents;
 using OpenClaw.Contracts.HierarchicalAgents;
+using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.HierarchicalAgents.Controllers;
@@ -11,6 +12,7 @@ namespace OpenClaw.Api.HierarchicalAgents.Controllers;
 public class AgentExecutionsController(
     IAgentRegistry agentRegistry,
     IDagExecutor dagExecutor,
+    ICurrentUserProvider currentUserProvider,
     IServiceProvider serviceProvider) : ApiController
 {
     /// <summary>
@@ -30,7 +32,8 @@ public class AgentExecutionsController(
         {
             Input = input,
             Services = serviceProvider,
-            Options = new AgentExecutionOptions()
+            Options = new AgentExecutionOptions(),
+            UserId = GetUserId()
         };
 
         var result = await agent.ExecuteAsync(context, ct);
@@ -78,7 +81,8 @@ public class AgentExecutionsController(
             return BadRequest(new { errors });
 
         var timeline = new AgentExecutionTimeline();
-        var result = await dagExecutor.ExecuteAsync(graph, new AgentExecutionOptions(), timeline, ct);
+        var userId = GetUserId();
+        var result = await dagExecutor.ExecuteAsync(graph, new AgentExecutionOptions(), userId, timeline, ct);
 
         return Ok(new
         {
@@ -102,5 +106,11 @@ public class AgentExecutionsController(
                 e.Detail
             })
         });
+    }
+
+    private Guid? GetUserId()
+    {
+        try { return currentUserProvider.GetCurrentUser().Id; }
+        catch { return null; }
     }
 }

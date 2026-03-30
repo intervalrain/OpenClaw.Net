@@ -33,7 +33,8 @@ public class DagExecutionEngine(
                 MaxDepth = 1,
                 MaxIterations = 1,
                 Timeout = TimeSpan.FromMinutes(2)
-            }
+            },
+            UserId = request.UserId
         };
 
         var planResult = await pioneer.ExecuteAsync(planContext, ct);
@@ -68,7 +69,7 @@ public class DagExecutionEngine(
             MaxDepth = 5,
             MaxIterations = 10,
             Timeout = TimeSpan.FromMinutes(10)
-        }, ct);
+        }, request.UserId, ct);
 
         // Step 4: Aggregate results
         var nodeOutputs = graph.Nodes

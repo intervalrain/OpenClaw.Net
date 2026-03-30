@@ -12,6 +12,9 @@ public class AgentExecutionContext
     public required IServiceProvider Services { get; init; }
     public required AgentExecutionOptions Options { get; init; }
 
+    /// <summary>User ID for per-user provider resolution and preference injection. Null for system-level execution.</summary>
+    public Guid? UserId { get; init; }
+
     /// <summary>Parent context for hierarchy tracking (null if root).</summary>
     public AgentExecutionContext? Parent { get; init; }
 

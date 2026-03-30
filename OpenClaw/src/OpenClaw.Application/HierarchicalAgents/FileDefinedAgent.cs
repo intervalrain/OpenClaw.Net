@@ -52,7 +52,10 @@ public class FileDefinedAgent : AgentBase
         var providerFactory = context.Services.GetRequiredService<ILlmProviderFactory>();
         var toolRegistry = context.Services.GetRequiredService<IToolRegistry>();
 
-        var provider = await providerFactory.GetProviderAsync(ct);
+        // Resolve provider using PreferredProvider from AGENT.md + user context
+        var provider = context.UserId.HasValue
+            ? await providerFactory.GetProviderAsync(context.UserId.Value, PreferredProvider, ct)
+            : await providerFactory.GetProviderAsync(ct);
 
         // Resolve tools
         var tools = new List<IAgentTool>();
@@ -71,6 +74,8 @@ public class FileDefinedAgent : AgentBase
         var instructions = _definition.Instructions;
         if (_definition.DirectoryPath is not null)
             instructions = instructions.Replace("{AGENT_DIR}", _definition.DirectoryPath);
+
+        instructions = await PreferenceInjector.EnrichWithPreferencesAsync(instructions, context, ct);
 
         var messages = new List<ChatMessage>
         {

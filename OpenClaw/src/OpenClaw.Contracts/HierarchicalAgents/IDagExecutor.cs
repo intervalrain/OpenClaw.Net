@@ -9,6 +9,7 @@ public interface IDagExecutor
     Task<DagExecutionResult> ExecuteAsync(
         TaskGraph graph,
         AgentExecutionOptions options,
+        Guid? userId = null,
         CancellationToken ct = default);
 }
 

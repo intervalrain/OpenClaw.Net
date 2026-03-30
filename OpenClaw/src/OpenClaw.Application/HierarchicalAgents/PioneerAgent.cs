@@ -27,12 +27,15 @@ public class PioneerAgent : AgentBase
         var providerFactory = context.Services.GetRequiredService<ILlmProviderFactory>();
         var agentRegistry = context.Services.GetRequiredService<IAgentRegistry>();
 
-        var provider = await providerFactory.GetProviderAsync(ct);
+        var provider = context.UserId.HasValue
+            ? await providerFactory.GetProviderAsync(context.UserId.Value, PreferredProvider, ct)
+            : await providerFactory.GetProviderAsync(ct);
 
         // Build agent registry dump for the prompt
         var agentDump = BuildAgentRegistryDump(agentRegistry);
 
         var systemPrompt = BuildSystemPrompt(agentDump);
+        systemPrompt = await PreferenceInjector.EnrichWithPreferencesAsync(systemPrompt, context, ct);
         var userTask = context.Input.RootElement.TryGetProperty("task", out var taskProp)
             ? taskProp.GetString() ?? context.Input.RootElement.ToString()
             : context.Input.RootElement.ToString();

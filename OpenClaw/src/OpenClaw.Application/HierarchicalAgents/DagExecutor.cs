@@ -12,14 +12,16 @@ public class DagExecutor(
     public async Task<DagExecutionResult> ExecuteAsync(
         TaskGraph graph,
         AgentExecutionOptions options,
+        Guid? userId = null,
         CancellationToken ct = default)
     {
-        return await ExecuteAsync(graph, options, timeline: null, ct);
+        return await ExecuteAsync(graph, options, userId, timeline: null, ct);
     }
 
     public async Task<DagExecutionResult> ExecuteAsync(
         TaskGraph graph,
         AgentExecutionOptions options,
+        Guid? userId,
         AgentExecutionTimeline? timeline,
         CancellationToken ct = default)
     {
@@ -53,7 +55,7 @@ public class DagExecutor(
             var readyNodes = graph.Nodes.Where(n => n.Status == TaskNodeStatus.Ready).ToList();
 
             // Execute all ready nodes in parallel
-            var tasks = readyNodes.Select(node => ExecuteNodeAsync(node, graph, nodeMap, options, timeline, ct));
+            var tasks = readyNodes.Select(node => ExecuteNodeAsync(node, graph, nodeMap, options, userId, timeline, ct));
             await Task.WhenAll(tasks);
 
             // After execution, check downstream nodes for readiness
@@ -101,6 +103,7 @@ public class DagExecutor(
         TaskGraph graph,
         Dictionary<string, TaskNode> nodeMap,
         AgentExecutionOptions options,
+        Guid? userId,
         AgentExecutionTimeline? timeline,
         CancellationToken ct)
     {
@@ -123,7 +126,8 @@ public class DagExecutor(
             {
                 Input = node.Input ?? JsonDocument.Parse("{}"),
                 Services = serviceProvider,
-                Options = options
+                Options = options,
+                UserId = userId
             };
 
             var result = await agent.ExecuteAsync(context, ct);
