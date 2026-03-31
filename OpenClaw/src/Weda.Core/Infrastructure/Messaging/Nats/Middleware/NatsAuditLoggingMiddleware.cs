@@ -7,7 +7,7 @@ namespace Weda.Core.Infrastructure.Messaging.Nats.Middleware;
 /// Middleware that adds audit context (TraceId, RequestId) to the logging scope
 /// for all EventController method invocations.
 /// </summary>
-public class AuditLoggingMiddleware(ILogger<AuditLoggingMiddleware> logger) : IEventControllerMiddleware
+public class NatsAuditLoggingMiddleware(ILogger<NatsAuditLoggingMiddleware> logger) : IEventControllerMiddleware
 {
     public async Task InvokeAsync(EventControllerContext context, Func<Task> next)
     {
