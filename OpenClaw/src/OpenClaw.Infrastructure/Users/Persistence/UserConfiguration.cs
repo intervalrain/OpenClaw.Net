@@ -88,5 +88,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.WorkspacePath)
             .HasMaxLength(500)
             .IsRequired(false);
+
+        builder.Property(u => u.WorkspaceQuotaMb)
+            .IsRequired(false);
     }
 }

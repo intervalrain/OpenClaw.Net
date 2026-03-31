@@ -10,9 +10,11 @@ using Microsoft.Extensions.DependencyInjection;
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Security;
 using OpenClaw.Domain.Audit.Repositories;
+using OpenClaw.Domain.Channels.Repositories;
 using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
 using OpenClaw.Domain.Users.Repositories;
+using OpenClaw.Domain.Workspaces.Repositories;
 using OpenClaw.Domain.Skills.Repositories;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Infrastructure.Persistence;
@@ -23,10 +25,12 @@ using OpenClaw.Infrastructure.Services;
 using OpenClaw.Infrastructure.Users.Persistence;
 using OpenClaw.Infrastructure.Chat.Persistence;
 using OpenClaw.Infrastructure.Audit.Persistence;
+using OpenClaw.Infrastructure.Channels.Persistence;
 using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
 using OpenClaw.Infrastructure.Skills.Persistence;
+using OpenClaw.Infrastructure.Workspaces.Persistence;
 using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure;
@@ -84,6 +88,8 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IAppConfigRepository, AppConfigRepository>();
         services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
+        services.AddScoped<IChannelUserBindingRepository, ChannelUserBindingRepository>();
 
         // configuration (chain: Database -> Environment)
         // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)

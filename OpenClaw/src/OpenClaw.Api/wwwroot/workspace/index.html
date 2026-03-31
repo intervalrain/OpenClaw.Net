@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workspace - OpenClaw</title>
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="workspace.css">
+</head>
+<body>
+    <!-- Top header injected by top-header.js -->
+
+    <div class="container">
+        <div class="workspace-header">
+            <div class="workspace-header-left">
+                <h1>Workspace</h1>
+                <nav class="breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item" data-path="/">/</span>
+                </nav>
+            </div>
+            <div class="workspace-header-actions">
+                <button class="btn btn-secondary btn-sm" id="newFolderBtn" title="New Folder">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        <line x1="12" y1="11" x2="12" y2="17"/>
+                        <line x1="9" y1="14" x2="15" y2="14"/>
+                    </svg>
+                    New Folder
+                </button>
+                <label class="btn btn-primary btn-sm upload-btn" id="uploadBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Upload
+                    <input type="file" id="fileInput" multiple hidden>
+                </label>
+            </div>
+        </div>
+
+        <!-- Quota bar -->
+        <div class="quota-bar" id="quotaBar" style="display: none;">
+            <div class="quota-info">
+                <span id="quotaText">-</span>
+            </div>
+            <div class="quota-track">
+                <div class="quota-fill" id="quotaFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <main class="main-content">
+            <!-- File list -->
+            <div class="file-list" id="fileList">
+                <div class="loading">Loading files...</div>
+            </div>
+        </main>
+
+        <!-- Rename Modal -->
+        <div class="modal" id="renameModal">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2 id="renameModalTitle">Rename</h2>
+                    <button class="close-btn" id="closeRenameModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="renameInput" class="rename-input" placeholder="New name">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelRename">Cancel</button>
+                    <button class="btn btn-primary" id="confirmRename">Rename</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Confirm Modal -->
+        <div class="modal" id="deleteModal">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2>Delete</h2>
+                    <button class="close-btn" id="closeDeleteModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete "<span id="deleteFileName"></span>"?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelDelete">Cancel</button>
+                    <button class="btn btn-danger" id="confirmDelete">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>&copy; 2026 OpenClaw. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="workspace.js"></script>
+</body>
+</html>

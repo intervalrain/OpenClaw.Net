@@ -10,6 +10,7 @@ function createTopHeader(activePage = '') {
     if (!activePage) {
         const path = window.location.pathname;
         if (path.includes('/openclaw')) activePage = 'chat';
+        else if (path.includes('/workspace')) activePage = 'workspace';
         else if (path.includes('/cronjobs')) activePage = 'cronjobs';
         else if (path.includes('/wiki')) activePage = 'wiki';
         else if (path.includes('/wedally')) activePage = 'wedally';
@@ -43,6 +44,12 @@ function createTopHeader(activePage = '') {
                         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
                     </svg>
                     <span>Wiki</span>
+                </a>
+                <a href="/workspace/index.html" class="nav-link ${activePage === 'workspace' ? 'active' : ''}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>Files</span>
                 </a>
                 <a href="/wedally/index.html" class="nav-link superadmin-only ${activePage === 'wedally' ? 'active' : ''}" target="_blank" style="display: none;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -11,11 +11,14 @@ using OpenClaw.Domain.Users.Entities;
 using OpenClaw.Domain.Users.Enums;
 using OpenClaw.Domain.Users.Errors;
 using OpenClaw.Domain.Users.Repositories;
+using OpenClaw.Domain.Workspaces.Entities;
+using OpenClaw.Domain.Workspaces.Repositories;
 
 namespace OpenClaw.Application.Auth.Commands;
 
 public class RegisterCommandHandler(
     IUserRepository userRepository,
+    IWorkspaceRepository workspaceRepository,
     IPasswordHasher passwordHasher,
     IUnitOfWork uow) : IRequestHandler<RegisterCommand, ErrorOr<RegisterResponse>>
 {
@@ -54,6 +57,11 @@ public class RegisterCommandHandler(
 
         // Save user (no token generated - user must wait for approval)
         await userRepository.AddAsync(user, ct);
+
+        // Create personal workspace
+        var personalWorkspace = Workspace.CreatePersonal(user.Id, user.Name);
+        await workspaceRepository.AddAsync(personalWorkspace, ct);
+
         await uow.SaveChangesAsync(ct);
 
         return new RegisterResponse(

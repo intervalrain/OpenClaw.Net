@@ -20,6 +20,7 @@ public class TelegramConversationMapper
     public async Task<Conversation> GetOrCreateConversationAsync(
         long chatId,
         string? username,
+        Guid? resolvedUserId,
         IConversationRepository repository,
         IUnitOfWork uow,
         CancellationToken ct)
@@ -31,16 +32,16 @@ public class TelegramConversationMapper
             if (existing is not null)
                 return existing;
 
-            // Cached conversation was deleted, remove stale cache
             _chatConversationMap.TryRemove(chatId, out _);
         }
 
-        // Create new conversation
+        // Create new conversation with resolved user (or Guid.Empty if unbound)
         var title = !string.IsNullOrEmpty(username)
             ? $"{TelegramTitlePrefix}{username}"
             : $"{TelegramTitlePrefix}{chatId}";
 
-        var conversation = Conversation.Create(Guid.Empty, title);
+        var userId = resolvedUserId ?? Guid.Empty;
+        var conversation = Conversation.Create(userId, title);
         await repository.AddAsync(conversation, ct);
         await uow.SaveChangesAsync(ct);
 
@@ -48,10 +49,6 @@ public class TelegramConversationMapper
         return conversation;
     }
 
-    /// <summary>
-    /// Resets the conversation for a given chatId (used by /new command).
-    /// Next call to GetOrCreateConversationAsync will create a new conversation.
-    /// </summary>
     public void ResetConversation(long chatId)
     {
         _chatConversationMap.TryRemove(chatId, out _);

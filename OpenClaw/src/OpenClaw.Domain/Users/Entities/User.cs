@@ -19,6 +19,12 @@ public class User : AggregateRoot<Guid>
     public DateTime? RefreshTokenExpiresAt { get; private set; }
     public string? WorkspacePath { get; private set; }
 
+    /// <summary>
+    /// Per-user workspace storage quota in MB. Null = use system default (from app-config).
+    /// SuperAdmin can override per user.
+    /// </summary>
+    public long? WorkspaceQuotaMb { get; private set; }
+
     private readonly List<string> _roles = [];
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
 
@@ -196,6 +202,12 @@ public class User : AggregateRoot<Guid>
     public void SetWorkspacePath(string? path)
     {
         WorkspacePath = path?.Trim();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetWorkspaceQuota(long? quotaMb)
+    {
+        WorkspaceQuotaMb = quotaMb;
         UpdatedAt = DateTime.UtcNow;
     }
 
