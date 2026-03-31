@@ -140,7 +140,7 @@ function showAdminNavItems() {
         });
     }
     if (isSuperAdmin) {
-        document.querySelectorAll('.top-nav .superadmin-only').forEach(el => {
+        document.querySelectorAll('.superadmin-only').forEach(el => {
             el.style.display = '';
         });
     }

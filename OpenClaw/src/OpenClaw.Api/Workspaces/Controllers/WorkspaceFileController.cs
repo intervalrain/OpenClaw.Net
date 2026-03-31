@@ -2,6 +2,8 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Domain.Users.Repositories;
+using OpenClaw.Domain.Workspaces.Entities;
+using OpenClaw.Domain.Workspaces.Repositories;
 using OpenClaw.Tools.FileSystem;
 using Weda.Core.Application.Security;
 using Weda.Core.Application.Security.Models;
@@ -15,20 +17,41 @@ namespace OpenClaw.Api.Workspaces.Controllers;
 public class WorkspaceFileController(
     ICurrentUserProvider currentUserProvider,
     IUserRepository userRepository,
+    IDirectoryPermissionRepository permissionRepository,
     IConfigStore configStore) : ApiController
 {
     private const long DefaultQuotaMb = 100; // 100 MB default
+
+    /// <summary>
+    /// Strip leading slashes so paths are always relative to user workspace.
+    /// Frontend sends "/subfolder" but PathSecurity needs "subfolder".
+    /// </summary>
+    private static string? NormalizePath(string? path)
+        => string.IsNullOrWhiteSpace(path) || path == "/" ? null : path.TrimStart('/');
+
+    /// <summary>
+    /// Resolve the base path for a given scope and relative path.
+    /// scope=my (default) → user workspace; scope=admin → workspace root (SuperAdmin only).
+    /// </summary>
+    private string ResolveWorkspacePath(string? path, Guid userId, bool isSuperAdmin, string scope = "my")
+    {
+        var root = scope == "admin" && isSuperAdmin
+            ? PathSecurity.GetWorkspaceBasePath()
+            : PathSecurity.GetUserWorkspacePath(userId);
+
+        return path is null ? root : Path.GetFullPath(Path.Combine(root, path));
+    }
+
     /// <summary>
     /// List files and directories at the given path within the user's workspace.
     /// </summary>
     [HttpGet("list")]
-    public IActionResult List([FromQuery] string? path = null)
+    public IActionResult List([FromQuery] string? path = null, [FromQuery] string scope = "my")
     {
+        path = NormalizePath(path);
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
-        var basePath = path is null
-            ? PathSecurity.GetUserWorkspacePath(user.Id)
-            : PathSecurity.ResolveUserPath(path, user.Id, isSuperAdmin);
+        var basePath = ResolveWorkspacePath(path, user.Id, isSuperAdmin, scope);
 
         var error = PathSecurity.ValidatePath(basePath, user.Id, isSuperAdmin);
         if (error is not null) return BadRequest(error);
@@ -72,6 +95,7 @@ public class WorkspaceFileController(
         IFormFile file,
         CancellationToken ct)
     {
+        path = NormalizePath(path);
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
 
@@ -81,9 +105,6 @@ public class WorkspaceFileController(
 
         var error = PathSecurity.ValidatePath(targetDir, user.Id, isSuperAdmin);
         if (error is not null) return BadRequest(error);
-
-        if (!isSuperAdmin && PathSecurity.IsSharedPath(targetDir))
-            return BadRequest("Cannot upload to shared workspace.");
 
         // Quota check
         if (!isSuperAdmin)
@@ -114,6 +135,7 @@ public class WorkspaceFileController(
     [HttpGet("download")]
     public IActionResult Download([FromQuery] string path)
     {
+        path = NormalizePath(path) ?? "";
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
         var filePath = PathSecurity.ResolveUserPath(path, user.Id, isSuperAdmin);
@@ -135,15 +157,13 @@ public class WorkspaceFileController(
     [HttpPost("mkdir")]
     public IActionResult Mkdir([FromBody] MkdirRequest request)
     {
+        var normalizedPath = NormalizePath(request.Path) ?? "";
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
-        var dirPath = PathSecurity.ResolveUserPath(request.Path, user.Id, isSuperAdmin);
+        var dirPath = PathSecurity.ResolveUserPath(normalizedPath, user.Id, isSuperAdmin);
 
         var error = PathSecurity.ValidatePath(dirPath, user.Id, isSuperAdmin);
         if (error is not null) return BadRequest(error);
-
-        if (!isSuperAdmin && PathSecurity.IsSharedPath(dirPath))
-            return BadRequest("Cannot create directories in shared workspace.");
 
         Directory.CreateDirectory(dirPath);
         return Ok(new { Path = request.Path });
@@ -155,15 +175,13 @@ public class WorkspaceFileController(
     [HttpDelete]
     public IActionResult Delete([FromQuery] string path)
     {
+        path = NormalizePath(path) ?? "";
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
         var fullPath = PathSecurity.ResolveUserPath(path, user.Id, isSuperAdmin);
 
         var error = PathSecurity.ValidatePath(fullPath, user.Id, isSuperAdmin);
         if (error is not null) return BadRequest(error);
-
-        if (!isSuperAdmin && PathSecurity.IsSharedPath(fullPath))
-            return BadRequest("Cannot delete from shared workspace.");
 
         if (System.IO.File.Exists(fullPath))
         {
@@ -192,17 +210,14 @@ public class WorkspaceFileController(
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
 
-        var sourcePath = PathSecurity.ResolveUserPath(request.OldPath, user.Id, isSuperAdmin);
-        var destPath = PathSecurity.ResolveUserPath(request.NewPath, user.Id, isSuperAdmin);
+        var sourcePath = PathSecurity.ResolveUserPath(NormalizePath(request.OldPath) ?? "", user.Id, isSuperAdmin);
+        var destPath = PathSecurity.ResolveUserPath(NormalizePath(request.NewPath) ?? "", user.Id, isSuperAdmin);
 
         var error = PathSecurity.ValidatePath(sourcePath, user.Id, isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
         error = PathSecurity.ValidatePath(destPath, user.Id, isSuperAdmin);
         if (error is not null) return BadRequest(error);
-
-        if (!isSuperAdmin && (PathSecurity.IsSharedPath(sourcePath) || PathSecurity.IsSharedPath(destPath)))
-            return BadRequest("Cannot modify shared workspace.");
 
         if (System.IO.File.Exists(sourcePath))
         {
@@ -226,16 +241,30 @@ public class WorkspaceFileController(
     public async Task<IActionResult> GetUsage(CancellationToken ct)
     {
         var user = currentUserProvider.GetCurrentUser();
+        var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
         var workspacePath = PathSecurity.GetUserWorkspacePath(user.Id);
         var usedBytes = GetDirectorySize(workspacePath);
-        var quotaMb = await GetQuotaMbAsync(user.Id, ct);
 
+        if (isSuperAdmin)
+        {
+            return Ok(new
+            {
+                UsedBytes = usedBytes,
+                UsedMb = Math.Round((double)usedBytes / (1024 * 1024), 2),
+                QuotaMb = -1, // unlimited
+                UsagePercent = 0,
+                Unlimited = true
+            });
+        }
+
+        var quotaMb = await GetQuotaMbAsync(user.Id, ct);
         return Ok(new
         {
             UsedBytes = usedBytes,
             UsedMb = Math.Round((double)usedBytes / (1024 * 1024), 2),
             QuotaMb = quotaMb,
-            UsagePercent = quotaMb > 0 ? Math.Round((double)usedBytes / (quotaMb * 1024 * 1024) * 100, 1) : 0
+            UsagePercent = quotaMb > 0 ? Math.Round((double)usedBytes / (quotaMb * 1024 * 1024) * 100, 1) : 0,
+            Unlimited = false
         });
     }
 
@@ -277,7 +306,90 @@ public class WorkspaceFileController(
             .EnumerateFiles("*", SearchOption.AllDirectories)
             .Sum(f => f.Length);
     }
+
+    // ===== Directory Permissions =====
+
+    /// <summary>
+    /// Get all directory permissions for the current user's workspace.
+    /// </summary>
+    [HttpGet("permissions")]
+    public async Task<IActionResult> GetPermissions(CancellationToken ct)
+    {
+        var user = currentUserProvider.GetCurrentUser();
+        var perms = await permissionRepository.GetByOwnerAsync(user.Id, ct);
+        return Ok(perms.Select(p => new
+        {
+            p.RelativePath,
+            Visibility = p.Visibility.ToString(),
+            p.CreatedAt
+        }));
+    }
+
+    /// <summary>
+    /// Set visibility for a directory in the current user's workspace.
+    /// </summary>
+    [HttpPut("permissions")]
+    public async Task<IActionResult> SetPermission([FromBody] SetPermissionRequest request, CancellationToken ct)
+    {
+        var user = currentUserProvider.GetCurrentUser();
+        var normalizedPath = NormalizePath(request.Path) ?? "";
+
+        if (!Enum.TryParse<DirectoryVisibility>(request.Visibility, true, out var visibility))
+            return BadRequest("Invalid visibility. Use: Private, PublicReadonly, or Public.");
+
+        // Verify directory exists
+        var fullPath = PathSecurity.ResolveUserPath(normalizedPath, user.Id);
+        if (!Directory.Exists(fullPath))
+            return BadRequest("Directory does not exist.");
+
+        var existing = await permissionRepository.GetAsync(user.Id, normalizedPath, ct);
+        if (existing is not null)
+        {
+            if (visibility == DirectoryVisibility.Private)
+            {
+                await permissionRepository.DeleteAsync(existing, ct);
+            }
+            else
+            {
+                existing.SetVisibility(visibility);
+                await permissionRepository.AddAsync(existing, ct);
+            }
+        }
+        else if (visibility != DirectoryVisibility.Private)
+        {
+            var perm = DirectoryPermission.Create(user.Id, normalizedPath, visibility);
+            await permissionRepository.AddAsync(perm, ct);
+        }
+
+        return Ok(new { Path = normalizedPath, Visibility = visibility.ToString() });
+    }
+
+    /// <summary>
+    /// Browse public directories from all users.
+    /// </summary>
+    [HttpGet("public")]
+    public async Task<IActionResult> GetPublicDirectories(CancellationToken ct)
+    {
+        var perms = await permissionRepository.GetPublicDirectoriesAsync(ct);
+        var userRepo = userRepository;
+
+        var result = new List<object>();
+        foreach (var perm in perms)
+        {
+            var owner = await userRepo.GetByIdAsync(perm.OwnerUserId, ct);
+            result.Add(new
+            {
+                OwnerUserId = perm.OwnerUserId,
+                OwnerName = owner?.Name ?? "Unknown",
+                perm.RelativePath,
+                Visibility = perm.Visibility.ToString()
+            });
+        }
+
+        return Ok(result);
+    }
 }
 
 public record MkdirRequest(string Path);
 public record RenameRequest(string OldPath, string NewPath);
+public record SetPermissionRequest(string Path, string Visibility);

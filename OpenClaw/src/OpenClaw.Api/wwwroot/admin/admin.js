@@ -417,6 +417,16 @@ function showUserDetails(userId) {
                 <div class="value">${new Date(selectedUser.lastLoginAt).toLocaleString()}</div>
             </div>
         ` : ''}
+        ${!isSuperAdminTarget ? `
+            <div class="user-detail">
+                <label>Workspace Quota (MB)</label>
+                <div class="value">
+                    <input type="number" id="userQuotaInput" min="0" max="10240" placeholder="Default (100)"
+                        value="${selectedUser.workspaceQuotaMb || ''}" style="width: 140px; padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); color: var(--text-color);">
+                    <span class="text-muted" style="margin-left: 0.5rem; font-size: 0.8rem;">Empty = system default</span>
+                </div>
+            </div>
+        ` : ''}
     `;
 
     // Setup role checkbox styling
@@ -476,6 +486,23 @@ async function saveUserChanges() {
             if (!rolesResponse.ok) {
                 const error = await rolesResponse.json();
                 throw new Error(error.title || 'Failed to update roles');
+            }
+        }
+
+        // Update workspace quota if changed
+        const quotaInput = document.getElementById('userQuotaInput');
+        if (quotaInput) {
+            const newQuota = quotaInput.value ? parseInt(quotaInput.value) : null;
+            const oldQuota = selectedUser.workspaceQuotaMb || null;
+            if (newQuota !== oldQuota) {
+                const quotaResponse = await authFetch(`${API_BASE}/${selectedUser.id}/quota`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ quotaMb: newQuota })
+                });
+                if (!quotaResponse.ok) {
+                    const error = await quotaResponse.json();
+                    throw new Error(error.title || 'Failed to update quota');
+                }
             }
         }
 

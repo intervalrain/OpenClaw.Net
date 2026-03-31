@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OpenClaw.Infrastructure.Common.Persistence;
@@ -11,9 +12,11 @@ using OpenClaw.Infrastructure.Common.Persistence;
 namespace OpenClaw.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260331060945_AddWorkspaceQuotaToUser")]
+    partial class AddWorkspaceQuotaToUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -752,47 +755,6 @@ namespace OpenClaw.Infrastructure.Migrations
                         .HasDatabaseName("uq_user_preferences_user_key");
 
                     b.ToTable("user_preferences", (string)null);
-                });
-
-            modelBuilder.Entity("OpenClaw.Domain.Workspaces.Entities.DirectoryPermission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_user_id");
-
-                    b.Property<string>("RelativePath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("relative_path");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("Visibility")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("visibility");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Visibility");
-
-                    b.HasIndex("OwnerUserId", "RelativePath")
-                        .IsUnique();
-
-                    b.ToTable("directory_permissions", (string)null);
                 });
 
             modelBuilder.Entity("OpenClaw.Domain.Workspaces.Entities.Workspace", b =>

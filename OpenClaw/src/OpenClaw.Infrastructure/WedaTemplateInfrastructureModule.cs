@@ -15,6 +15,7 @@ using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
 using OpenClaw.Domain.Users.Repositories;
 using OpenClaw.Domain.Workspaces.Repositories;
+using OpenClaw.Infrastructure.Workspaces.Persistence;
 using OpenClaw.Domain.Skills.Repositories;
 using OpenClaw.Infrastructure.Common.Persistence;
 using OpenClaw.Infrastructure.Persistence;
@@ -30,7 +31,6 @@ using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
 using OpenClaw.Infrastructure.Skills.Persistence;
-using OpenClaw.Infrastructure.Workspaces.Persistence;
 using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure;
@@ -89,6 +89,7 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
+        services.AddScoped<IDirectoryPermissionRepository, DirectoryPermissionRepository>();
         services.AddScoped<IChannelUserBindingRepository, ChannelUserBindingRepository>();
 
         // configuration (chain: Database -> Environment)
