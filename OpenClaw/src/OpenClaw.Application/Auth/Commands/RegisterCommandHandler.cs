@@ -77,8 +77,8 @@ public class RegisterCommandHandler(
         if (string.IsNullOrWhiteSpace(password))
             return "Password is required.";
 
-        if (password.Length < 12)
-            return "Password must be at least 12 characters long.";
+        if (password.Length < 8)
+            return "Password must be at least 8 characters long.";
 
         if (!password.Any(char.IsUpper))
             return "Password must contain at least one uppercase letter.";

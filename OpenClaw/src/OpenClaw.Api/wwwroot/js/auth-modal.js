@@ -242,7 +242,13 @@ class AuthModal {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.detail || data.title || 'Registration failed');
+                // Parse ASP.NET validation errors
+                let errorMsg = data.detail || data.title || 'Registration failed';
+                if (data.errors) {
+                    const messages = Object.values(data.errors).flat();
+                    if (messages.length > 0) errorMsg = messages.join('. ');
+                }
+                throw new Error(errorMsg);
             }
 
             form.classList.remove('loading');
