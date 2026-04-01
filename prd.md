@@ -1,12 +1,22 @@
-# PRD：C# Agent Platform（ClawOS.NET）
+# PRD：ClawOS — AI Agent Operating System
 
 ## 1. 產品背景與目標
 
 ### 1.1 背景
 
-隨著 LLM 與 Tool Calling 成熟，AI Agent 已從「聊天機器人」進化為可執行實際任務的 Agent Runtime。現有 ClawOS（Node.js / TypeScript）雖功能完整，但在 **強型別、安全性、長期運行穩定度、企業級擴展性** 上存在限制。
+隨著 LLM 與 Tool Calling 成熟，AI Agent 已從「聊天機器人」進化為可執行實際任務的自主系統。然而現有方案普遍面臨以下挑戰：
 
-本專案目標是使用 **C# / .NET** 重建一套 **ClawOS.NET Agent Platform**，專注於工程品質、可維護性與長期演進能力。
+- **碎片化**：Chat、DevOps、IoT、排程分散在不同平台
+- **缺乏標準化 Runtime**：Agent 沒有統一的執行環境與資源管理
+- **安全性不足**：SaaS 方案資料無法留在企業內網
+- **擴展性受限**：無法從 Cloud 延伸到 Edge Device
+
+ClawOS 定位為 **AI Agent 的作業系統（Operating System）**，以 C#/.NET 打造，提供 Agent 執行、排程、通訊、裝置管理的統一 Runtime。
+
+### 1.2 命名哲學
+
+> **Claw**（爪）= Agent 與真實世界互動的能力  
+> **OS**（Operating System）= 不只是應用程式，而是 Agent 的運行環境
 
 ---
 
@@ -14,16 +24,31 @@
 
 ### 2.1 產品一句話描述
 
-> 一個以 C#/.NET 打造的「可插拔、事件驅動、強型別」AI Agent Runtime，可透過多種 Channel 操作並安全執行真實世界任務。
+> 一個以 C#/.NET 打造的 AI Agent Operating System：管理 Agent、Tool、Channel、Device，讓 AI 在 Cloud 與 Edge 上自主執行真實世界任務。
 
-### 2.2 目標使用者
+### 2.2 ClawOS 的 "OS" 類比
+
+| OS 概念 | ClawOS 對應 |
+|---------|------------|
+| Process Management | Agent Pipeline + CronJob Scheduler |
+| File System | Tools.FileSystem + Per-user Workspace Isolation |
+| IPC (Inter-Process Communication) | NATS Messaging (Broker + Bus) |
+| Device Drivers | Tool Plugins (Shell, Git, HTTP, MQTT...) |
+| Networking | Channel Adapters (Telegram, MQTT, WebSocket) |
+| User Space | Multi-user RBAC + UserPreference + Encrypted Config |
+| Kernel | Weda.Core Framework (DDD, CQRS, Middleware Pipeline) |
+| Scheduler | CronJob + Distributed Leader Election |
+| Package Manager | Skills (SKILL.md) + Tool Auto-discovery |
+
+### 2.3 目標使用者
 
 * 高階軟體工程師 / 平台工程師
 * 企業內部 AI / Agent 平台團隊
+* IoT / Edge Computing 團隊
 * 想自託管 Agent、避免 SaaS Lock-in 的團隊
 * 高資安需求的用戶場景
 
-### 2.3 非目標
+### 2.4 非目標
 
 * 一般消費級聊天機器人
 * 純 Prompt 工具（無實際任務執行）
@@ -32,11 +57,13 @@
 
 ## 3. 核心設計原則
 
-1. **Strongly Typed First**（所有 Tool / Skill 皆可編譯期檢查）
-2. **Event-Driven & Pipeline-based**
-3. **Plugin-oriented Architecture**
-4. **LLM Provider Agnostic**
-5. **Secure by Default**（權限、Sandbox、限制）
+1. **OS-level Abstraction** — Agent、Tool、Channel、Device 皆為 OS 管理的資源
+2. **Strongly Typed First** — 所有 Tool / Skill 皆可編譯期檢查
+3. **Event-Driven & Pipeline-based** — NATS messaging + Middleware pipeline
+4. **Plugin-oriented Architecture** — Tool、Channel、LLM Provider 皆可插拔
+5. **LLM Provider Agnostic** — OpenAI、Ollama、Anthropic、自訂 endpoint
+6. **Secure by Default** — 權限隔離、加密儲存、Sandbox 執行
+7. **Cloud-to-Edge** — 同一套架構可部署在 Server 與 Edge Device
 
 ---
 
@@ -45,220 +72,280 @@
 ### 4.1 高階架構
 
 ```
-[ Channel Adapter ]
-        ↓
-[ Agent Gateway ]
-        ↓
-[ Agent Pipeline (Middleware) ]
-        ↓
-[ LLM Invoker ]
-        ↓
-[ Skill / Plugin Executor ]
-        ↓
-[ State / Memory / Storage ]
+┌─────────────────────────────────────────────────┐
+│                   ClawOS Cloud                   │
+│                                                  │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
+│  │ Web UI   │  │ Telegram │  │  MQTT Bridge  │  │
+│  │ Channel  │  │ Channel  │  │  (IoT)        │  │
+│  └────┬─────┘  └────┬─────┘  └───────┬───────┘  │
+│       └──────────────┼────────────────┘          │
+│                      ▼                           │
+│           ┌──────────────────┐                   │
+│           │  Agent Gateway   │                   │
+│           └────────┬─────────┘                   │
+│                    ▼                             │
+│           ┌──────────────────┐                   │
+│           │  Agent Pipeline  │                   │
+│           │  (Middleware)    │                   │
+│           └────────┬─────────┘                   │
+│                    ▼                             │
+│     ┌──────────────┼──────────────┐              │
+│     ▼              ▼              ▼              │
+│ ┌────────┐  ┌───────────┐  ┌──────────┐         │
+│ │  LLM   │  │   Tools   │  │  Skills  │         │
+│ │Invoker │  │  Plugins  │  │  Store   │         │
+│ └────────┘  └───────────┘  └──────────┘         │
+│                    │                             │
+│     ┌──────────────┼──────────────┐              │
+│     ▼              ▼              ▼              │
+│ ┌────────┐  ┌───────────┐  ┌──────────┐         │
+│ │  NATS  │  │ PostgreSQL│  │  Device  │         │
+│ │Messaging│ │  Storage  │  │  Shadow  │         │
+│ └────────┘  └───────────┘  └──────────┘         │
+└─────────────────────┬───────────────────────────┘
+                      │ NATS Leaf / MQTT
+        ┌─────────────┼─────────────┐
+        ▼             ▼             ▼
+   ┌─────────┐  ┌─────────┐  ┌─────────┐
+   │  Edge   │  │  Edge   │  │  Edge   │
+   │  Agent  │  │  Agent  │  │  Agent  │
+   └─────────┘  └─────────┘  └─────────┘
 ```
 
 ---
 
 ## 5. 核心模組與功能需求
 
-### 5.1 Channel Adapter
+### 5.1 Channel Adapter（通訊層）
 
-#### 功能
-
-* 接收外部輸入並轉為統一 AgentEvent
-
-#### MVP 支援
-
-* CLI
-* WebSocket
+#### 已實現
+* Web UI (SSE streaming)
+* Telegram Bot (polling mode)
 
 #### 擴充目標
-
-* Telegram
-* Line
-
----
-
-### 5.2 Agent Gateway
-
-#### 功能
-
-* Event routing
-* Session / Conversation 管理
-* Context 組裝
-
-#### 需求
-
-* 支援多 Agent Instance
-* 支援並行請求
+* Line Messaging API
+* Discord
+* MQTT (IoT 裝置通訊)
+* CoAP (低功耗 IoT 協議)
 
 ---
 
-### 5.3 Agent Pipeline（Middleware）
+### 5.2 Agent Pipeline（Middleware）
 
 #### 設計
 
 ```csharp
 IAgentPipeline
-  .Use<Auth>()
-  .Use<RateLimit>()
-  .Use<PromptGuard>()
+  .Use<ErrorHandling>()
+  .Use<SecretRedaction>()
+  .Use<Logging>()
+  .Use<Timeout>()
   .Use<LLMInvoker>()
-  .Use<SkillExecutor>();
+  .Use<ToolExecutor>();
 ```
 
-#### MVP Middleware
-
-* Logging
-* Error Handling
-* Timeout
+#### 已實現 Middleware
+* Logging / Error Handling / Timeout / Secret Redaction
 
 ---
 
-### 5.4 LLM Abstraction Layer
+### 5.3 LLM Abstraction Layer
 
-#### 功能
-
-* 封裝不同 LLM Provider
-* 支援 Tool Calling
-
-#### MVP Provider
-
-* OpenAI
+#### 已實現
+* OpenAI / Azure OpenAI
+* Ollama (本地 LLM)
+* Two-layer Provider（Global + Per-user）
 
 #### 擴充
-
-* Azure OpenAI
-* Anthropic
-* Local LLM
+* Anthropic Claude
+* Custom OpenAI-compatible endpoint
 
 ---
 
-### 5.5 Skill / Plugin System
+### 5.4 Tool Plugin System（裝置驅動層）
 
-#### Skill 定義
+#### 機制
+* C# DLL 自動掃描載入（AssemblyLoadContext）
+* `AgentToolBase<TArgs>` 基類 + Record 參數自動生成 JSON Schema
+* Per-user workspace 隔離
+
+#### 已實現 Tools
+* FileSystem / Shell / Git / GitHub / AzureDevOps
+* Http / WebSearch (SearXNG) / Notion / PDF / ImageGen
+* Tmux / Preference
+
+#### IoT 擴充目標
+* DeviceManagement（裝置 CRUD、狀態查詢）
+* FirmwareDeployment（OTA 推送）
+* TelemetryQuery（感測器數據查詢）
+
+---
+
+### 5.5 Skill System（應用層）
+
+#### 機制
+* Markdown-based 宣告式定義（SKILL.md）
+* 組合 Tool + LLM 指令
+* `@skill-name` mention 觸發 / CronJob context 引用
+
+#### 已實現 Skills
+* daily-ado-report / ado-task-sync / manage-cron-jobs
+
+---
+
+### 5.6 CronJob Scheduler（排程系統）
+
+#### 已實現
+* 分散式排程 (NATS JetStream + Leader Election)
+* 支援 cron / daily / weekly / monthly
+* 手動 / 排程觸發
+* 執行紀錄與歷史
+
+---
+
+### 5.7 Security（安全層）
+
+#### 已實現
+* JWT Authentication + Refresh Token
+* RBAC (User / Admin / SuperAdmin)
+* AES-256 加密設定儲存
+* Per-user data isolation (EF Core Query Filter)
+* Audit Logging
+* Login Rate Limiting / Path Traversal Protection
+* Content Security Policy (CSP)
+
+---
+
+## 6. IoT / Edge 擴充藍圖
+
+### 6.1 Device Domain Model
 
 ```csharp
-public interface IAgentSkill
-{
-    string Name { get; }
-    string Description { get; }
-    Task<SkillResult> ExecuteAsync(SkillContext ctx);
-}
+// 新增 Domain 實體
+Device          // id, name, type, status, firmwareVersion, lastSeen, tags
+DeviceGroup     // fleet 管理，批量操作
+DeviceShadow    // desired state vs reported state
+DeviceEvent     // telemetry, alert, heartbeat
 ```
 
-#### Plugin 機制
+### 6.2 MQTT Channel Adapter
 
-* DLL 動態載入（AssemblyLoadContext）
-* Attribute-based discovery
-* Config 啟用/停用
+```
+實作 IChannelAdapter + IHostedService
+- devices/{id}/telemetry   → 上報感測器數據
+- devices/{id}/command     → 下發控制指令
+- devices/{id}/shadow      → 狀態同步
+- MQTT v5 topic routing
+```
 
-#### MVP Skills
+### 6.3 Edge Agent（ClawOS.Edge）
 
-* FileSystem
-* Shell (受限)
-* HTTP Client
+```
+輕量版 ClawOS，部署在 Edge Device：
+- .NET 8 AOT 發布（小 binary）
+- 本地 Tool 執行（Shell, FileSystem）
+- NATS Leaf Node 或 MQTT client 連回 Cloud
+- 離線排隊、重連後同步
+- Provision key 自動註冊
+```
 
----
+### 6.4 Fleet Management
 
-### 5.6 Memory / State
+```
+Device Registration Flow:
+1. Edge Agent 首次啟動 → provision key 註冊
+2. Cloud 回傳 device certificate + config
+3. NATS subject hierarchy 實現群組廣播：
+   - devices.>              （所有裝置）
+   - devices.fleet-A.>      （特定 fleet）
+   - devices.{deviceId}.cmd （單一裝置）
+```
 
-#### 功能
+### 6.5 OTA Firmware Update
 
-* Conversation memory
-* Agent state
-
-#### MVP
-
-* In-memory
-
-#### 擴充
-
-* SQLite
-* Redis
-
----
-
-### 5.7 Security
-
-#### 需求
-
-* Skill Permission
-* Tool Allowlist
-* Execution Timeout
-
-#### 非目標（第一版）
-
-* OS-level Sandbox
-
----
-
-## 6. 非功能性需求（NFR）
-
-| 類型   | 需求              |
-| ---- | --------------- |
-| 穩定性  | 可長時間運行          |
-| 可觀測性 | Structured logs |
-| 擴展性  | Plugin 不影響核心    |
-| 可測試性 | 核心可單元測試         |
+```
+利用 CronJob + Skill 系統：
+- firmware-rollout skill
+- Canary deployment（10% → 觀察 → 全量）
+- NATS JetStream at-least-once delivery
+- DeviceShadow 追蹤 desired vs actual version
+```
 
 ---
 
-## 7. 技術選型
+## 7. 非功能性需求（NFR）
 
-| 層級      | 技術                  |
-| ------- | ------------------- |
-| Runtime | .NET 8/9            |
-| Web     | ASP.NET Core        |
-| CLI     | System.CommandLine  |
-| JSON    | System.Text.Json    |
-| Plugin  | AssemblyLoadContext |
-| LLM     | OpenAI .NET SDK     |
-
----
-
-## 8. 開發里程碑
-
-### Phase 1：Agent Core (2 週)
-
-* CLI
-* LLM Tool Calling
-* 內建 Skills
-
-### Phase 2：Pipeline & Plugin (2 週)
-
-* Middleware
-* Plugin Loader
-
-### Phase 3：Channel & Memory (2 週)
-
-* WebSocket
-* Memory Provider
+| 類型 | 需求 |
+|------|------|
+| 穩定性 | 可長時間運行（24/7 Agent） |
+| 可觀測性 | OpenTelemetry + Grafana Dashboard |
+| 擴展性 | Plugin 不影響核心；水平擴展 via NATS |
+| 可測試性 | 核心可單元測試；Integration Test |
+| 安全性 | 加密儲存、Workspace 隔離、Audit Trail |
+| 可部署性 | Docker Compose / Kubernetes / Edge AOT |
 
 ---
 
-## 9. 成功指標（Success Metrics）
+## 8. 技術選型
 
-* 可在 CLI 完成複雜任務（多 tool）
-* 新增 Skill 不需改核心程式
-* Agent 可連續運行 > 24h
+| 層級 | 技術 |
+|------|------|
+| Runtime | .NET 10 |
+| Web | ASP.NET Core |
+| Database | PostgreSQL (EF Core) |
+| Messaging | NATS JetStream (Broker + Bus) |
+| Search | SearXNG |
+| Observability | OpenTelemetry + Prometheus + Grafana |
+| Container | Docker / Docker Compose |
+| IoT Protocol | MQTT v5 / CoAP (planned) |
+| Edge Runtime | .NET 8 AOT (planned) |
+| Framework | Weda.Core (DDD, CQRS, SAGA) |
 
 ---
 
-## 10. 未來展望
+## 9. 開發里程碑
 
-* Agent-to-Agent 通訊（NATS）
-* 分散式 Agent Runtime
-* Web UI / Dashboard
-* Enterprise Policy Engine
+### Phase 1：Agent Core (已完成)
+* CLI + Web UI
+* LLM Tool Calling + Streaming
+* 內建 Tools + Markdown Skills
+* Multi-user + RBAC
+
+### Phase 2：Platform Features (已完成)
+* Middleware Pipeline
+* CronJob Scheduler (NATS distributed)
+* Telegram Channel
+* Audit Logging + Security Hardening
+
+### Phase 3：Enterprise & IoT (進行中)
+* Device Domain Model + MQTT Channel
+* Edge Agent (AOT)
+* Fleet Management + OTA
+* Agent-to-Agent Communication
+
+### Phase 4：Ecosystem
+* Skill Marketplace
+* Plugin SDK for 3rd-party Tools
+* Multi-cluster Federation
+* Edge AI Inference
 
 ---
 
-## 11. User Stories（未來功能）
+## 10. 成功指標（Success Metrics）
+
+* 可透過自然語言管理 100+ 台 edge device
+* 新增 Tool / Channel 不需改核心程式
+* Agent 可連續運行 > 30 天
+* Cloud → Edge 延遲 < 500ms (NATS Leaf Node)
+* OTA 推送成功率 > 99.5%
+
+---
+
+## 11. User Stories
 
 ### US-01：多 Channel 對話整合
-**作為** 使用者，**我希望** 透過 Telegram 或 Line 與 ClawOS 進行對話，**以便** 不需開啟電腦也能操作 Agent。
+**作為**使用者，**我希望**透過 Telegram 或 Line 與 ClawOS 進行對話，**以便**不需開啟電腦也能操作 Agent。
 
 **Acceptance Criteria:**
 - 支援 Telegram Bot Channel
@@ -267,18 +354,8 @@ public interface IAgentSkill
 
 ---
 
-### US-02：遠端桌面/瀏覽器操作可視化
-**作為** Host 管理員，**我希望** 當程式運行在 Server 容器內時，可透過 SSH 看到 Server 的桌面動作或瀏覽器操作，**以便** 監控 Agent 的實際執行狀況。
-
-**Acceptance Criteria:**
-- 容器內運行 headless browser（Playwright/Puppeteer）
-- 透過 VNC/noVNC 或 X11 forwarding 提供遠端可視化
-- SSH tunnel 支援安全連線
-
----
-
-### US-03：對話式 Cron Job 管理
-**作為** 使用者，**我希望** 透過對話方式新增 Cron Jobs，**以便** 不需手動編輯設定檔即可排程任務。
+### US-02：對話式 Cron Job 管理
+**作為**使用者，**我希望**透過對話方式新增 Cron Jobs，**以便**不需手動編輯設定檔即可排程任務。
 
 **Acceptance Criteria:**
 - 自然語言描述排程（如「每天早上 9 點執行 X」）
@@ -287,71 +364,69 @@ public interface IAgentSkill
 
 ---
 
-### US-04：Web 管理介面
-**作為** 管理員，**我希望** 有一個網頁介面來管理 Config、Cron Jobs、API Keys、Models、Skills 等，同時支援網頁版對話，**以便** 集中管理所有設定與功能。
+### US-03：Web 管理介面
+**作為**管理員，**我希望**有一個網頁介面來管理 Config、Cron Jobs、API Keys、Models、Skills，**以便**集中管理所有設定與功能。
 
 **Acceptance Criteria:**
-- Web Dashboard：Config 管理
+- Web Dashboard：Config / User / Model Provider 管理
 - Cron Jobs CRUD 介面
-- API Key / LLM Model 設定
-- Skills 啟用/停用管理
+- Audit Log 查看器
 - 內建 Web Chat 介面
 
 ---
 
-### US-05：24/7 自主開發模式
-**作為** 開發者，**我希望** Agent 可以自主、不停歇的 24/7 進行程式開發，**以便** 持續推進專案進度。
+### US-04：24/7 自主開發模式
+**作為**開發者，**我希望**Agent 可以自主、不停歇地進行程式開發，**以便**持續推進專案進度。
 
 **Acceptance Criteria:**
 - Agent 具備 Task Queue 與優先序管理
 - 自動 commit、push、建立 PR
 - 錯誤自動恢復與重試機制
-- 進度報告與通知（Telegram/Line/Email）
+- 進度報告與通知（Telegram/Line）
 
 ---
 
-### US-06：瀏覽器自動化購物
-**作為** 使用者，**我希望** Agent 可透過瀏覽器操作進行購物流程（瀏覽、加入購物車、填寫資料），支付動作仍由我執行，**以便** 節省重複操作時間。
+### US-05：Azure DevOps 整合與自動化
+**作為**開發者，**我希望**Agent 可讀取 Azure DevOps 的 Work Items 並自動更新狀態，**以便**減少手動維護 ADO 的時間。
 
 **Acceptance Criteria:**
-- Browser Skill 支援 Playwright/Puppeteer
-- 從 ConfigStore 讀取使用者資料（姓名、地址、電話等）
-- 自動填入表單欄位
-- 停在支付頁面等待使用者確認
-- 支援截圖回傳確認畫面
+- ADO REST API 整合（Work Items CRUD）
+- 根據 Git commits 自動推斷 Task 完成度
+- 雙向同步：本地 todo ↔ ADO Work Items
 
 ---
 
-### US-07：Azure DevOps 整合與自動化
-**作為** 開發者，**我希望** Agent 可透過 HTTP Request 讀取 Azure DevOps (ADO)，自動分析 User Story、更新 Tasks 狀態，**以便** 減少手動維護 ADO 的時間。
+### US-06：IoT 裝置管理
+**作為**平台管理員，**我希望**透過自然語言管理 edge device（查詢狀態、推送韌體、重啟裝置），**以便**不需登入每台裝置即可批量管理。
 
 **Acceptance Criteria:**
-- 從 ConfigStore 讀取 ADO PAT Token 與組織/專案設定
-- 透過 ADO REST API 讀取 Work Items（User Stories、Tasks）
-- 根據 ADO Task 對應的 project-path，掃描本地 Git commits
-- 比對 codebase 變更與 Task 描述，判斷完成度
-- 自動更新 ADO Task 狀態（New → Active → Closed）
-- 針對 User Story 進行分析，自動拆解為 Tasks/Todos
-- 新建立的 Tasks 同步推送至 ADO
-- 支援雙向同步：本地 todo 檔案 ↔ ADO Work Items
+- Device 註冊與 Fleet 分組
+- Device Shadow（desired vs reported state）
+- 自然語言指令：「重啟所有 fleet-A 中超過 24 小時沒回報的裝置」
+- OTA 韌體推送（canary → full rollout）
 
-**技術細節:**
-- ADO Skill：封裝 ADO REST API 操作
-- Git Skill：分析 commits、diff、branch 狀態
-- 映射表：ADO Work Item ID ↔ Local Project Path
-- 狀態推斷邏輯：根據 commit message 關鍵字或程式碼變更判斷
+---
+
+### US-07：Edge Agent 部署
+**作為**IoT 工程師，**我希望**在 edge device 上部署輕量版 ClawOS，**以便**裝置可以本地執行 AI 任務並與 Cloud 同步。
+
+**Acceptance Criteria:**
+- .NET AOT 發布（< 50MB binary）
+- NATS Leaf Node 或 MQTT 連回 Cloud
+- 離線模式：排隊 → 重連後同步
+- Provision key 自動註冊
 
 ---
 
 ## 12. 開放問題
 
-* Plugin 安全邊界策略
-* Tool 自動生成 Schema 標準
-* Memory 壓縮策略
-* Browser Skill 安全性（防止敏感資料洩漏）
-* 24/7 模式下的資源管理與成本控制
-* ADO 同步衝突處理策略（本地 vs 遠端變更）
-* Git commit message 與 ADO Task 的映射規則
+* Plugin 安全邊界策略（Sandbox vs Trust）
+* Edge Agent 的最低硬體需求
+* MQTT vs NATS Leaf Node 的選型考量
+* Device Shadow 一致性保證策略
+* OTA 失敗回滾機制
+* Multi-cluster Federation 架構
+* Edge-side LLM inference（小模型本地推論）
 
 ---
 

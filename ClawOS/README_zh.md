@@ -1,66 +1,87 @@
-# WEDA Template
+# ClawOS
 
 [English](README.md)
 
-一個適用於 .NET 10 應用程式的生產級 Clean Architecture 模板，採用領域驅動設計 (DDD)、CQRS 模式，並包含完整的測試實踐。
+一套以 .NET 10 打造的 AI Agent 作業系統，採用 Clean Architecture（DDD、CQRS），具備多用戶工作空間隔離、分散式排程，以及模組化的 Tool / Skill / Channel 插件系統。
 
 ## 功能特色
 
-- **Clean Architecture** - 分層架構，關注點分離清晰
-- **領域驅動設計 (DDD)** - Entity、Value Object、Aggregate Root、Domain Event
-- **CQRS 模式** - 使用 Mediator 實現命令查詢職責分離
-- **多資料庫支援** - SQLite、PostgreSQL、MongoDB
-- **JWT 認證** - 基於角色和權限的授權機制
-- **NATS 訊息傳遞** - 支援 request-reply 和 pub-sub 模式的事件驅動架構
-- **API 版本控制** - 內建 API 版本控制支援
-- **Swagger/OpenAPI** - 自動產生 API 文件
-- **完整測試** - 單元測試、整合測試、子表層測試
-- **分散式快取** - 基於 NATS KV 的分散式快取，實作 IDistributedCache
-- **物件儲存** - 使用 NATS Object Store 的二進位檔案儲存
-- **SAGA 模式** - 分散式交易編排與補償機制
-- **可觀測性** - OpenTelemetry 追蹤與指標
+- **Clean Architecture** — 分層架構，關注點分離清晰（Api / Application / Domain / Infrastructure）
+- **領域驅動設計 (DDD)** — Entity、Value Object、Aggregate Root、Domain Event
+- **CQRS 模式** — 使用 Mediator 實現命令查詢職責分離
+- **Agent Pipeline** — 基於 Middleware 的 LLM 呼叫鏈（錯誤處理、日誌、逾時、秘密遮蔽）
+- **Tool 插件系統** — 透過組件掃描自動註冊 C# Tools（`AgentToolBase<TArgs>`）
+- **Markdown Skills** — 宣告式 `SKILL.md` 定義，組合 Tool 與 LLM 指令
+- **多 Channel** — Web UI (SSE)、Telegram Bot，可擴充的 Adapter 模式（`IChannelAdapter`）
+- **分散式 CronJob** — NATS JetStream + Leader Election 排程執行
+- **雙層 Model Provider** — 全域（SuperAdmin）+ 每用戶各自的 LLM Provider
+- **多用戶隔離** — 每用戶獨立工作空間、EF Core Query Filter、加密設定儲存
+- **RBAC** — User / Admin / SuperAdmin，細粒度權限控制
+- **NATS 訊息** — 雙 Broker 架構（Protobuf broker + JSON bus）
+- **分散式快取** — 基於 NATS KV 的 `IDistributedCache`
+- **物件儲存** — NATS Object Store 存放二進位檔案
+- **SAGA 模式** — 分散式交易編排與補償機制
+- **可觀測性** — OpenTelemetry 追蹤與指標（Prometheus + Grafana）
+- **稽核日誌** — 安全關鍵操作的持久化稽核記錄
+- **安全性** — JWT、AES-256 加密、CSP、登入限流、路徑穿越防護
 
 ## 預覽
 
 ### 開發者 UI
-+ 適用於開發者環境的 UI，包含 Swagger UI, Wedally UI 與 Wiki
+開發者友善介面，包含 Swagger UI、Wedally UI 與 Wiki：
 ![homepage](resources/homepage.png)
 
 ### 預設置的 Swagger UI
-+ 預先配置好的 Swagger UI，包含 Grouping, Tags, SecurityRequirement 設定
+預先配置好的 Swagger UI，包含 Grouping、Tags、SecurityRequirement 設定：
 ![swagger](resources/swagger.png)
 
-###  NATS 端點 UI (Wedally UI)
-+ 類似 NATS 版的 swagger UI，支援直接操作，並提供可直接執行的 payload
+### NATS 端點 UI (Wedally UI)
+類似 Swagger 的 NATS 端點操作介面：
 ![wedally](resources/wedally.png)
-+ 直接提供操作
 ![wedally_req](resources/wedally_req.png)
 
-### 自動產生的 wiki page
-+ 自動將 `docs/wiki/{en,zh}` 路徑下的文章轉成靜態網頁
-+ 支援 markdown 格式渲染
+### 自動產生的 Wiki 頁面
+自動將 `docs/wiki/{en,zh}` 路徑下的文章轉成靜態網頁，支援 Markdown 格式渲染：
 ![wiki](resources/wiki.png)
-
 
 ## 專案結構
 
 ```
-WedaTemplate/
+ClawOS/
 ├── src/
-│   ├── Weda.Core/                    # 共用基礎設施 (DDD, CQRS, NATS, Cache, SAGA)
-│   ├── ClawOS.Api/            # REST API 層
-│   ├── ClawOS.Application/    # 應用層/CQRS 層
-│   ├── ClawOS.Contracts/      # DTO 和契約
-│   ├── ClawOS.Domain/         # 領域層
-│   └── ClawOS.Infrastructure/ # 基礎設施層
+│   ├── ClawOS.Api/                       # ASP.NET Core API + 靜態前端
+│   ├── ClawOS.Application/               # 業務邏輯、Agent Pipeline、CronJob 執行器
+│   ├── ClawOS.Contracts/                 # 介面、DTO、Tool/Skill/Channel 契約
+│   ├── ClawOS.Domain/                    # 領域實體
+│   ├── ClawOS.Infrastructure/            # EF Core、安全、持久化
+│   ├── ClawOS.Infrastructure.Llm.OpenAI/ # OpenAI LLM Provider
+│   ├── ClawOS.Infrastructure.Llm.Ollama/ # Ollama LLM Provider
+│   ├── ClawOS.Hosting/                   # DI 組裝、服務註冊
+│   ├── ClawOS.Channels.Telegram/         # Telegram Bot Channel Adapter
+│   ├── ClawOS.Cli/                       # CLI 介面
+│   └── tools/                            # 內建 Tool 插件
+│       ├── ClawOS.Tools.FileSystem/
+│       ├── ClawOS.Tools.Shell/
+│       ├── ClawOS.Tools.Git/
+│       ├── ClawOS.Tools.GitHub/
+│       ├── ClawOS.Tools.AzureDevOps/
+│       ├── ClawOS.Tools.Http/
+│       ├── ClawOS.Tools.WebSearch/
+│       ├── ClawOS.Tools.Notion/
+│       ├── ClawOS.Tools.Pdf/
+│       ├── ClawOS.Tools.ImageGen/
+│       ├── ClawOS.Tools.Tmux/
+│       └── ClawOS.Tools.Preference/
+├── skills/                               # Markdown 技能定義
 ├── tests/
 │   ├── ClawOS.Api.IntegrationTests/
 │   ├── ClawOS.Application.UnitTests/
 │   ├── ClawOS.Domain.UnitTests/
 │   ├── ClawOS.Infrastructure.UnitTests/
 │   └── ClawOS.TestCommon/
-└── tools/
-    └── WikiGenerator/
+├── docs/                                 # Wiki 文件
+├── docker-compose.yml
+└── Dockerfile
 ```
 
 ## 快速開始
@@ -69,398 +90,186 @@ WedaTemplate/
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - Docker & Docker Compose
-- NATS Server（選用，用於訊息傳遞功能）
 
 ### 使用 Docker Compose 執行（推薦）
 
-啟動所有服務（API + PostgreSQL）：
-
 ```bash
+cp .env.example .env  # 編輯設定值
 docker compose up -d
 ```
 
-查看 logs：
+| 服務 | URL |
+|------|-----|
+| Web UI | http://localhost:5001 |
+| Swagger UI | http://localhost:5001/swagger |
+| SearXNG | http://localhost:8080 |
+| PostgreSQL | localhost:5433 |
+
+### 本機開發
 
 ```bash
-docker compose logs -f
-```
+# 啟動基礎設施服務
+docker compose up -d postgres nats-broker nats-bus searxng
 
-停止服務：
-
-```bash
-docker compose down
-```
-
-### 本機開發搭配 Docker PostgreSQL
-
-僅啟動 PostgreSQL 容器：
-
-```bash
-docker compose up -d postgres
-```
-
-本機執行 API：
-
-```bash
+# 執行 API
 dotnet run --project src/ClawOS.Api
 ```
 
-### 不使用 Docker 執行
+### 資料庫遷移
 
-如果你有本機 PostgreSQL，請更新 `appsettings.Development.json` 中的連線字串：
+遷移會在啟動時自動套用。若需建立新遷移：
 
-```json
+```bash
+dotnet ef migrations add MigrationName \
+  --project src/ClawOS.Infrastructure \
+  --startup-project src/ClawOS.Api
+```
+
+## 建立擴充
+
+### Tool（C#）
+
+Tool 提供可執行的能力（檔案讀寫、API 呼叫、Shell 指令等）：
+
+```csharp
+public class MyTool(IServiceProvider sp) : AgentToolBase<MyToolArgs>
 {
-  "Database": {
-    "Provider": "PostgreSql",
-    "ConnectionString": "Host=localhost;Port=5432;Database=clawos_dev;Username=postgres;Password=postgres"
-  }
+    public override string Name => "my_tool";
+    public override string Description => "這個工具做什麼";
+
+    public override async Task<ToolResult> ExecuteAsync(
+        MyToolArgs args, ToolContext context, CancellationToken ct)
+    {
+        return ToolResult.Success("結果");
+    }
+}
+
+public record MyToolArgs(
+    [property: Description("參數說明")]
+    string? Parameter
+);
+```
+
+放在 `src/tools/` 下 — 啟動時透過組件掃描自動註冊。
+
+### Skill（Markdown）
+
+Skill 組合 Tool 與 LLM 指令：
+
+```markdown
+---
+name: my-skill
+description: 這個技能做什麼
+tools:
+  - shell
+  - read_file
+---
+
+## Instructions
+
+你是一個有用的助手...
+```
+
+放在 `skills/` 下 — 在聊天中透過 `@my-skill` 觸發，或在 CronJob context 中引用。
+
+### Channel Adapter
+
+實作 `IChannelAdapter` + `IHostedService` 來橋接外部通訊平台：
+
+```csharp
+public interface IChannelAdapter
+{
+    string Name { get; }
+    string DisplayName { get; }
+    ChannelAdapterStatus Status { get; }
+    Task SendMessageAsync(string externalId, string message, CancellationToken ct);
 }
 ```
 
-然後執行：
+## API 概覽
 
-```bash
-dotnet run --project src/ClawOS.Api
-```
+### 聊天與對話
+- `POST /api/v1/chat/stream` — 串流聊天回應 (SSE)
+- `GET/POST/DELETE /api/v1/conversation` — 管理對話
 
-### 存取端點
+### Model Provider
+- `GET/POST/PUT/DELETE /api/v1/model-provider` — 全域 Provider（SuperAdmin）
+- `GET/POST/PUT/DELETE /api/v1/user-model-provider` — 每用戶 Provider
 
-| 服務 | URL |
-|------|-----|
-| API | http://localhost:5001 |
-| Swagger UI | http://localhost:5001/swagger |
-| PostgreSQL | localhost:5433 (Docker) |
+### CronJob
+- `GET/POST/PUT/DELETE /api/v1/cron-job` — 管理排程任務
+- `POST /api/v1/cron-job/{id}/execute` — 手動觸發
 
-## 領域模型
+### 設定
+- `GET/PUT/DELETE /api/v1/user-config/{key}` — 每用戶加密設定
+- `GET/PUT/DELETE /api/v1/app-config/{key}` — 全域應用設定（SuperAdmin）
 
-### Employee（員工）
-
-- 階層式組織架構，支援主管關係
-- 部門管理（Engineering、HR、Finance、Marketing、Sales、Operations）
-- 狀態追蹤（Active、OnLeave、Inactive）
-- 下屬管理，防止循環參照
-
-### User（使用者）
-
-- 基於 Email 的認證
-- 角色管理（User、Admin、SuperAdmin）
-- 基於權限的存取控制
-- 登入追蹤
-
-## API 端點
-
-### Auth（認證）
-
-| 方法 | 端點 | 說明 |
-|------|------|------|
-| POST | `/api/v1/auth/login` | 使用者登入 |
-
-### Users（使用者）
-
-| 方法 | 端點 | 角色 | 說明 |
-|------|------|------|------|
-| GET | `/api/v1/users/me` | 已認證 | 取得目前使用者 |
-| GET | `/api/v1/users` | Admin | 列出所有使用者 |
-| GET | `/api/v1/users/{id}` | Admin | 依 ID 取得使用者 |
-| POST | `/api/v1/users` | Admin | 建立使用者 |
-| PUT | `/api/v1/users/{id}` | Admin | 更新使用者 |
-| PUT | `/api/v1/users/{id}/roles` | SuperAdmin | 更新角色 |
-| DELETE | `/api/v1/users/{id}` | Admin | 刪除使用者 |
-
-### Employees（員工）
-
-| 方法 | 端點 | 說明 |
-|------|------|------|
-| GET | `/api/v1/employees` | 列出所有員工 |
-| GET | `/api/v1/employees/{id}` | 依 ID 取得員工 |
-| POST | `/api/v1/employees` | 建立員工 |
-| PUT | `/api/v1/employees/{id}` | 更新員工 |
-| DELETE | `/api/v1/employees/{id}` | 刪除員工 |
-| GET | `/api/v1/employees/{id}/subordinates` | 取得下屬 |
+### 使用者管理
+- `POST /api/v1/auth/login` — 登入
+- `POST /api/v1/auth/register` — 註冊
+- `GET/POST /api/v1/user-management` — 使用者管理（SuperAdmin）
 
 ## NATS 整合
 
-### EventController - 類似 ApiController 的 NATS 開發體驗
+ClawOS 使用雙 NATS Broker：
+- **Broker**（port 4222）：Protobuf 序列化，LLM 協調
+- **Bus**（port 4223）：JSON 序列化，事件分發，CronJob 派送
 
-此模板提供 `EventController`，一個類似 ASP.NET Core `ApiController` 的抽象層，讓你可以用熟悉的模式處理 NATS 訊息。
+### EventController 模式
 
 ```csharp
 [ApiVersion("1")]
-public class EmployeeEventController : EventController
+public class MyEventController : EventController
 {
-    // Request-Reply 模式，支援 subject 路由
     [Subject("[controller].v{version:apiVersion}.{id}.get")]
-    public async Task<GetEmployeeResponse> GetEmployee(int id)
+    public async Task<MyResponse> GetById(int id)
     {
-        var query = new GetEmployeeQuery(id);
-        var result = await Mediator.Send(query);
-        return new GetEmployeeResponse(result.Value);
-    }
-
-    // 建立員工
-    [Subject("[controller].v{version:apiVersion}.create")]
-    public async Task<GetEmployeeResponse> CreateEmployee(CreateEmployeeRequest request)
-    {
-        var command = new CreateEmployeeCommand(request.Name, request.Email, ...);
-        var result = await Mediator.Send(command);
-        return new GetEmployeeResponse(result.Value);
-    }
-
-    // JetStream Consume 模式（fire-and-forget）
-    [Subject("[controller].v{version:apiVersion}.created")]
-    public async Task OnEmployeeCreated(CreateEmployeeNatsEvent @event)
-    {
-        var command = new CreateEmployeeCommand(@event.Name, @event.Email, ...);
-        await Mediator.Send(command);
+        var result = await Mediator.Send(new GetByIdQuery(id));
+        return new MyResponse(result.Value);
     }
 }
-```
-
-### 支援的 NATS 模式
-
-| 模式 | 說明 | 使用場景 |
-|------|------|----------|
-| **Request-Reply** | 同步請求與回應 | CRUD 操作 |
-| **JetStream Consume** | 持續訊息處理 | 事件處理器 |
-| **JetStream Fetch** | 批次訊息處理 | 批量操作 |
-| **Core Pub-Sub** | Fire-and-forget 訊息 | 通知 |
-
-### NATS 端點
-
-| Subject | 說明 |
-|---------|------|
-| `employee.v1.{id}.get` | 依 ID 取得員工 |
-| `employee.v1.getAll` | 列出所有員工 |
-| `employee.v1.create` | 建立員工 |
-| `employee.v1.{id}.update` | 更新員工 |
-| `employee.v1.{id}.delete` | 刪除員工 |
-
-### NATS CLI 範例
-
-複製貼上以下指令即可直接操作 NATS 端點：
-
-**依 ID 取得員工：**
-```bash
-nats req employee.v1.1.get ''
-```
-
-**列出所有員工：**
-```bash
-nats req employee.v1.getAll ''
-```
-
-**建立員工：**
-```bash
-nats req employee.v1.create '{"name":"John Doe","email":"john@example.com","department":"Engineering","position":"Software Engineer"}'
-```
-
-**更新員工：**
-```bash
-nats req employee.v1.1.update '{"name":"John Doe","email":"john.doe@example.com","department":"Engineering","position":"Senior Engineer","status":"Active"}'
-```
-
-**刪除員工：**
-```bash
-nats req employee.v1.1.delete ''
 ```
 
 ## 設定
 
-### 資料庫
+### 環境變數
 
-```json
-{
-  "Database": {
-    "Provider": "Sqlite",
-    "ConnectionString": "Data Source=ClawOS.sqlite"
-  }
-}
-```
-
-支援的 Provider：`Sqlite`、`PostgreSQL`、`MongoDB`
-
-### JWT 設定
-
-```json
-{
-  "JwtSettings": {
-    "Secret": "your-secret-key-at-least-32-characters",
-    "TokenExpirationInMinutes": 60,
-    "Issuer": "WedaTemplate",
-    "Audience": "WedaTemplate"
-  }
-}
-```
-
-### NATS 訊息傳遞
-
-```json
-{
-  "Nats": {
-    "Url": "nats://localhost:4222",
-    "Name": "clawos"
-  }
-}
-```
-
-### Email 通知
-
-```json
-{
-  "EmailSettings": {
-    "EnableEmailNotifications": false,
-    "DefaultFromEmail": "your-email@example.com",
-    "SmtpSettings": {
-      "Server": "smtp.gmail.com",
-      "Port": 587,
-      "Username": "your-email@gmail.com",
-      "Password": "your-password"
-    }
-  }
-}
-```
-
-## 授權機制
-
-此模板支援三種授權類型：
-
-### 基於角色的授權
-
-```csharp
-[Authorize(Roles = "Admin")]
-public record GetUserQuery(Guid Id) : IAuthorizeableRequest<ErrorOr<User>>;
-```
-
-### 基於權限的授權
-
-```csharp
-[Authorize(Permissions = "users:read")]
-public record ListUsersQuery : IAuthorizeableRequest<ErrorOr<List<User>>>;
-```
-
-### 基於策略的授權
-
-```csharp
-[Authorize(Policies = "SelfOrAdmin")]
-public record UpdateUserCommand(Guid Id, ...) : IAuthorizeableRequest<ErrorOr<User>>;
-```
+| 變數 | 說明 |
+|------|------|
+| `JWT_SECRET` | JWT 簽章金鑰（>= 32 字元）|
+| `CLAWOS_ENCRYPTION_KEY` | AES-256 加密金鑰 |
+| `LLM_PROVIDER` | 預設 Provider（`ollama` / `openai`）|
+| `OPENAI_API_KEY` | OpenAI API Key |
+| `OLLAMA_URL` | Ollama 伺服器 URL |
+| `SEARXNG_URL` | SearXNG 搜尋引擎 URL |
 
 ## 測試
 
 ```bash
-# 執行所有測試
 dotnet test
-
-# 執行並產生覆蓋率報告
-dotnet test --collect:"XPlat Code Coverage"
 ```
 
 ### 測試類型
+- **領域單元測試** — 測試領域實體和值物件
+- **應用層單元測試** — 測試處理器和 Pipeline 行為
+- **基礎設施單元測試** — 測試儲存庫和持久化
+- **整合測試** — 端對端 API 測試
 
-- **領域單元測試** - 測試領域實體和值物件
-- **應用層單元測試** - 測試處理器和管線行為
-- **基礎設施單元測試** - 測試儲存庫和持久化
-- **整合測試** - 端對端 API 測試
+## 技術選型
 
-## 架構模式
-
-| 模式 | 實作 |
+| 層級 | 技術 |
 |------|------|
-| 領域驅動設計 | Entity、AggregateRoot、Value Object、Domain Event |
-| CQRS | 基於 Mediator 的命令/查詢分離 |
-| Repository 模式 | 通用和特定儲存庫 |
-| Pipeline Behavior | 驗證和授權的橫切關注點 |
-| 最終一致性 | 基於 Middleware 的領域事件發布 |
-| 事件驅動 | NATS 訊息傳遞用於非同步通訊 |
-| 分散式快取 | NATS KV 搭配 IDistributedCache 介面 |
-| 物件儲存 | NATS Object Store 用於二進位檔案 |
-| SAGA 模式 | 編排式分散式交易 |
-| 可觀測性 | OpenTelemetry 追蹤與指標 |
-
-## Weda.Core 基礎設施
-
-`Weda.Core` 函式庫提供生產級的基礎設施模式：
-
-### 分散式快取 (NATS KV)
-
-```csharp
-// 注入 IDistributedCache
-public class MyService(IDistributedCache cache)
-{
-    public async Task CacheDataAsync(string key, MyData data)
-    {
-        var json = JsonSerializer.Serialize(data);
-        await cache.SetStringAsync(key, json, new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
-        });
-    }
-}
-```
-
-### 物件儲存（二進位檔案）
-
-```csharp
-// 注入 IBlobStorage
-public class FileService(IBlobStorage storage)
-{
-    public async Task<string> UploadAsync(Stream file, string filename)
-    {
-        return await storage.UploadAsync(file, filename);
-    }
-
-    public async Task<Stream> DownloadAsync(string filename)
-    {
-        return await storage.DownloadAsync(filename);
-    }
-}
-```
-
-### SAGA 模式
-
-```csharp
-// 定義 saga 步驟
-public class CreateOrderStep : ISagaStep<OrderSagaData>
-{
-    public string Name => "CreateOrder";
-
-    public async Task<ErrorOr<OrderSagaData>> ExecuteAsync(OrderSagaData data, CancellationToken ct)
-    {
-        // 建立訂單邏輯
-        return data;
-    }
-
-    public async Task<ErrorOr<OrderSagaData>> CompensateAsync(OrderSagaData data, CancellationToken ct)
-    {
-        // 回滾訂單建立
-        return data;
-    }
-}
-
-// 執行 saga
-var result = await sagaOrchestrator.ExecuteAsync(saga, initialData);
-```
-
-### 可觀測性設定
-
-```json
-{
-  "Observability": {
-    "ServiceName": "MyService",
-    "Tracing": {
-      "Enabled": true,
-      "UseConsoleExporter": true,
-      "OtlpEndpoint": "http://localhost:4317"
-    },
-    "Metrics": {
-      "Enabled": true,
-      "UseConsoleExporter": false
-    }
-  }
-}
-```
+| 後端 | .NET 10、ASP.NET Core、EF Core、Mediator (CQRS) |
+| 資料庫 | PostgreSQL（自動遷移）|
+| 訊息 | NATS JetStream（雙 Broker）|
+| 搜尋 | SearXNG |
+| Channel | Web UI (SSE)、Telegram Bot |
+| 前端 | Vanilla JS（CSP-compliant）、marked.js、highlight.js、KaTeX |
+| 安全性 | JWT、AES-256、CSP、稽核日誌、登入限流 |
+| 可觀測性 | OpenTelemetry、Prometheus、Grafana |
+| 容器 | Docker、Docker Compose |
+| 框架 | Weda.Core（DDD、CQRS、SAGA、分散式快取）|
 
 ## 授權條款
 
-本專案採用 MIT 授權條款。
+MIT

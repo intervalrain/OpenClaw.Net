@@ -1,68 +1,68 @@
-# ClawOS.Net
+# ClawOS
 
-An enterprise-grade AI Agent Platform built with .NET, featuring multi-user workspace isolation, two-layer model provider management, a modular tool system, and a modern web interface.
+**AI Agent Operating System** — Manage Agents, Tools, Channels, and Devices from Cloud to Edge.
+
+Built with C#/.NET, ClawOS provides a unified runtime for AI agents to autonomously execute real-world tasks with enterprise-grade security, multi-user isolation, and extensible plugin architecture.
+
+## Why "OS"?
+
+ClawOS is not just an AI chatbot — it's an **operating system for AI agents**:
+
+| OS Concept | ClawOS |
+|-----------|--------|
+| Process Management | Agent Pipeline + CronJob Scheduler |
+| File System | Tools.FileSystem + Per-user Workspace Isolation |
+| IPC | NATS Messaging (Broker + Bus) |
+| Device Drivers | Tool Plugins (Shell, Git, HTTP, MQTT...) |
+| Networking | Channel Adapters (Web, Telegram, MQTT) |
+| User Space | Multi-user RBAC + Encrypted Config Storage |
+| Scheduler | Distributed CronJob with Leader Election |
+| Package Manager | Skills (SKILL.md) + Tool Auto-discovery |
 
 ## Features
 
-### Core Capabilities
-- **Multi-Provider LLM Support**: Ollama, OpenAI, Anthropic, and custom OpenAI-compatible endpoints
-- **Two-Layer Model Providers**: SuperAdmin manages global providers; users can add their own with personal API keys
-- **Multi-Channel Support**: Web UI and Telegram Bot with per-user channel configuration
-- **Modular Tool System**: Auto-registered C# tools via assembly scanning
-- **Markdown Skills**: Declarative skill definitions (`SKILL.md`) that compose tools with LLM instructions
-- **CronJob Scheduler**: Scheduled task execution with LLM-assisted argument resolution
-- **Real-time Streaming**: SSE (Server-Sent Events) for streaming responses
-- **Conversation History**: Persistent chat history with automatic compaction
-- **Vision Support**: Image upload and analysis with OpenAI Vision API
+### Core
+- **Multi-Provider LLM**: Ollama, OpenAI, Anthropic, custom endpoints
+- **Two-Layer Model Providers**: Global (SuperAdmin) + Per-user with own API keys
+- **Agent Pipeline**: Middleware-based (Logging, Error Handling, Timeout, Secret Redaction)
+- **Modular Tool System**: Auto-registered C# plugins via assembly scanning
+- **Markdown Skills**: Declarative `SKILL.md` composing tools with LLM instructions
+- **CronJob Scheduler**: Distributed scheduling via NATS JetStream + Leader Election
+- **Multi-Channel**: Web UI (SSE), Telegram Bot, extensible to MQTT/Line/Discord
+- **Real-time Streaming**: Server-Sent Events for chat responses
 
-### Multi-User & Security
-- **Per-User Data Isolation**: All data scoped by authenticated user (conversations, cron jobs, tools, configs, channels)
-- **Role-Based Access Control**: Three-tier roles (User / Admin / SuperAdmin) with fine-grained permissions
-- **JWT Authentication**: Token-based auth with refresh tokens and account lockout
-- **Content Security Policy**: Strict CSP enforcement with no inline scripts
-- **Encrypted Config Storage**: AES-256 encryption for user secrets and API keys at rest
-- **Security Middleware**: Audit logging, login rate limiting, path traversal protection
+### Security
+- **Per-User Isolation**: All data scoped by authenticated user
+- **RBAC**: User / Admin / SuperAdmin with fine-grained permissions
+- **JWT Auth**: Token-based with refresh tokens and account lockout
+- **AES-256 Encryption**: User secrets and API keys encrypted at rest
+- **Audit Logging**: Persistent audit trail for all security-critical operations
+- **CSP Enforcement**: Strict Content Security Policy with no inline scripts
 
-### Administration (SuperAdmin)
-- **Application Settings**: Unified admin panel for user management, model providers, and app configuration
-- **Global Model Providers**: Configure shared LLM providers available to all users
-- **App Config Management**: System-wide encrypted configuration (API keys, tokens)
-- **User Management**: Approve/reject registrations, manage roles and status
-
-### Integrations (Tools)
-- **Azure DevOps**: Work items, repositories, builds, pipelines, and PRs
-- **Notion**: Pages, databases, search, and comments
-- **GitHub**: Issues, PRs, and CI workflows via GitHub CLI
-- **Web Search**: Integrated SearXNG for web search capabilities
-- **File System**: Read, write, list with path traversal protection
-- **Shell**: Restricted command execution
-- **PDF**: Read and search PDF documents
-- **Image Generation**: DALL-E integration
+### Built-in Tools
+Azure DevOps | Notion | GitHub | Web Search (SearXNG) | File System | Shell | Git | PDF | Image Generation (DALL-E) | HTTP | Tmux | Preference
 
 ## Architecture
 
 ```
-ClawOS.Net/
-├── ClawOS/
-│   ├── src/
-│   │   ├── ClawOS.Api/                # ASP.NET Core Web API + Static Frontend
-│   │   ├── ClawOS.Application/        # Business logic, CronJob executor, Agent pipeline
-│   │   ├── ClawOS.Contracts/          # Interfaces, DTOs, shared types
-│   │   ├── ClawOS.Domain/             # Domain entities (User, CronJob, ModelProvider, etc.)
-│   │   ├── ClawOS.Infrastructure/     # EF Core, security, persistence
-│   │   ├── ClawOS.Channels.Telegram/  # Telegram Bot channel adapter
-│   │   ├── ClawOS.Hosting/            # DI registration, service extensions
-│   │   ├── Weda.Core/                   # Framework core (CQRS, middleware, security)
-│   │   └── tools/                       # Built-in tools (FileSystem, Git, Shell, etc.)
-│   ├── skills/                          # Markdown-based skill definitions (SKILL.md)
-│   ├── docs/                            # Documentation
-│   └── docker-compose.yml
+ClawOS/
+├── src/
+│   ├── ClawOS.Api/                # ASP.NET Core API + Static Frontend
+│   ├── ClawOS.Application/        # Business logic, Agent pipeline, CronJob executor
+│   ├── ClawOS.Contracts/          # Interfaces, DTOs, Tool/Skill/Channel contracts
+│   ├── ClawOS.Domain/             # Domain entities (User, CronJob, Device...)
+│   ├── ClawOS.Infrastructure/     # EF Core, Security, Persistence
+│   ├── ClawOS.Hosting/            # DI composition, LLM/Tool/Channel registration
+│   ├── ClawOS.Channels.Telegram/  # Telegram Bot channel adapter
+│   └── tools/                     # Built-in tool plugins
+├── skills/                        # Markdown-based skill definitions
+├── docker-compose.yml
+└── Dockerfile
 ```
 
 ## Quick Start
 
 ### Prerequisites
-
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Docker](https://www.docker.com/get-started) & Docker Compose
 
@@ -70,75 +70,57 @@ ClawOS.Net/
 
 ```bash
 cd ClawOS
-
-# Configure secrets in .env
-cp .env.example .env  # Edit with your values
-
+cp .env.example .env   # Edit with your values
 docker compose up -d
 ```
 
-Services will be available at:
-- **Web UI**: http://localhost:5001
-- **API Docs**: http://localhost:5001/swagger
-- **SearXNG**: http://localhost:8080
+| Service | URL |
+|---------|-----|
+| Web UI | http://localhost:5001 |
+| API Docs | http://localhost:5001/swagger |
+| SearXNG | http://localhost:8080 |
 
 ### First-Time Setup
 
-1. Open http://localhost:5001 - you'll be redirected to the setup page
+1. Open http://localhost:5001 — redirects to setup page
 2. Create the initial SuperAdmin account
 3. Go to **Settings > Models** to configure your LLM provider
 4. Start chatting!
 
 ### Configuration
 
-Key environment variables (set in `.env`):
-
 | Variable | Description |
 |----------|-------------|
-| `JWT_SECRET` | JWT signing key (>= 32 chars, required) |
-| `CLAWOS_ENCRYPTION_KEY` | AES-256 key for encrypting secrets at rest |
-| `LLM_PROVIDER` | Default LLM provider (`ollama` or `openai`) |
-| `OPENAI_API_KEY` | OpenAI API key (if using OpenAI) |
-| `OLLAMA_URL` | Ollama server URL (default: `http://localhost:11434`) |
+| `JWT_SECRET` | JWT signing key (>= 32 chars) |
+| `CLAWOS_ENCRYPTION_KEY` | AES-256 key for secrets at rest |
+| `LLM_PROVIDER` | Default LLM provider (`ollama` / `openai`) |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `OLLAMA_URL` | Ollama server URL |
 
 ## Development
-
-### Local Development
 
 ```bash
 cd ClawOS
 
-# Start infrastructure services
+# Start infrastructure
 docker compose up -d postgres nats-broker nats-bus searxng
 
 # Run the API
 dotnet run --project src/ClawOS.Api
 ```
 
-### Database Migrations
-
-Migrations are **automatically applied** on startup. To create a new migration:
-
-```bash
-cd ClawOS
-dotnet ef migrations add MigrationName \
-  --project src/ClawOS.Infrastructure \
-  --startup-project src/ClawOS.Api
-```
-
-### Creating a New Tool (C#)
-
-Tools are C# classes that provide executable capabilities (file I/O, API calls, shell commands, etc.).
+### Creating a Tool
 
 ```csharp
-public class MyTool(IServiceProvider sp) : AgentSkillBase<MyToolArgs>
+public class MyTool(IServiceProvider sp) : AgentToolBase<MyToolArgs>
 {
     public override string Name => "my_tool";
     public override string Description => "What this tool does";
 
-    public override async Task<SkillResult> ExecuteAsync(MyToolArgs args, CancellationToken ct)
+    public override async Task<ToolResult> ExecuteAsync(
+        MyToolArgs args, ToolContext context, CancellationToken ct)
     {
-        return SkillResult.Success("Result");
+        return ToolResult.Success("Result");
     }
 }
 
@@ -148,11 +130,9 @@ public record MyToolArgs(
 );
 ```
 
-Tools are auto-registered via assembly scanning under `src/tools/`.
+Tools placed in `src/tools/` are auto-discovered at startup.
 
-### Creating a Markdown Skill
-
-Skills are declarative definitions that compose tools with LLM instructions. Create a `SKILL.md` file in the `skills/` directory:
+### Creating a Skill
 
 ```markdown
 ---
@@ -168,45 +148,32 @@ tools:
 You are a helpful assistant that...
 ```
 
-Skills can be invoked via `@my-skill` mention in chat or referenced in CronJob context.
-
-## API Overview
-
-### Chat & Conversations
-- `POST /api/v1/chat/stream` - Stream chat response (SSE)
-- `GET/POST/DELETE /api/v1/conversation` - Manage conversations
-
-### Model Providers
-- `GET/POST/PUT/DELETE /api/v1/model-provider` - Global providers (SuperAdmin)
-- `GET/POST/PUT/DELETE /api/v1/user-model-provider` - User providers
-- `GET /api/v1/user-model-provider/available` - List available global providers
-
-### CronJobs
-- `GET/POST/PUT/DELETE /api/v1/cron-job` - Manage scheduled jobs
-- `POST /api/v1/cron-job/{id}/execute` - Manual execution
-- `GET/POST/PUT/DELETE /api/v1/tool-instance` - Manage tool instances
-
-### Configuration
-- `GET/PUT/DELETE /api/v1/user-config/{key}` - Per-user encrypted config
-- `GET/PUT/DELETE /api/v1/app-config/{key}` - Global app config (SuperAdmin)
-- `GET/PUT /api/v1/channel-settings/telegram` - Per-user Telegram settings
-
-### User Management
-- `POST /api/v1/auth/login` - Login
-- `POST /api/v1/auth/register` - Register
-- `GET/POST /api/v1/user-management` - User admin (SuperAdmin)
+Skills in `skills/` are loaded at startup. Invoke via `@my-skill` in chat.
 
 ## Tech Stack
 
-- **Backend**: .NET 10, ASP.NET Core, Entity Framework Core, Mediator (CQRS)
-- **Database**: PostgreSQL with auto-migration
-- **Messaging**: NATS JetStream
-- **Search**: SearXNG
-- **Channels**: Web UI, Telegram Bot
-- **Frontend**: Vanilla JS (CSP-compliant), CSS Variables, marked.js, highlight.js, KaTeX
-- **Security**: JWT, AES-256, CSP, audit logging, rate limiting
-- **CI/CD**: GitHub Actions (build, test, dependency vulnerability scan)
-- **Containerization**: Docker, Docker Compose
+| Layer | Technology |
+|-------|-----------|
+| Runtime | .NET 10, ASP.NET Core |
+| Database | PostgreSQL (EF Core) |
+| Messaging | NATS JetStream |
+| Search | SearXNG |
+| Observability | OpenTelemetry, Prometheus, Grafana |
+| Frontend | Vanilla JS, CSS Variables, marked.js, highlight.js, KaTeX |
+| Security | JWT, AES-256, CSP, Audit Logging |
+| Container | Docker, Docker Compose |
+
+## Roadmap
+
+- [x] Multi-user Agent Platform with RBAC
+- [x] Distributed CronJob Scheduling (NATS)
+- [x] Telegram Channel Integration
+- [x] Audit Logging & Security Hardening
+- [ ] IoT Device Management (MQTT Channel, Device Shadow)
+- [ ] Edge Agent (ClawOS.Edge, .NET AOT)
+- [ ] Fleet Management & OTA Firmware Updates
+- [ ] Agent-to-Agent Communication
+- [ ] Skill Marketplace
 
 ## License
 

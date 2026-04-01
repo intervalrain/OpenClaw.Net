@@ -1,65 +1,87 @@
-# WEDA Template
+# ClawOS
 
 [中文版](README_zh.md)
 
-A production-ready Clean Architecture template for .NET 10 applications, featuring Domain-Driven Design (DDD), CQRS pattern, and comprehensive testing practices.
+An AI Agent Operating System built with .NET 10, featuring Clean Architecture (DDD, CQRS), multi-user workspace isolation, distributed scheduling, and a modular tool/skill/channel plugin system.
 
 ## Features
 
-- **Clean Architecture** - Layered architecture with clear separation of concerns
-- **Domain-Driven Design** - Entities, Value Objects, Aggregate Roots, Domain Events
-- **CQRS Pattern** - Command Query Responsibility Segregation with Mediator
-- **Multiple Database Support** - SQLite, PostgreSQL, MongoDB
-- **JWT Authentication** - Role-based and permission-based authorization
-- **NATS Messaging** - Event-driven architecture with request-reply and pub-sub patterns
-- **API Versioning** - Built-in API versioning support
-- **Swagger/OpenAPI** - Auto-generated API documentation
-- **Comprehensive Testing** - Unit, integration, and subcutaneous tests
-- **Distributed Cache** - NATS KV-based distributed caching with IDistributedCache
-- **Object Store** - Binary file storage with NATS Object Store
-- **SAGA Pattern** - Distributed transaction orchestration with compensation
-- **Observability** - OpenTelemetry tracing and metrics
+- **Clean Architecture** — Layered with clear separation of concerns (Api / Application / Domain / Infrastructure)
+- **Domain-Driven Design** — Entities, Value Objects, Aggregate Roots, Domain Events
+- **CQRS Pattern** — Command Query Responsibility Segregation with Mediator
+- **Agent Pipeline** — Middleware-based LLM invocation with error handling, logging, timeout, secret redaction
+- **Tool Plugin System** — Auto-registered C# tools via assembly scanning (`AgentToolBase<TArgs>`)
+- **Markdown Skills** — Declarative `SKILL.md` definitions composing tools with LLM instructions
+- **Multi-Channel** — Web UI (SSE), Telegram Bot, extensible adapter pattern (`IChannelAdapter`)
+- **Distributed CronJob** — NATS JetStream + Leader Election for scheduled task execution
+- **Two-Layer Model Provider** — Global (SuperAdmin) + Per-user LLM providers
+- **Multi-User Isolation** — Per-user workspace, EF Core query filters, encrypted config storage
+- **RBAC** — User / Admin / SuperAdmin with fine-grained permissions
+- **NATS Messaging** — Dual-broker architecture (Protobuf broker + JSON bus)
+- **Distributed Cache** — NATS KV-based `IDistributedCache`
+- **Object Store** — NATS Object Store for binary files
+- **SAGA Pattern** — Distributed transaction orchestration with compensation
+- **Observability** — OpenTelemetry tracing and metrics (Prometheus + Grafana)
+- **Audit Logging** — Persistent audit trail for security-critical operations
+- **Security** — JWT, AES-256 encryption, CSP, login rate limiting, path traversal protection
 
 ## Preview
 
 ### Developer UI
-+ Developer-friendly UI including Swagger UI, Wedally UI, and Wiki
+Developer-friendly UI including Swagger UI, Wedally UI, and Wiki:
 ![homepage](resources/homepage.png)
 
 ### Pre-configured Swagger UI
-+ Pre-configured Swagger UI with Grouping, Tags, and SecurityRequirement settings
+Swagger UI with Grouping, Tags, and SecurityRequirement settings:
 ![swagger](resources/swagger.png)
 
 ### NATS Endpoint UI (Wedally UI)
-+ Swagger-like UI for NATS endpoints with direct interaction support and copy-paste ready payloads
+Swagger-like UI for NATS endpoints with direct interaction support:
 ![wedally](resources/wedally.png)
-+ Direct operation support
 ![wedally_req](resources/wedally_req.png)
 
 ### Auto-generated Wiki Pages
-+ Automatically converts articles from `docs/wiki/{en,zh}` to static web pages
-+ Supports markdown rendering
+Converts articles from `docs/wiki/{en,zh}` to static web pages with markdown rendering:
 ![wiki](resources/wiki.png)
 
 ## Project Structure
 
 ```
-WedaTemplate/
+ClawOS/
 ├── src/
-│   ├── Weda.Core/                    # Shared infrastructure (DDD, CQRS, NATS, Cache, SAGA)
-│   ├── ClawOS.Api/            # REST API layer
-│   ├── ClawOS.Application/    # Application/CQRS layer
-│   ├── ClawOS.Contracts/      # DTOs and contracts
-│   ├── ClawOS.Domain/         # Domain layer
-│   └── ClawOS.Infrastructure/ # Infrastructure layer
+│   ├── ClawOS.Api/                       # ASP.NET Core API + Static Frontend
+│   ├── ClawOS.Application/               # Business logic, Agent pipeline, CronJob executor
+│   ├── ClawOS.Contracts/                 # Interfaces, DTOs, Tool/Skill/Channel contracts
+│   ├── ClawOS.Domain/                    # Domain entities
+│   ├── ClawOS.Infrastructure/            # EF Core, Security, Persistence
+│   ├── ClawOS.Infrastructure.Llm.OpenAI/ # OpenAI LLM provider
+│   ├── ClawOS.Infrastructure.Llm.Ollama/ # Ollama LLM provider
+│   ├── ClawOS.Hosting/                   # DI composition, service registration
+│   ├── ClawOS.Channels.Telegram/         # Telegram Bot channel adapter
+│   ├── ClawOS.Cli/                       # CLI interface
+│   └── tools/                            # Built-in tool plugins
+│       ├── ClawOS.Tools.FileSystem/
+│       ├── ClawOS.Tools.Shell/
+│       ├── ClawOS.Tools.Git/
+│       ├── ClawOS.Tools.GitHub/
+│       ├── ClawOS.Tools.AzureDevOps/
+│       ├── ClawOS.Tools.Http/
+│       ├── ClawOS.Tools.WebSearch/
+│       ├── ClawOS.Tools.Notion/
+│       ├── ClawOS.Tools.Pdf/
+│       ├── ClawOS.Tools.ImageGen/
+│       ├── ClawOS.Tools.Tmux/
+│       └── ClawOS.Tools.Preference/
+├── skills/                               # Markdown-based skill definitions
 ├── tests/
 │   ├── ClawOS.Api.IntegrationTests/
 │   ├── ClawOS.Application.UnitTests/
 │   ├── ClawOS.Domain.UnitTests/
 │   ├── ClawOS.Infrastructure.UnitTests/
 │   └── ClawOS.TestCommon/
-└── tools/
-    └── WikiGenerator/
+├── docs/                                 # Wiki documentation
+├── docker-compose.yml
+└── Dockerfile
 ```
 
 ## Getting Started
@@ -68,398 +90,186 @@ WedaTemplate/
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - Docker & Docker Compose
-- NATS Server (optional, for messaging features)
 
 ### Run with Docker Compose (Recommended)
 
-Start all services (API + PostgreSQL):
-
 ```bash
+cp .env.example .env  # Edit with your values
 docker compose up -d
 ```
 
-View logs:
+| Service | URL |
+|---------|-----|
+| Web UI | http://localhost:5001 |
+| Swagger UI | http://localhost:5001/swagger |
+| SearXNG | http://localhost:8080 |
+| PostgreSQL | localhost:5433 |
+
+### Local Development
 
 ```bash
-docker compose logs -f
-```
+# Start infrastructure services
+docker compose up -d postgres nats-broker nats-bus searxng
 
-Stop services:
-
-```bash
-docker compose down
-```
-
-### Local Development with Docker PostgreSQL
-
-Start only PostgreSQL container:
-
-```bash
-docker compose up -d postgres
-```
-
-Run API locally:
-
-```bash
+# Run the API
 dotnet run --project src/ClawOS.Api
 ```
 
-### Run without Docker
+### Database Migrations
 
-If you have a local PostgreSQL instance, update the connection string in `appsettings.Development.json`:
+Migrations are automatically applied on startup. To create a new migration:
 
-```json
+```bash
+dotnet ef migrations add MigrationName \
+  --project src/ClawOS.Infrastructure \
+  --startup-project src/ClawOS.Api
+```
+
+## Creating Extensions
+
+### Tool (C#)
+
+Tools provide executable capabilities (file I/O, API calls, shell commands, etc.):
+
+```csharp
+public class MyTool(IServiceProvider sp) : AgentToolBase<MyToolArgs>
 {
-  "Database": {
-    "Provider": "PostgreSql",
-    "ConnectionString": "Host=localhost;Port=5432;Database=clawos_dev;Username=postgres;Password=postgres"
-  }
+    public override string Name => "my_tool";
+    public override string Description => "What this tool does";
+
+    public override async Task<ToolResult> ExecuteAsync(
+        MyToolArgs args, ToolContext context, CancellationToken ct)
+    {
+        return ToolResult.Success("Result");
+    }
+}
+
+public record MyToolArgs(
+    [property: Description("Parameter description")]
+    string? Parameter
+);
+```
+
+Place under `src/tools/` — auto-registered via assembly scanning at startup.
+
+### Skill (Markdown)
+
+Skills compose tools with LLM instructions:
+
+```markdown
+---
+name: my-skill
+description: What this skill does
+tools:
+  - shell
+  - read_file
+---
+
+## Instructions
+
+You are a helpful assistant that...
+```
+
+Place under `skills/` — invoke via `@my-skill` in chat or reference in CronJob context.
+
+### Channel Adapter
+
+Implement `IChannelAdapter` + `IHostedService` to bridge external messaging platforms:
+
+```csharp
+public interface IChannelAdapter
+{
+    string Name { get; }
+    string DisplayName { get; }
+    ChannelAdapterStatus Status { get; }
+    Task SendMessageAsync(string externalId, string message, CancellationToken ct);
 }
 ```
 
-Then run:
+## API Overview
 
-```bash
-dotnet run --project src/ClawOS.Api
-```
+### Chat & Conversations
+- `POST /api/v1/chat/stream` — Stream chat response (SSE)
+- `GET/POST/DELETE /api/v1/conversation` — Manage conversations
 
-### Access Points
+### Model Providers
+- `GET/POST/PUT/DELETE /api/v1/model-provider` — Global providers (SuperAdmin)
+- `GET/POST/PUT/DELETE /api/v1/user-model-provider` — Per-user providers
 
-| Service | URL |
-|---------|-----|
-| API | http://localhost:5001 |
-| Swagger UI | http://localhost:5001/swagger |
-| PostgreSQL | localhost:5433 (Docker) |
+### CronJobs
+- `GET/POST/PUT/DELETE /api/v1/cron-job` — Manage scheduled jobs
+- `POST /api/v1/cron-job/{id}/execute` — Manual trigger
 
-## Domain Models
+### Configuration
+- `GET/PUT/DELETE /api/v1/user-config/{key}` — Per-user encrypted config
+- `GET/PUT/DELETE /api/v1/app-config/{key}` — Global app config (SuperAdmin)
 
-### Employee
-
-- Hierarchical organization structure with supervisor relationships
-- Department management (Engineering, HR, Finance, Marketing, Sales, Operations)
-- Status tracking (Active, OnLeave, Inactive)
-- Subordinate management with circular reference prevention
-
-### User
-
-- Email-based authentication
-- Role management (User, Admin, SuperAdmin)
-- Permission-based access control
-- Login tracking
-
-## API Endpoints
-
-### Auth
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/auth/login` | User login |
-
-### Users
-
-| Method | Endpoint | Role | Description |
-|--------|----------|------|-------------|
-| GET | `/api/v1/users/me` | Authenticated | Get current user |
-| GET | `/api/v1/users` | Admin | List all users |
-| GET | `/api/v1/users/{id}` | Admin | Get user by ID |
-| POST | `/api/v1/users` | Admin | Create user |
-| PUT | `/api/v1/users/{id}` | Admin | Update user |
-| PUT | `/api/v1/users/{id}/roles` | SuperAdmin | Update roles |
-| DELETE | `/api/v1/users/{id}` | Admin | Delete user |
-
-### Employees
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/employees` | List all employees |
-| GET | `/api/v1/employees/{id}` | Get employee by ID |
-| POST | `/api/v1/employees` | Create employee |
-| PUT | `/api/v1/employees/{id}` | Update employee |
-| DELETE | `/api/v1/employees/{id}` | Delete employee |
-| GET | `/api/v1/employees/{id}/subordinates` | Get subordinates |
+### User Management
+- `POST /api/v1/auth/login` — Login
+- `POST /api/v1/auth/register` — Register
+- `GET/POST /api/v1/user-management` — User admin (SuperAdmin)
 
 ## NATS Integration
 
-### EventController - ApiController-like Experience for NATS
+ClawOS uses dual NATS brokers:
+- **Broker** (port 4222): Protobuf serialization, LLM coordination
+- **Bus** (port 4223): JSON serialization, event distribution, CronJob dispatch
 
-The template provides `EventController`, an abstraction similar to ASP.NET Core's `ApiController` but for NATS messaging. This allows you to handle NATS messages with familiar patterns.
+### EventController Pattern
 
 ```csharp
 [ApiVersion("1")]
-public class EmployeeEventController : EventController
+public class MyEventController : EventController
 {
-    // Request-Reply pattern with subject-based routing
     [Subject("[controller].v{version:apiVersion}.{id}.get")]
-    public async Task<GetEmployeeResponse> GetEmployee(int id)
+    public async Task<MyResponse> GetById(int id)
     {
-        var query = new GetEmployeeQuery(id);
-        var result = await Mediator.Send(query);
-        return new GetEmployeeResponse(result.Value);
-    }
-
-    // Create employee
-    [Subject("[controller].v{version:apiVersion}.create")]
-    public async Task<GetEmployeeResponse> CreateEmployee(CreateEmployeeRequest request)
-    {
-        var command = new CreateEmployeeCommand(request.Name, request.Email, ...);
-        var result = await Mediator.Send(command);
-        return new GetEmployeeResponse(result.Value);
-    }
-
-    // JetStream Consume pattern (fire-and-forget)
-    [Subject("[controller].v{version:apiVersion}.created")]
-    public async Task OnEmployeeCreated(CreateEmployeeNatsEvent @event)
-    {
-        var command = new CreateEmployeeCommand(@event.Name, @event.Email, ...);
-        await Mediator.Send(command);
+        var result = await Mediator.Send(new GetByIdQuery(id));
+        return new MyResponse(result.Value);
     }
 }
-```
-
-### Supported NATS Patterns
-
-| Pattern | Description | Use Case |
-|---------|-------------|----------|
-| **Request-Reply** | Synchronous request with response | CRUD operations |
-| **JetStream Consume** | Continuous message processing | Event handlers |
-| **JetStream Fetch** | Batch message processing | Bulk operations |
-| **Core Pub-Sub** | Fire-and-forget messaging | Notifications |
-
-### NATS Endpoints
-
-| Subject | Description |
-|---------|-------------|
-| `employee.v1.{id}.get` | Get employee by ID |
-| `employee.v1.getAll` | List all employees |
-| `employee.v1.create` | Create employee |
-| `employee.v1.{id}.update` | Update employee |
-| `employee.v1.{id}.delete` | Delete employee |
-
-### NATS CLI Examples
-
-Copy and paste these commands to interact with the NATS endpoints directly:
-
-**Get Employee by ID:**
-```bash
-nats req employee.v1.1.get ''
-```
-
-**List All Employees:**
-```bash
-nats req employee.v1.getAll ''
-```
-
-**Create Employee:**
-```bash
-nats req employee.v1.create '{"name":"John Doe","email":"john@example.com","department":"Engineering","position":"Software Engineer"}'
-```
-
-**Update Employee:**
-```bash
-nats req employee.v1.1.update '{"name":"John Doe","email":"john.doe@example.com","department":"Engineering","position":"Senior Engineer","status":"Active"}'
-```
-
-**Delete Employee:**
-```bash
-nats req employee.v1.1.delete ''
 ```
 
 ## Configuration
 
-### Database
+### Environment Variables
 
-```json
-{
-  "Database": {
-    "Provider": "Sqlite",
-    "ConnectionString": "Data Source=ClawOS.sqlite"
-  }
-}
-```
-
-Supported providers: `Sqlite`, `PostgreSQL`, `MongoDB`
-
-### JWT Settings
-
-```json
-{
-  "JwtSettings": {
-    "Secret": "your-secret-key-at-least-32-characters",
-    "TokenExpirationInMinutes": 60,
-    "Issuer": "WedaTemplate",
-    "Audience": "WedaTemplate"
-  }
-}
-```
-
-### NATS Messaging
-
-```json
-{
-  "Nats": {
-    "Url": "nats://localhost:4222",
-    "Name": "clawos"
-  }
-}
-```
-
-### Email Notifications
-
-```json
-{
-  "EmailSettings": {
-    "EnableEmailNotifications": false,
-    "DefaultFromEmail": "your-email@example.com",
-    "SmtpSettings": {
-      "Server": "smtp.gmail.com",
-      "Port": 587,
-      "Username": "your-email@gmail.com",
-      "Password": "your-password"
-    }
-  }
-}
-```
-
-## Authorization
-
-The template supports three types of authorization:
-
-### Role-Based Authorization
-
-```csharp
-[Authorize(Roles = "Admin")]
-public record GetUserQuery(Guid Id) : IAuthorizeableRequest<ErrorOr<User>>;
-```
-
-### Permission-Based Authorization
-
-```csharp
-[Authorize(Permissions = "users:read")]
-public record ListUsersQuery : IAuthorizeableRequest<ErrorOr<List<User>>>;
-```
-
-### Policy-Based Authorization
-
-```csharp
-[Authorize(Policies = "SelfOrAdmin")]
-public record UpdateUserCommand(Guid Id, ...) : IAuthorizeableRequest<ErrorOr<User>>;
-```
+| Variable | Description |
+|----------|-------------|
+| `JWT_SECRET` | JWT signing key (>= 32 chars) |
+| `CLAWOS_ENCRYPTION_KEY` | AES-256 key for encrypted config |
+| `LLM_PROVIDER` | Default provider (`ollama` / `openai`) |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `OLLAMA_URL` | Ollama server URL |
+| `SEARXNG_URL` | SearXNG URL for web search |
 
 ## Testing
 
 ```bash
-# Run all tests
 dotnet test
-
-# Run with coverage
-dotnet test --collect:"XPlat Code Coverage"
 ```
 
 ### Test Types
+- **Domain Unit Tests** — Entities and value objects
+- **Application Unit Tests** — Handlers and pipeline behaviors
+- **Infrastructure Unit Tests** — Repositories and persistence
+- **Integration Tests** — End-to-end API testing
 
-- **Domain Unit Tests** - Test domain entities and value objects
-- **Application Unit Tests** - Test handlers and pipeline behaviors
-- **Infrastructure Unit Tests** - Test repositories and persistence
-- **Integration Tests** - End-to-end API testing
+## Tech Stack
 
-## Architecture Patterns
-
-| Pattern | Implementation |
-|---------|----------------|
-| Domain-Driven Design | Entity, AggregateRoot, Value Objects, Domain Events |
-| CQRS | Mediator-based command/query separation |
-| Repository Pattern | Generic and specialized repositories |
-| Pipeline Behaviors | Validation and authorization cross-cutting |
-| Eventual Consistency | Middleware-based domain event publishing |
-| Event-Driven | NATS messaging for async communication |
-| Distributed Cache | NATS KV with IDistributedCache interface |
-| Object Store | NATS Object Store for binary files |
-| SAGA Pattern | Orchestration-based distributed transactions |
-| Observability | OpenTelemetry tracing and metrics |
-
-## Weda.Core Infrastructure
-
-The `Weda.Core` library provides production-ready infrastructure patterns:
-
-### Distributed Cache (NATS KV)
-
-```csharp
-// Inject IDistributedCache
-public class MyService(IDistributedCache cache)
-{
-    public async Task CacheDataAsync(string key, MyData data)
-    {
-        var json = JsonSerializer.Serialize(data);
-        await cache.SetStringAsync(key, json, new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
-        });
-    }
-}
-```
-
-### Object Store (Binary Files)
-
-```csharp
-// Inject IBlobStorage
-public class FileService(IBlobStorage storage)
-{
-    public async Task<string> UploadAsync(Stream file, string filename)
-    {
-        return await storage.UploadAsync(file, filename);
-    }
-
-    public async Task<Stream> DownloadAsync(string filename)
-    {
-        return await storage.DownloadAsync(filename);
-    }
-}
-```
-
-### SAGA Pattern
-
-```csharp
-// Define saga steps
-public class CreateOrderStep : ISagaStep<OrderSagaData>
-{
-    public string Name => "CreateOrder";
-
-    public async Task<ErrorOr<OrderSagaData>> ExecuteAsync(OrderSagaData data, CancellationToken ct)
-    {
-        // Create order logic
-        return data;
-    }
-
-    public async Task<ErrorOr<OrderSagaData>> CompensateAsync(OrderSagaData data, CancellationToken ct)
-    {
-        // Rollback order creation
-        return data;
-    }
-}
-
-// Execute saga
-var result = await sagaOrchestrator.ExecuteAsync(saga, initialData);
-```
-
-### Observability Configuration
-
-```json
-{
-  "Observability": {
-    "ServiceName": "MyService",
-    "Tracing": {
-      "Enabled": true,
-      "UseConsoleExporter": true,
-      "OtlpEndpoint": "http://localhost:4317"
-    },
-    "Metrics": {
-      "Enabled": true,
-      "UseConsoleExporter": false
-    }
-  }
-}
-```
+| Layer | Technology |
+|-------|-----------|
+| Backend | .NET 10, ASP.NET Core, EF Core, Mediator (CQRS) |
+| Database | PostgreSQL with auto-migration |
+| Messaging | NATS JetStream (dual broker) |
+| Search | SearXNG |
+| Channels | Web UI (SSE), Telegram Bot |
+| Frontend | Vanilla JS (CSP-compliant), marked.js, highlight.js, KaTeX |
+| Security | JWT, AES-256, CSP, Audit Logging, Rate Limiting |
+| Observability | OpenTelemetry, Prometheus, Grafana |
+| Container | Docker, Docker Compose |
+| Framework | Weda.Core (DDD, CQRS, SAGA, Distributed Cache) |
 
 ## License
 
-This project is licensed under the MIT License.
+MIT
