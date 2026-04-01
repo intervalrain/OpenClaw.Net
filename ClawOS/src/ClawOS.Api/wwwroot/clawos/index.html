@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawOS.NET</title>
+    <link rel="icon" href="/favicon.png" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/clawos/app.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <!-- Marked.js for Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js" integrity="sha384-H+hy9ULve6xfxRkWIh/YOtvDdpXgV2fmAGQkIDTxIgZwNoaoBal14Di2YTMR6MzR" crossorigin="anonymous"></script>
+    <!-- DOMPurify for XSS sanitization -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js" integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu" crossorigin="anonymous"></script>
+    <!-- KaTeX for LaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <!-- highlight.js for code syntax -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-theme" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
+</head>
+<body>
+    <!-- Top header will be injected by top-header.js -->
+    <div id="app">
+        <nav class="sidebar">
+            <!-- Sidebar Header -->
+            <div class="sidebar-header">
+                <button id="sidebar-toggle" class="icon-btn sidebar-toggle-btn" title="Toggle sidebar" data-tooltip="Toggle sidebar">
+                    <svg class="icon-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18M3 6h18M3 18h18"/>
+                    </svg>
+                </button>
+                <button id="new-chat-btn" class="icon-btn new-chat-btn" title="New Chat" data-tooltip="New Chat">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Conversations Section -->
+            <div class="conversation-section">
+                <div class="conversation-header">Conversations</div>
+                <div class="conversation-list" id="conversation-list">
+                    <!-- Conversations will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Profile Section (Bottom) -->
+            <div class="sidebar-footer">
+                <div class="profile-section">
+                    <button id="profile-btn" class="profile-btn" data-tooltip="Settings">
+                        <div class="profile-avatar">U</div>
+                        <span class="profile-name">User</span>
+                        <svg class="profile-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <!-- Profile Dropdown -->
+                    <div id="profile-dropdown" class="profile-dropdown">
+                        <button id="theme-toggle" class="dropdown-item">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"/>
+                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                            </svg>
+                            <span class="theme-text">Light Mode</span>
+                        </button>
+                        <button id="settings-link" class="dropdown-item">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                            </svg>
+                            <span>Settings</span>
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button id="logout-btn" class="dropdown-item logout-item">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        <main class="content">
+            <div id="chat-page" class="page active">
+                <div class="chat-container">
+                    <div id="messages" class="messages"></div>
+                    <div class="input-area">
+                        <!-- Image preview area -->
+                        <div id="image-preview-area" class="image-preview-area" style="display: none;">
+                            <!-- Image thumbnails will be added here -->
+                        </div>
+                        <div class="input-row">
+                            <button id="attach-btn" class="attach-btn" title="Attach image">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                                </svg>
+                            </button>
+                            <input type="file" id="image-input" accept="image/*" multiple style="display: none;">
+                            <div class="input-wrapper">
+                                <textarea id="user-input" placeholder="Type a message or paste an image..."></textarea>
+                                <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                            <button id="send-btn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="dashboard-page" class="page">
+                <h2>Dashboard</h2>
+                <p>Coming soon...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="settings-layout">
+                <!-- Settings Sidebar -->
+                <div class="settings-sidebar">
+                    <button class="settings-tab active" data-tab="general">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                        </svg>
+                        <span>General</span>
+                    </button>
+                    <button class="settings-tab" data-tab="models">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                            <line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                        <span>Models</span>
+                    </button>
+                    <button class="settings-tab" data-tab="skills">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                        <span>Tools</span>
+                    </button>
+                    <button class="settings-tab" data-tab="preferences">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"/>
+                            <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                        <span>Preferences</span>
+                    </button>
+                    <button class="settings-tab" data-tab="channels">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                        </svg>
+                        <span>Channels</span>
+                    </button>
+                    <button class="settings-tab" data-tab="configs">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0110 0v4"/>
+                        </svg>
+                        <span>Configs</span>
+                    </button>
+                    <button class="settings-tab" data-tab="account">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <span>Account</span>
+                    </button>
+                </div>
+
+                <!-- Settings Content -->
+                <div class="settings-content">
+                    <!-- General Tab -->
+                    <div class="settings-panel active" data-panel="general">
+                        <h4>General</h4>
+                        <div class="setting-group">
+                            <label for="language-select">Response Language</label>
+                            <select id="language-select">
+                                <option value="zh-TW">繁體中文</option>
+                                <option value="en">English</option>
+                                <option value="ja">日本語</option>
+                                <option value="auto">Auto (follow user)</option>
+                            </select>
+                            <p class="setting-hint">AI will respond in the selected language</p>
+                        </div>
+                    </div>
+
+                    <!-- Models Tab -->
+                    <div class="settings-panel" data-panel="models">
+                        <h4>My Model Providers</h4>
+                        <p class="setting-hint">Select your default model provider for chat and cron jobs.</p>
+                        <div id="model-list" class="model-list">
+                            <!-- User's model providers will be rendered here -->
+                        </div>
+                        <button id="add-model-btn" class="btn btn-outline add-model-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                            Add Custom Provider
+                        </button>
+
+                        <h4 class="section-divider">Available Global Providers</h4>
+                        <p class="setting-hint">Shared providers managed by your administrator. Click + to add to your list.</p>
+                        <div id="available-provider-list" class="model-list">
+                            <!-- Available global providers will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Tools Tab -->
+                    <div class="settings-panel" data-panel="skills">
+                        <h4>Tools</h4>
+                        <p class="setting-hint">Use <code>/tool_name args</code> to directly invoke a tool</p>
+                        <div id="skills-list" class="skills-list">
+                            <!-- Tools will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Preferences Tab -->
+                    <div class="settings-panel" data-panel="preferences">
+                        <h4>Preferences</h4>
+                        <p class="setting-hint">Personal preferences that can be set via chat or this UI</p>
+
+                        <!-- Add Preference Form -->
+                        <div class="config-add-row">
+                            <input type="text" id="pref-new-key" placeholder="key (e.g., ado.assignedTo)" class="config-input-key">
+                            <input type="text" id="pref-new-value" placeholder="value" class="config-input-value">
+                            <button class="config-add-btn" id="add-pref-btn" title="Add Preference">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Preference List -->
+                        <div id="preference-list" class="config-list">
+                            <!-- Preferences will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Channels Tab -->
+                    <div class="settings-panel" data-panel="channels">
+                        <h4>Channels</h4>
+                        <p class="setting-hint">Configure messaging channels to receive messages from external platforms</p>
+
+                        <!-- Telegram Channel -->
+                        <div class="channel-card collapsed" id="telegram-channel">
+                            <div class="channel-header" id="telegram-channel-header">
+                                <div class="channel-info">
+                                    <svg class="channel-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                                    </svg>
+                                    <div>
+                                        <div class="channel-name">Telegram Bot</div>
+                                        <div class="channel-status" id="telegram-status">Not configured</div>
+                                    </div>
+                                </div>
+                                <label class="toggle-switch" id="telegram-toggle-label">
+                                    <input type="checkbox" id="telegram-enabled">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="channel-body">
+                                <div class="setting-group">
+                                    <label for="telegram-bot-token">Bot Token</label>
+                                    <div class="input-with-btn">
+                                        <input type="password" id="telegram-bot-token" placeholder="123456789:ABCdefGHI...">
+                                        <button class="btn btn-outline btn-sm" id="validate-telegram-btn">Validate</button>
+                                    </div>
+                                    <p class="setting-hint">Get your bot token from <a href="https://t.me/BotFather" target="_blank">@BotFather</a></p>
+                                </div>
+                                <div id="telegram-bot-info" class="bot-info-card" style="display: none;">
+                                    <!-- Bot info will be shown here after validation -->
+                                </div>
+                                <div class="setting-group">
+                                    <label for="telegram-webhook-url">Webhook URL (Optional)</label>
+                                    <input type="text" id="telegram-webhook-url" placeholder="https://your-domain.com/api/v1/telegram/webhook">
+                                    <p class="setting-hint">Leave empty to use polling mode</p>
+                                </div>
+                                <div class="setting-group">
+                                    <label for="telegram-secret-token">Secret Token (Optional)</label>
+                                    <input type="text" id="telegram-secret-token" placeholder="your-secret-token">
+                                    <p class="setting-hint">Used for webhook verification</p>
+                                </div>
+                                <div class="setting-group">
+                                    <label for="telegram-allowed-users">Allowed User IDs</label>
+                                    <input type="text" id="telegram-allowed-users" placeholder="123456789, 987654321">
+                                    <p class="setting-hint">Comma-separated list of Telegram user IDs. Leave empty to allow all users.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configs Tab -->
+                    <div class="settings-panel" data-panel="configs">
+                        <h4>My Configs</h4>
+                        <p class="setting-hint">Manage your personal encrypted secrets (API keys, tokens). All values are encrypted at rest.</p>
+
+                        <!-- Add Config Form - Single Line -->
+                        <div class="config-add-row">
+                            <input type="text" id="config-new-key" placeholder="KEY" class="config-input-key">
+                            <input type="password" id="config-new-value" placeholder="Value (encrypted)" class="config-input-value">
+                            <button class="config-add-btn" id="add-config-btn" title="Add Config">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Config List -->
+                        <div id="config-list" class="config-list">
+                            <!-- Configs will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Account Tab -->
+                    <div class="settings-panel" data-panel="account">
+                        <h4>Account</h4>
+                        <div class="setting-group">
+                            <label>User Information</label>
+                            <div class="account-info">
+                                <div class="account-avatar" id="settings-avatar">U</div>
+                                <div class="account-details">
+                                    <div class="account-name" id="settings-name">User</div>
+                                    <div class="account-email" id="settings-email">user@example.com</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-group">
+                            <button id="settings-logout-btn" class="btn btn-outline btn-danger">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                                    <polyline points="16 17 21 12 16 7"/>
+                                    <line x1="21" y1="12" x2="9" y2="12"/>
+                                </svg>
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-cancel">Close</button>
+                <button class="btn btn-primary modal-save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Model Modal -->
+    <div id="add-model-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="model-modal-title">Add Model Provider</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="provider-id" value="">
+                <div class="setting-group">
+                    <label for="provider-type">Provider Type</label>
+                    <select id="provider-type">
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="custom">Custom OpenAI-Compatible</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label for="provider-name">Display Name</label>
+                    <input type="text" id="provider-name" placeholder="e.g., My Ollama Server">
+                </div>
+                <div class="setting-group url-group">
+                    <label for="provider-url">API URL</label>
+                    <input type="text" id="provider-url" placeholder="http://localhost:11434">
+                    <p class="setting-hint provider-url-hint">Ollama default: http://localhost:11434</p>
+                </div>
+                <div class="setting-group api-key-group" style="display: none;">
+                    <label for="provider-api-key">API Key</label>
+                    <input type="password" id="provider-api-key" placeholder="sk-...">
+                </div>
+                <div class="setting-group">
+                    <label for="provider-model">Model Name</label>
+                    <input type="text" id="provider-model" placeholder="qwen2.5:7b">
+                </div>
+                <div id="validation-status" class="validation-status"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-add-model">Cancel</button>
+                <button class="btn btn-outline" id="validate-model-btn">Validate</button>
+                <button class="btn btn-primary" id="save-model-btn" disabled>Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Cron Job Drawer -->
+    <div id="cronjob-drawer" class="cronjob-drawer">
+        <div class="drawer-header">
+            <h3>Cron Jobs</h3>
+            <button id="drawer-close-btn" class="drawer-close-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="drawer-content">
+            <div id="cronjobDrawerList" class="cronjob-list">
+                <!-- Cron job items will be loaded here -->
+            </div>
+        </div>
+        <div class="drawer-footer">
+            <a href="/cronjobs/index.html" class="drawer-footer-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                Open Editor
+            </a>
+        </div>
+    </div>
+
+    <!-- Cron Job Toggle Button -->
+    <button id="cronjob-toggle-btn" class="cronjob-toggle-btn" title="Open Cron Jobs">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+        </svg>
+    </button>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="/js/approval.js"></script>
+    <script src="/clawos/app.js"></script>
+</body>
+</html>

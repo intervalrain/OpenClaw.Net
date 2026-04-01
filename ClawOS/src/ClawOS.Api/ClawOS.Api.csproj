@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <UserSecretsId>36d3aabc-1075-47d7-9b3b-c1feebf8f3bd</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591;MSG0005</NoWarn>
+    <WikiSourceDir>$(MSBuildProjectDirectory)/../../docs/wiki</WikiSourceDir>
+    <WikiOutputDir>$(MSBuildProjectDirectory)/wwwroot/wiki</WikiOutputDir>
+  </PropertyGroup>
+
+  <!-- Generate Wiki HTML before build -->
+  <Target Name="GenerateWiki" BeforeTargets="Build" Condition="Exists('$(WikiSourceDir)/en') Or Exists('$(WikiSourceDir)/zh')">
+    <Exec Command="dotnet run --project $(MSBuildProjectDirectory)/../../tools/WikiGenerator/WikiGenerator.csproj -- $(WikiSourceDir) $(WikiOutputDir)" ConsoleToMSBuild="true" StandardOutputImportance="high" />
+    <!-- Copy static assets -->
+    <Copy SourceFiles="$(WikiSourceDir)/index.html;$(WikiSourceDir)/wiki.css" DestinationFolder="$(WikiOutputDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Asp.Versioning.Mvc" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Riok.Mapperly" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Filters" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <!-- OpenTelemetry -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Weda.Core\Weda.Core.csproj" />
+    <ProjectReference Include="..\ClawOS.Contracts\ClawOS.Contracts.csproj" />
+    <ProjectReference Include="..\ClawOS.Application\ClawOS.Application.csproj" />
+    <ProjectReference Include="..\ClawOS.Infrastructure\ClawOS.Infrastructure.csproj" />
+    <ProjectReference Include="..\Weda.Protocol\Weda.Protocol.csproj" />
+    <ProjectReference Include="..\ClawOS.Hosting\ClawOS.Hosting.csproj" />
+  </ItemGroup>
+
+</Project>

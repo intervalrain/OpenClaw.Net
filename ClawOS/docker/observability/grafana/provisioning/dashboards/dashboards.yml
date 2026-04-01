@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'ClawOS'
+    orgId: 1
+    folder: 'ClawOS'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

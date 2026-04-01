@@ -1,0 +1,48 @@
+using ErrorOr;
+
+using ClawOS.Domain.Users.Entities;
+using ClawOS.Domain.Users.Enums;
+using ClawOS.Domain.Users.Repositories;
+
+using Weda.Core.Application.Interfaces;
+using Weda.Core.Application.Security;
+using Weda.Core.Application.Security.Models;
+
+namespace ClawOS.Contracts.Setup.Commands;
+
+public record InitializeSystemCommand(string Email, string Password, string? Name) : IQuery<ErrorOr<InitializeSystemResult>>;
+
+public record InitializeSystemResult(string Message);
+
+public class InitializeSystemCommandHandler(
+    IUserRepository userRepository,
+    IPasswordHasher passwordHasher,
+    IUnitOfWork uow)
+    : Mediator.IRequestHandler<InitializeSystemCommand, ErrorOr<InitializeSystemResult>>
+{
+    public async ValueTask<ErrorOr<InitializeSystemResult>> Handle(InitializeSystemCommand request, CancellationToken ct)
+    {
+        var hasUser = await userRepository.AnyAsync(ct);
+
+        if (hasUser) return Error.Conflict("Setup.AlreadyInitialized", "System already initialized");
+
+        // First user is automatically SuperAdmin with Active status
+        var userResult = User.Create(
+            email: request.Email,
+            passwordHash: passwordHasher.HashPassword(request.Password),
+            name: request.Name ?? "Admin",
+            roles: [Role.SuperAdmin, Role.Admin, Role.User],
+            permissions: null,
+            status: UserStatus.Active);
+
+        if (userResult.IsError)
+        {
+            return userResult.Errors;
+        }
+
+        await userRepository.AddAsync(userResult.Value, ct);
+        await uow.SaveChangesAsync(ct);
+
+        return new InitializeSystemResult("SuperAdmin user created successfully");
+    }
+}

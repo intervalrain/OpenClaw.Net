@@ -1,12 +1,12 @@
-# PRD：C# Agent Platform（OpenClaw.NET）
+# PRD：C# Agent Platform（ClawOS.NET）
 
 ## 1. 產品背景與目標
 
 ### 1.1 背景
 
-隨著 LLM 與 Tool Calling 成熟，AI Agent 已從「聊天機器人」進化為可執行實際任務的 Agent Runtime。現有 OpenClaw（Node.js / TypeScript）雖功能完整，但在 **強型別、安全性、長期運行穩定度、企業級擴展性** 上存在限制。
+隨著 LLM 與 Tool Calling 成熟，AI Agent 已從「聊天機器人」進化為可執行實際任務的 Agent Runtime。現有 ClawOS（Node.js / TypeScript）雖功能完整，但在 **強型別、安全性、長期運行穩定度、企業級擴展性** 上存在限制。
 
-本專案目標是使用 **C# / .NET** 重建一套 **OpenClaw.NET Agent Platform**，專注於工程品質、可維護性與長期演進能力。
+本專案目標是使用 **C# / .NET** 重建一套 **ClawOS.NET Agent Platform**，專注於工程品質、可維護性與長期演進能力。
 
 ---
 
@@ -258,7 +258,7 @@ public interface IAgentSkill
 ## 11. User Stories（未來功能）
 
 ### US-01：多 Channel 對話整合
-**作為** 使用者，**我希望** 透過 Telegram 或 Line 與 OpenClaw 進行對話，**以便** 不需開啟電腦也能操作 Agent。
+**作為** 使用者，**我希望** 透過 Telegram 或 Line 與 ClawOS 進行對話，**以便** 不需開啟電腦也能操作 Agent。
 
 **Acceptance Criteria:**
 - 支援 Telegram Bot Channel

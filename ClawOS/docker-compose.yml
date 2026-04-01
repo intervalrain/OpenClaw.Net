@@ -1,0 +1,107 @@
+services:
+  api:
+    container_name: clawos-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Database__Provider=PostgreSql
+      - Database__ConnectionString=Host=postgres;Database=clawos_dev;Username=postgres;Password=postgres
+      - OpenTelemetry__OtlpEndpoint=http://host.docker.internal:4317
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - Nats__Broker__Url=nats://nats-broker:4222
+      - Nats__Bus__Url=nats://nats-bus:4222
+      - SEARXNG_URL=http://searxng:8080
+      - CLAWOS_ENCRYPTION_KEY=${CLAWOS_ENCRYPTION_KEY}
+      - JwtSettings__Secret=${JWT_SECRET}
+      - AllowedHosts=*
+    volumes:
+      - ./.data/workspace:/app/workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats-broker:
+        condition: service_healthy
+      nats-bus:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - clawos-network
+
+  postgres:
+    container_name: clawos-postgres
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=clawos_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - clawos-network
+
+  nats-broker:
+    container_name: clawos-nats-broker
+    image: nats:2.10-alpine
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    volumes:
+      - nats-broker-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - clawos-network
+
+  nats-bus:
+    container_name: clawos-nats-bus
+    image: nats:2.10-alpine
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    volumes:
+      - nats-bus-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - clawos-network
+
+  searxng:
+    container_name: clawos-searxng
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - clawos-network
+
+networks:
+  clawos-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  nats-broker-data:
+  nats-bus-data:
+  searxng-data:

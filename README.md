@@ -1,4 +1,4 @@
-# OpenClaw.Net
+# ClawOS.Net
 
 An enterprise-grade AI Agent Platform built with .NET, featuring multi-user workspace isolation, two-layer model provider management, a modular tool system, and a modern web interface.
 
@@ -42,16 +42,16 @@ An enterprise-grade AI Agent Platform built with .NET, featuring multi-user work
 ## Architecture
 
 ```
-OpenClaw.Net/
-├── OpenClaw/
+ClawOS.Net/
+├── ClawOS/
 │   ├── src/
-│   │   ├── OpenClaw.Api/                # ASP.NET Core Web API + Static Frontend
-│   │   ├── OpenClaw.Application/        # Business logic, CronJob executor, Agent pipeline
-│   │   ├── OpenClaw.Contracts/          # Interfaces, DTOs, shared types
-│   │   ├── OpenClaw.Domain/             # Domain entities (User, CronJob, ModelProvider, etc.)
-│   │   ├── OpenClaw.Infrastructure/     # EF Core, security, persistence
-│   │   ├── OpenClaw.Channels.Telegram/  # Telegram Bot channel adapter
-│   │   ├── OpenClaw.Hosting/            # DI registration, service extensions
+│   │   ├── ClawOS.Api/                # ASP.NET Core Web API + Static Frontend
+│   │   ├── ClawOS.Application/        # Business logic, CronJob executor, Agent pipeline
+│   │   ├── ClawOS.Contracts/          # Interfaces, DTOs, shared types
+│   │   ├── ClawOS.Domain/             # Domain entities (User, CronJob, ModelProvider, etc.)
+│   │   ├── ClawOS.Infrastructure/     # EF Core, security, persistence
+│   │   ├── ClawOS.Channels.Telegram/  # Telegram Bot channel adapter
+│   │   ├── ClawOS.Hosting/            # DI registration, service extensions
 │   │   ├── Weda.Core/                   # Framework core (CQRS, middleware, security)
 │   │   └── tools/                       # Built-in tools (FileSystem, Git, Shell, etc.)
 │   ├── skills/                          # Markdown-based skill definitions (SKILL.md)
@@ -69,7 +69,7 @@ OpenClaw.Net/
 ### Run with Docker Compose
 
 ```bash
-cd OpenClaw
+cd ClawOS
 
 # Configure secrets in .env
 cp .env.example .env  # Edit with your values
@@ -96,7 +96,7 @@ Key environment variables (set in `.env`):
 | Variable | Description |
 |----------|-------------|
 | `JWT_SECRET` | JWT signing key (>= 32 chars, required) |
-| `OPENCLAW_ENCRYPTION_KEY` | AES-256 key for encrypting secrets at rest |
+| `CLAWOS_ENCRYPTION_KEY` | AES-256 key for encrypting secrets at rest |
 | `LLM_PROVIDER` | Default LLM provider (`ollama` or `openai`) |
 | `OPENAI_API_KEY` | OpenAI API key (if using OpenAI) |
 | `OLLAMA_URL` | Ollama server URL (default: `http://localhost:11434`) |
@@ -106,13 +106,13 @@ Key environment variables (set in `.env`):
 ### Local Development
 
 ```bash
-cd OpenClaw
+cd ClawOS
 
 # Start infrastructure services
 docker compose up -d postgres nats-broker nats-bus searxng
 
 # Run the API
-dotnet run --project src/OpenClaw.Api
+dotnet run --project src/ClawOS.Api
 ```
 
 ### Database Migrations
@@ -120,10 +120,10 @@ dotnet run --project src/OpenClaw.Api
 Migrations are **automatically applied** on startup. To create a new migration:
 
 ```bash
-cd OpenClaw
+cd ClawOS
 dotnet ef migrations add MigrationName \
-  --project src/OpenClaw.Infrastructure \
-  --startup-project src/OpenClaw.Api
+  --project src/ClawOS.Infrastructure \
+  --startup-project src/ClawOS.Api
 ```
 
 ### Creating a New Tool (C#)

@@ -1,4 +1,4 @@
-# OpenClaw.Net Development Progress
+# ClawOS.Net Development Progress
 
 ## Current Sprint (2026-03-30)
 

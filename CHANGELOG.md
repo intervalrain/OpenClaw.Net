@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Audit Logging System** — Persistent audit log for security-critical operations (login, user management, config changes, cron job operations). Includes admin UI with action/date filters, pagination, and auto-cleanup background service. (#9)
-- **Per-user Workspace Isolation** — Each user gets an isolated filesystem workspace (`~/.openclaw-net/workspace/{userId}/`). Shared workspace is read-only for non-SuperAdmin. All file system and shell tools enforce workspace boundaries via `PathSecurity`. (#18)
+- **Per-user Workspace Isolation** — Each user gets an isolated filesystem workspace (`~/.clawos-net/workspace/{userId}/`). Shared workspace is read-only for non-SuperAdmin. All file system and shell tools enforce workspace boundaries via `PathSecurity`. (#18)
 - **Two-layer Model Provider** — Global providers managed by SuperAdmin, per-user providers with own API keys. LLM resolution: User default > Global default > Ollama fallback. (#8)
 - **User Ban System** — Permission-based ban with `BanCheckMiddleware` (in-memory cached). Ban/Unban API with reason. Banned users see `banned.html`.
 - **CSP Compliance** — All inline scripts and event handlers replaced with external JS + `addEventListener`. Strict `script-src 'self'` enforced.
@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Admin Page** renamed from "User Management" to "Application Settings" with tabs: Pending Approval, All Users, Model Providers, App Config, Audit Log.
-- **Home Page** branding updated from "Weda Template" to "OpenClaw".
+- **Home Page** branding updated from "Weda Template" to "ClawOS".
 - **Tabs** restyled to pill/segment style.
 - **EF Query Filters** — Removed `Guid.Empty` backdoor; use `IsSuperAdmin` for admin bypass. Added filters for `UserModelProvider`, `UserConfig`, `UserPreference`, `ChannelSettings`.
 - **Database Migration** — Switched from `EnsureCreated` to `Database.Migrate()` with legacy baseline detection.
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Unsafe unscoped repository methods (`GetRecentAsync`, `GetByChannelTypeAsync`).
-- `docker-compose.override.yml` approach — replaced with `~/.openclaw-net/workspace` bind mount.
+- `docker-compose.override.yml` approach — replaced with `~/.clawos-net/workspace` bind mount.
 
 ## [1.0.0] - 2026-03-29
 

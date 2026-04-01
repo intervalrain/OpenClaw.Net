@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <!-- OpenTelemetry -->
+    <PackageReference Include="OpenTelemetry" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClawOS.Application\ClawOS.Application.csproj" />
+    <ProjectReference Include="..\ClawOS.Channels.Telegram\ClawOS.Channels.Telegram.csproj" />
+    <ProjectReference Include="..\ClawOS.Infrastructure\ClawOS.Infrastructure.csproj" />
+    <ProjectReference Include="..\ClawOS.Infrastructure.Llm.Ollama\ClawOS.Infrastructure.Llm.Ollama.csproj" />
+    <ProjectReference Include="..\ClawOS.Infrastructure.Llm.OpenAI\ClawOS.Infrastructure.Llm.OpenAI.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.FileSystem\ClawOS.Tools.FileSystem.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.Http\ClawOS.Tools.Http.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.Shell\ClawOS.Tools.Shell.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.WebSearch\ClawOS.Tools.WebSearch.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.GitHub\ClawOS.Tools.GitHub.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.Git\ClawOS.Tools.Git.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.AzureDevOps\ClawOS.Tools.AzureDevOps.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.ImageGen\ClawOS.Tools.ImageGen.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.Pdf\ClawOS.Tools.Pdf.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.Tmux\ClawOS.Tools.Tmux.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.Preference\ClawOS.Tools.Preference.csproj" />
+    <ProjectReference Include="..\tools\ClawOS.Tools.Notion\ClawOS.Tools.Notion.csproj" />
+  </ItemGroup>
+
+</Project>
