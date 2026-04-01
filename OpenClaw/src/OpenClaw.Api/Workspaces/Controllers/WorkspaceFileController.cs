@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Contracts.Configuration;
 using OpenClaw.Domain.Users.Repositories;
+using Weda.Core.Application.Interfaces;
 using OpenClaw.Domain.Workspaces.Entities;
 using OpenClaw.Domain.Workspaces.Repositories;
 using OpenClaw.Tools.FileSystem;
@@ -46,32 +47,67 @@ public class WorkspaceFileController(
     /// List files and directories at the given path within the user's workspace.
     /// </summary>
     [HttpGet("list")]
-    public IActionResult List([FromQuery] string? path = null, [FromQuery] string scope = "my")
+    public async Task<IActionResult> List(
+        [FromQuery] string? path = null,
+        [FromQuery] string scope = "my",
+        [FromQuery] Guid? ownerId = null,
+        CancellationToken ct = default)
     {
         path = NormalizePath(path);
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
-        var basePath = ResolveWorkspacePath(path, user.Id, isSuperAdmin, scope);
 
-        var error = PathSecurity.ValidatePath(basePath, user.Id, isSuperAdmin);
+        // Browsing another user's public directory
+        if (ownerId.HasValue && ownerId.Value != user.Id && !isSuperAdmin)
+        {
+            return await ListPublicDirectory(ownerId.Value, path, user.Id, ct);
+        }
+
+        var targetUserId = (ownerId.HasValue && isSuperAdmin) ? ownerId.Value : user.Id;
+        var basePath = ResolveWorkspacePath(path, targetUserId, isSuperAdmin, scope);
+
+        var error = PathSecurity.ValidatePath(basePath, targetUserId, isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
         if (!Directory.Exists(basePath))
             return NotFound("Directory not found.");
+
+        // Load all permissions for this user to resolve inheritance
+        var permissions = scope == "my"
+            ? await permissionRepository.GetByOwnerAsync(user.Id, ct)
+            : [];
 
         var entries = Directory.GetFileSystemEntries(basePath)
             .Select(e =>
             {
                 var isDir = Directory.Exists(e);
                 var info = isDir ? null : new FileInfo(e);
+                var name = Path.GetFileName(e);
+
+                // Resolve effective visibility (inherited from parent tree)
+                string? visibility = null;
+                string? explicitVisibility = null;
+                if (scope == "my")
+                {
+                    var relPath = path is null ? name : $"{path}/{name}";
+                    var effective = DirectoryPermission.ResolveEffective(relPath, permissions);
+                    visibility = effective.ToString();
+
+                    // Check if this path has an explicit (non-inherited) setting
+                    var exactMatch = permissions.FirstOrDefault(p => p.RelativePath == relPath.TrimStart('/').TrimEnd('/'));
+                    explicitVisibility = exactMatch?.Visibility.ToString();
+                }
+
                 return new
                 {
-                    Name = Path.GetFileName(e),
+                    Name = name,
                     IsDirectory = isDir,
                     Size = info?.Length,
                     ModifiedAt = isDir
                         ? Directory.GetLastWriteTimeUtc(e)
-                        : info!.LastWriteTimeUtc
+                        : info!.LastWriteTimeUtc,
+                    Visibility = visibility,
+                    ExplicitVisibility = explicitVisibility
                 };
             })
             .OrderByDescending(e => e.IsDirectory)
@@ -86,24 +122,92 @@ public class WorkspaceFileController(
     }
 
     /// <summary>
+    /// List another user's directory — only if effective visibility is Public or PublicReadonly.
+    /// </summary>
+    private async Task<IActionResult> ListPublicDirectory(Guid ownerId, string? path, Guid requesterId, CancellationToken ct)
+    {
+        // Check visibility permission
+        var ownerPermissions = await permissionRepository.GetByOwnerAsync(ownerId, ct);
+        var relPath = path ?? "";
+        var effective = DirectoryPermission.ResolveEffective(relPath, ownerPermissions);
+
+        if (effective == DirectoryVisibility.Private || effective == DirectoryVisibility.Default)
+            return Forbid();
+
+        var basePath = path is null
+            ? PathSecurity.GetUserWorkspacePath(ownerId)
+            : Path.GetFullPath(Path.Combine(PathSecurity.GetUserWorkspacePath(ownerId), path));
+
+        if (!Directory.Exists(basePath))
+            return NotFound("Directory not found.");
+
+        var entries = Directory.GetFileSystemEntries(basePath)
+            .Select(e =>
+            {
+                var isDir = Directory.Exists(e);
+                var info = isDir ? null : new FileInfo(e);
+                var name = Path.GetFileName(e);
+                var childRelPath = string.IsNullOrEmpty(relPath) ? name : $"{relPath}/{name}";
+                var childEffective = DirectoryPermission.ResolveEffective(childRelPath, ownerPermissions);
+
+                // Hide private children
+                if (childEffective == DirectoryVisibility.Private)
+                    return null;
+
+                return new
+                {
+                    Name = name,
+                    IsDirectory = isDir,
+                    Size = info?.Length,
+                    ModifiedAt = isDir ? Directory.GetLastWriteTimeUtc(e) : info!.LastWriteTimeUtc,
+                    Visibility = childEffective.ToString(),
+                    ExplicitVisibility = (string?)null
+                };
+            })
+            .Where(e => e is not null)
+            .OrderByDescending(e => e!.IsDirectory)
+            .ThenBy(e => e!.Name)
+            .ToList();
+
+        return Ok(new
+        {
+            Path = path ?? "/",
+            Entries = entries,
+            OwnerId = ownerId,
+            ReadOnly = effective == DirectoryVisibility.PublicReadonly
+        });
+    }
+
+    /// <summary>
     /// Upload a file to the user's workspace.
     /// </summary>
     [HttpPost("upload")]
     [RequestSizeLimit(50 * 1024 * 1024)] // 50MB
     public async Task<IActionResult> Upload(
         [FromQuery] string? path,
+        [FromQuery] Guid? ownerId,
         IFormFile file,
         CancellationToken ct)
     {
         path = NormalizePath(path);
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
+        var targetUserId = ownerId ?? user.Id;
+
+        // Cross-user access: only Public (RW) allows writing
+        if (ownerId.HasValue && ownerId.Value != user.Id && !isSuperAdmin)
+        {
+            var perms = await permissionRepository.GetByOwnerAsync(ownerId.Value, ct);
+            var effective = DirectoryPermission.ResolveEffective(path ?? "", perms);
+            if (effective != DirectoryVisibility.Public)
+                return BadRequest("This directory is read-only or private.");
+        }
 
         var targetDir = path is null
-            ? PathSecurity.GetUserWorkspacePath(user.Id)
-            : PathSecurity.ResolveUserPath(path, user.Id, isSuperAdmin);
+            ? PathSecurity.GetUserWorkspacePath(targetUserId)
+            : Path.GetFullPath(Path.Combine(PathSecurity.GetUserWorkspacePath(targetUserId), path));
 
-        var error = PathSecurity.ValidatePath(targetDir, user.Id, isSuperAdmin);
+        var error = PathSecurity.ValidatePath(targetDir, targetUserId, isSuperAdmin || ownerId.HasValue);
         if (error is not null) return BadRequest(error);
 
         // Quota check
@@ -130,21 +234,29 @@ public class WorkspaceFileController(
     }
 
     /// <summary>
-    /// Download a file from the user's workspace.
+    /// Download a file. Supports ownerId for cross-user public access.
     /// </summary>
     [HttpGet("download")]
-    public IActionResult Download([FromQuery] string path)
+    public async Task<IActionResult> Download([FromQuery] string path, [FromQuery] Guid? ownerId = null, CancellationToken ct = default)
     {
         path = NormalizePath(path) ?? "";
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
-        var filePath = PathSecurity.ResolveUserPath(path, user.Id, isSuperAdmin);
+        var targetUserId = ownerId ?? user.Id;
 
-        var error = PathSecurity.ValidatePath(filePath, user.Id, isSuperAdmin);
-        if (error is not null) return BadRequest(error);
+        // Cross-user access: check public visibility
+        if (ownerId.HasValue && ownerId.Value != user.Id && !isSuperAdmin)
+        {
+            var perms = await permissionRepository.GetByOwnerAsync(ownerId.Value, ct);
+            var effective = DirectoryPermission.ResolveEffective(path, perms);
+            if (effective != DirectoryVisibility.Public && effective != DirectoryVisibility.PublicReadonly)
+                return Forbid();
+        }
+
+        var filePath = Path.GetFullPath(Path.Combine(PathSecurity.GetUserWorkspacePath(targetUserId), path));
 
         if (!System.IO.File.Exists(filePath))
-            return NotFound("File not found.");
+            return NotFound($"File not found. Path: {path}, Resolved: {filePath}");
 
         var contentType = "application/octet-stream";
         var fileName = Path.GetFileName(filePath);
@@ -335,27 +447,24 @@ public class WorkspaceFileController(
         var normalizedPath = NormalizePath(request.Path) ?? "";
 
         if (!Enum.TryParse<DirectoryVisibility>(request.Visibility, true, out var visibility))
-            return BadRequest("Invalid visibility. Use: Private, PublicReadonly, or Public.");
-
-        // Verify directory exists
-        var fullPath = PathSecurity.ResolveUserPath(normalizedPath, user.Id);
-        if (!Directory.Exists(fullPath))
-            return BadRequest("Directory does not exist.");
+            return BadRequest("Invalid visibility. Use: Default, Public, PublicReadonly, or Private.");
 
         var existing = await permissionRepository.GetAsync(user.Id, normalizedPath, ct);
         if (existing is not null)
         {
-            if (visibility == DirectoryVisibility.Private)
+            if (visibility == DirectoryVisibility.Default)
             {
+                // Default = remove explicit setting, inherit from parent
                 await permissionRepository.DeleteAsync(existing, ct);
             }
             else
             {
                 existing.SetVisibility(visibility);
-                await permissionRepository.AddAsync(existing, ct);
+                var uow = HttpContext.RequestServices.GetRequiredService<IUnitOfWork>();
+                await uow.SaveChangesAsync(ct);
             }
         }
-        else if (visibility != DirectoryVisibility.Private)
+        else if (visibility != DirectoryVisibility.Default)
         {
             var perm = DirectoryPermission.Create(user.Id, normalizedPath, visibility);
             await permissionRepository.AddAsync(perm, ct);

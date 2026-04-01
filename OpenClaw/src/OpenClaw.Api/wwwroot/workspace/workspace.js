@@ -4,9 +4,10 @@ const FILE_API = '/api/v1/workspace-file';
 
 let currentPath = '/';
 let currentEntries = [];
+let browsingOwnerId = null; // set when browsing another user's public dir
 let selectedFiles = new Set(); // multi-select
 let pendingAction = null;
-let viewingScope = 'my'; // 'my' or 'admin'
+let viewingScope = 'my'; // 'my', 'admin', or 'public'
 let clipboard = null; // { action: 'copy'|'cut', paths: [...] }
 
 // Icons
@@ -71,9 +72,30 @@ async function loadDirectory(path) {
     fileList.innerHTML = '<div class="loading">Loading...</div>';
 
     try {
+        // Public scope root: list all public directories from all users
+        if (viewingScope === 'public' && currentPath === '/' && !browsingOwnerId) {
+            const res = await authFetch(`${FILE_API}/public`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const publicDirs = await res.json();
+            currentEntries = publicDirs.map(d => ({
+                name: `${d.ownerName}/${d.relativePath}`,
+                isDirectory: true,
+                size: null,
+                modifiedAt: null,
+                visibility: d.visibility,
+                explicitVisibility: d.visibility,
+                _ownerId: d.ownerUserId,
+                _relativePath: d.relativePath
+            }));
+            renderBreadcrumb();
+            renderFileList();
+            return;
+        }
+
         const params = new URLSearchParams();
         if (currentPath !== '/') params.set('path', currentPath.replace(/^\//, ''));
-        if (viewingScope !== 'my') params.set('scope', viewingScope);
+        if (viewingScope === 'admin') params.set('scope', 'admin');
+        if (browsingOwnerId) params.set('ownerId', browsingOwnerId);
         const res = await authFetch(`${FILE_API}/list?${params}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -88,7 +110,7 @@ async function loadDirectory(path) {
 // ===== Breadcrumb =====
 function renderBreadcrumb() {
     const nav = document.getElementById('breadcrumb');
-    const prefix = viewingScope === 'admin' ? 'All Users' : '~';
+    const prefix = viewingScope === 'admin' ? 'All Users' : viewingScope === 'public' ? 'Public' : '~';
     const parts = currentPath === '/' ? [] : currentPath.split('/').filter(Boolean);
 
     let html = `<span class="breadcrumb-item" data-path="/">${prefix}</span>`;
@@ -121,11 +143,16 @@ function renderFileList() {
         const rowClass = entry.isDirectory ? 'file-row directory' : 'file-row';
         const size = entry.isDirectory ? '' : formatSize(entry.size);
         const modified = formatDate(entry.modifiedAt);
+        const effVis = entry.visibility || 'Private';
+        const isExplicit = entry.explicitVisibility && entry.explicitVisibility !== 'Default';
+        const visBadge = effVis !== 'Private'
+            ? `<span class="vis-badge vis-${effVis.toLowerCase()} ${isExplicit ? '' : 'inherited'}" title="${effVis}${isExplicit ? '' : ' (inherited)'}">${effVis === 'PublicReadonly' ? 'RO' : effVis === 'Public' ? 'RW' : ''}</span>`
+            : '';
 
-        return `<div class="${rowClass}" data-name="${entry.name}" data-is-dir="${entry.isDirectory}">
+        return `<div class="${rowClass}" data-name="${entry.name}" data-is-dir="${entry.isDirectory}" data-visibility="${entry.explicitVisibility || 'Default'}" data-effective-visibility="${effVis}">
             <input type="checkbox" class="file-checkbox" data-name="${entry.name}">
             ${icon}
-            <span class="${nameClass}">${entry.name}</span>
+            <span class="${nameClass}">${entry.name}${visBadge}</span>
             <span class="file-size">${size}</span>
             <span class="file-modified">${modified}</span>
             <div class="file-actions">
@@ -164,6 +191,14 @@ function handleFileListClick(e) {
     if (e.target.closest('.file-actions')) return;
 
     if (isDir) {
+        // If clicking a public directory entry (from the public listing), set browsingOwnerId
+        const entry = currentEntries.find(en => en.name === name);
+        if (entry?._ownerId) {
+            browsingOwnerId = entry._ownerId;
+            currentPath = '/' + entry._relativePath;
+            loadDirectory(currentPath);
+            return;
+        }
         const newPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
         loadDirectory(newPath);
     } else if (e.ctrlKey || e.metaKey) {
@@ -235,6 +270,16 @@ function handleContextMenu(e) {
         items.push({ label: 'Rename', action: () => openRenameModal(name, isDir) });
         items.push({ label: 'Copy', action: () => { clipboard = { action: 'copy', paths: [resolvePath(name)] }; } });
         items.push({ label: 'Cut', action: () => { clipboard = { action: 'cut', paths: [resolvePath(name)] }; } });
+        if (viewingScope === 'my') {
+            items.push({ divider: true });
+            const curVis = row.dataset.visibility || 'Default';
+            const effVis = row.dataset.effectiveVisibility || 'Private';
+            const inheritLabel = curVis === 'Default' ? ` (→ ${effVis})` : '';
+            items.push({ label: `${curVis === 'Default' ? '* ' : '  '}Default${curVis === 'Default' ? ` (→ ${effVis})` : ''}`, action: () => setDirVisibility(name, 'Default') });
+            items.push({ label: `${curVis === 'Public' ? '* ' : '  '}Public (Read/Write)`, action: () => setDirVisibility(name, 'Public') });
+            items.push({ label: `${curVis === 'PublicReadonly' ? '* ' : '  '}Public (Read-only)`, action: () => setDirVisibility(name, 'PublicReadonly') });
+            items.push({ label: `${curVis === 'Private' ? '* ' : '  '}Private`, action: () => setDirVisibility(name, 'Private') });
+        }
         items.push({ divider: true });
         items.push({ label: 'Delete', danger: true, action: () => openDeleteModal(name, isDir) });
     } else {
@@ -280,6 +325,24 @@ async function doPaste() {
     loadDirectory(currentPath);
 }
 
+// ===== Directory Visibility =====
+async function setDirVisibility(name, visibility) {
+    const dirPath = resolvePath(name).replace(/^\//, '');
+    try {
+        const res = await authFetch(`${FILE_API}/permissions`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: dirPath, visibility })
+        });
+        if (res.ok) {
+            appendTerminalLine(`Set ${name}/ to ${visibility}`, 'system');
+            loadDirectory(currentPath);
+        } else {
+            alert('Failed to set visibility: ' + await res.text());
+        }
+    } catch (e) { alert('Failed: ' + e.message); }
+}
+
 // ===== File Preview =====
 async function openPreview(name) {
     const filePath = resolvePath(name);
@@ -291,11 +354,13 @@ async function openPreview(name) {
     title.textContent = name;
     panel.classList.add('active');
 
+    const ownerParam = browsingOwnerId ? `&ownerId=${browsingOwnerId}` : '';
+
     if (isImage(name)) {
         body.innerHTML = '<div class="loading">Loading...</div>';
         try {
             const imgPath = filePath.replace(/^\//, '');
-            const imgRes = await authFetch(`${FILE_API}/download?path=${encodeURIComponent(imgPath)}`);
+            const imgRes = await authFetch(`${FILE_API}/download?path=${encodeURIComponent(imgPath)}${ownerParam}`);
             const blob = await imgRes.blob();
             const url = URL.createObjectURL(blob);
             body.innerHTML = `<img src="${url}" alt="${name}" class="preview-image">`;
@@ -306,9 +371,11 @@ async function openPreview(name) {
         body.innerHTML = '<div class="loading">Loading...</div>';
         try {
             const downloadPath = filePath.replace(/^\//, '');
-            const res = await authFetch(`${FILE_API}/download?path=${encodeURIComponent(downloadPath)}`);
+            const res = await authFetch(`${FILE_API}/download?path=${encodeURIComponent(downloadPath)}${ownerParam}`);
             const text = await res.text();
-            const isReadonly = viewingScope === 'admin';
+            // Readonly: admin scope, or browsing another user's PublicReadonly dir
+            const browsingReadonly = browsingOwnerId && currentEntries.some(e => e.name === name && e.visibility === 'PublicReadonly');
+            const isReadonly = viewingScope === 'admin' || browsingReadonly;
             body.innerHTML = `
                 <div class="editor-toolbar">
                     <span class="editor-filename">${name}</span>
@@ -322,7 +389,10 @@ async function openPreview(name) {
                 const formData = new FormData();
                 formData.append('file', blob, name);
                 const dirPath = currentPath === '/' ? '' : currentPath.replace(/^\//, '');
-                const uploadParams = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
+                const qp = new URLSearchParams();
+                if (dirPath) qp.set('path', dirPath);
+                if (browsingOwnerId) qp.set('ownerId', browsingOwnerId);
+                const uploadParams = qp.toString() ? `?${qp}` : '';
                 const saveRes = await fetch(`${FILE_API}/upload${uploadParams}`, {
                     method: 'POST',
                     headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -359,15 +429,21 @@ function filterFiles(query) {
     });
 }
 
-// ===== Admin Browse Toggle =====
-function toggleAdminView() {
-    viewingScope = viewingScope === 'admin' ? 'my' : 'admin';
-    const btn = document.getElementById('adminBrowseBtn');
-    if (btn) {
-        btn.classList.toggle('active', viewingScope === 'admin');
-        btn.textContent = viewingScope === 'admin' ? 'My Files' : 'All Users';
-    }
+// ===== Scope Toggles =====
+function setScopeActive(scope) {
+    viewingScope = scope;
+    browsingOwnerId = null;
+    document.getElementById('publicBrowseBtn')?.classList.toggle('active', scope === 'public');
+    document.getElementById('adminBrowseBtn')?.classList.toggle('active', scope === 'admin');
     loadDirectory('/');
+}
+
+function togglePublicView() {
+    setScopeActive(viewingScope === 'public' ? 'my' : 'public');
+}
+
+function toggleAdminView() {
+    setScopeActive(viewingScope === 'admin' ? 'my' : 'admin');
 }
 
 // ===== Event Listeners =====
@@ -408,7 +484,8 @@ function setupEventListeners() {
     // Preview panel close
     document.getElementById('closePreview')?.addEventListener('click', closePreview);
 
-    // Admin browse toggle (SuperAdmin only)
+    // Scope toggles
+    document.getElementById('publicBrowseBtn')?.addEventListener('click', togglePublicView);
     document.getElementById('adminBrowseBtn')?.addEventListener('click', toggleAdminView);
 
     // Search
@@ -448,11 +525,12 @@ function setupKeyboard() {
 async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
+    const qp = new URLSearchParams();
     const normalizedPath = currentPath === '/' ? '' : currentPath.replace(/^\//, '');
-    const params = normalizedPath ? `?path=${encodeURIComponent(normalizedPath)}` : '';
+    if (normalizedPath) qp.set('path', normalizedPath);
+    if (browsingOwnerId) qp.set('ownerId', browsingOwnerId);
+    const params = qp.toString() ? `?${qp}` : '';
     try {
-        // Don't use authFetch — it adds Content-Type: application/json which breaks FormData.
-        // Manually set only Authorization header; let browser set multipart boundary.
         const token = localStorage.getItem('weda_auth_token');
         const res = await fetch(`${FILE_API}/upload${params}`, {
             method: 'POST',
@@ -531,8 +609,9 @@ async function doDelete() {
 function resolvePath(name) { return currentPath === '/' ? name : `${currentPath}/${name}`; }
 async function downloadFile(name) {
     const path = resolvePath(name).replace(/^\//, '');
+    const ownerParam = browsingOwnerId ? `&ownerId=${browsingOwnerId}` : '';
     try {
-        const res = await authFetch(`${FILE_API}/download?path=${encodeURIComponent(path)}`);
+        const res = await authFetch(`${FILE_API}/download?path=${encodeURIComponent(path)}${ownerParam}`);
         if (!res.ok) { alert('Download failed'); return; }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);

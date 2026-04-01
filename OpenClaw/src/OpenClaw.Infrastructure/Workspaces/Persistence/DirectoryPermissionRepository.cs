@@ -25,7 +25,7 @@ public class DirectoryPermissionRepository(AppDbContext context) : IDirectoryPer
     public async Task<List<DirectoryPermission>> GetPublicDirectoriesAsync(CancellationToken ct = default)
     {
         return await context.Set<DirectoryPermission>()
-            .Where(x => x.Visibility != DirectoryVisibility.Private)
+            .Where(x => x.Visibility == DirectoryVisibility.Public || x.Visibility == DirectoryVisibility.PublicReadonly)
             .OrderBy(x => x.OwnerUserId)
             .ThenBy(x => x.RelativePath)
             .ToListAsync(ct);

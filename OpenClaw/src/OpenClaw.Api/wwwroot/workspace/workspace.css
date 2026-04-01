@@ -482,6 +482,34 @@
     color: var(--text-muted);
 }
 
+/* Visibility Badges */
+.vis-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.vis-publicreadonly {
+    background: var(--status-info-bg, #1a3a5c);
+    color: var(--status-info-text, #7eb8ff);
+}
+
+.vis-public {
+    background: var(--status-success-bg, #1b4332);
+    color: var(--status-success-text, #95d5b2);
+}
+
+.vis-badge.inherited {
+    opacity: 0.6;
+    font-style: italic;
+}
+
 /* Editor */
 .editor-toolbar {
     display: flex;
@@ -507,8 +535,8 @@
 .editor-textarea {
     width: 100%;
     height: calc(100vh - 160px);
-    background: var(--bg-secondary, #1a1a1a);
-    color: #d4d4d4;
+    background: var(--card-bg);
+    color: var(--text-color);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 0.75rem;
@@ -525,11 +553,13 @@
 }
 
 .editor-textarea[readonly] {
-    opacity: 0.8;
+    background: var(--card-bg);
+    color: #ddd;
     cursor: default;
 }
 
-/* Admin Browse Toggle Active State */
+/* Scope Toggle Active State */
+#publicBrowseBtn.active,
 #adminBrowseBtn.active {
     background: var(--primary-color);
     color: white;
