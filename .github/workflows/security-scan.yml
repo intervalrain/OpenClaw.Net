@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: OpenClaw
+        working-directory: ClawOS
 
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
       - name: Check for vulnerable packages
         run: |
           echo "## Dependency Vulnerability Report" >> $GITHUB_STEP_SUMMARY
-          OUTPUT=$(dotnet list OpenClaw.sln package --vulnerable 2>&1)
+          OUTPUT=$(dotnet list ClawOS.sln package --vulnerable 2>&1)
           echo "$OUTPUT"
           if echo "$OUTPUT" | grep -q "has the following vulnerable packages"; then
             echo "::error::Vulnerable packages detected!"
@@ -49,14 +49,14 @@ jobs:
 
       - name: Check for outdated packages
         if: github.event_name == 'schedule'
-        run: dotnet list OpenClaw.sln package --outdated
+        run: dotnet list ClawOS.sln package --outdated
 
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: OpenClaw
+        working-directory: ClawOS
 
     steps:
       - uses: actions/checkout@v4
@@ -80,5 +80,5 @@ jobs:
         if: always()
         with:
           name: Test Results
-          path: 'OpenClaw/**/test-results.trx'
+          path: 'ClawOS/**/test-results.trx'
           reporter: dotnet-trx
