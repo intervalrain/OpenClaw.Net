@@ -39,4 +39,12 @@ public static class AuthErrors
     public static readonly Error VerificationMaxAttempts = Error.Validation(
         code: "Auth.VerificationMaxAttempts",
         description: "Too many verification attempts. Please request a new code.");
+
+    public static readonly Error ResetTokenInvalid = Error.Validation(
+        code: "Auth.ResetTokenInvalid",
+        description: "Invalid or expired password reset link.");
+
+    public static readonly Error ResetTokenUsed = Error.Validation(
+        code: "Auth.ResetTokenUsed",
+        description: "This password reset link has already been used.");
 }

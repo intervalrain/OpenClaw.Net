@@ -251,6 +251,26 @@
     text-decoration: underline;
 }
 
+/* Forgot Password Link */
+.auth-forgot {
+    text-align: center;
+    margin-top: 12px;
+}
+
+.auth-forgot-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted, #666);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.auth-forgot-btn:hover {
+    color: var(--primary-color, #3498db);
+    text-decoration: underline;
+}
+
 /* Verification Panel */
 .verify-icon {
     text-align: center;
