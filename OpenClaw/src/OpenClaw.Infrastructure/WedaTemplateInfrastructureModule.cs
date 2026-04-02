@@ -100,6 +100,7 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IDirectoryPermissionRepository, DirectoryPermissionRepository>();
         services.AddScoped<IChannelUserBindingRepository, ChannelUserBindingRepository>();
         services.AddScoped<IEmailVerificationRepository, EmailVerificationRepository>();
+        services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
 
         // configuration (chain: Database -> Environment)
