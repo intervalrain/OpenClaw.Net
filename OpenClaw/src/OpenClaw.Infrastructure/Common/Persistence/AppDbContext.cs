@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Configuration.Entities;
 using OpenClaw.Domain.CronJobs.Entities;
+using OpenClaw.Domain.Notifications.Entities;
+using OpenClaw.Domain.SkillStore.Entities;
 using OpenClaw.Domain.Users.Entities;
 using Weda.Core.Application.Security.Models;
 using Weda.Core.Infrastructure.Persistence;
@@ -68,6 +70,12 @@ public class AppDbContext : WedaDbContext
             .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
 
         modelBuilder.Entity<ChannelSettings>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
+
+        modelBuilder.Entity<Notification>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
+
+        modelBuilder.Entity<SkillInstallation>()
             .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
     }
 

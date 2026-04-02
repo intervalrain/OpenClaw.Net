@@ -12,6 +12,10 @@ using OpenClaw.Contracts.Security;
 using OpenClaw.Domain.Audit.Repositories;
 using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
+using OpenClaw.Domain.Notifications.Repositories;
+using OpenClaw.Domain.SkillStore.Repositories;
+using OpenClaw.Domain.ToolStore.Repositories;
+using OpenClaw.Domain.Updates.Repositories;
 using OpenClaw.Domain.Users.Repositories;
 using OpenClaw.Domain.Skills.Repositories;
 using OpenClaw.Infrastructure.Common.Persistence;
@@ -26,7 +30,11 @@ using OpenClaw.Infrastructure.Audit.Persistence;
 using OpenClaw.Infrastructure.Configuration.Persistence;
 using OpenClaw.Infrastructure.Security.CurrentUserProvider;
 using OpenClaw.Infrastructure.Security.PasswordHasher;
+using OpenClaw.Infrastructure.Notifications.Persistence;
+using OpenClaw.Infrastructure.SkillStore.Persistence;
 using OpenClaw.Infrastructure.Skills.Persistence;
+using OpenClaw.Infrastructure.ToolStore.Persistence;
+using OpenClaw.Infrastructure.Updates.Persistence;
 using OpenClaw.Infrastructure.Configuration;
 
 namespace OpenClaw.Infrastructure;
@@ -84,6 +92,21 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IAppConfigRepository, AppConfigRepository>();
         services.AddScoped<IUserPreferenceRepository, UserPreferenceRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+
+        // Updates
+        services.AddScoped<ISystemUpdateRepository, SystemUpdateRepository>();
+
+        // Tool Store
+        services.AddScoped<IToolPackageRepository, ToolPackageRepository>();
+
+        // Skill Store
+        services.AddScoped<ISkillListingRepository, SkillListingRepository>();
+        services.AddScoped<ISkillStarRepository, SkillStarRepository>();
+        services.AddScoped<ISkillFollowRepository, SkillFollowRepository>();
+        services.AddScoped<ISkillInstallationRepository, SkillInstallationRepository>();
+
+        // Notifications
+        services.AddScoped<INotificationRepository, NotificationRepository>();
 
         // configuration (chain: Database -> Environment)
         // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)
