@@ -35,6 +35,8 @@ using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Email;
 using OpenClaw.Contracts.Email;
 using OpenClaw.Domain.Auth.Repositories;
+using OpenClaw.Domain.Notifications.Repositories;
+using OpenClaw.Infrastructure.Notifications.Persistence;
 using OpenClaw.Infrastructure.Auth.Persistence;
 
 namespace OpenClaw.Infrastructure;
@@ -98,6 +100,7 @@ public static class WedaTemplateInfrastructureModule
         services.AddScoped<IDirectoryPermissionRepository, DirectoryPermissionRepository>();
         services.AddScoped<IChannelUserBindingRepository, ChannelUserBindingRepository>();
         services.AddScoped<IEmailVerificationRepository, EmailVerificationRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
 
         // configuration (chain: Database -> Environment)
         // EnvironmentConfigStore is the terminal store (no fallback, read-only for env vars/.env file)

@@ -96,7 +96,8 @@ public class AuthController(ISender _mediator, LoginRateLimiter rateLimiter, Reg
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> VerifyRegistration([FromBody] VerifyRegistrationRequest request)
     {
-        var command = new VerifyRegistrationCommand(request.Email, request.Code);
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var command = new VerifyRegistrationCommand(request.Email, request.Code, baseUrl);
         var result = await _mediator.Send(command);
         return result.Match(Ok, Problem);
     }
