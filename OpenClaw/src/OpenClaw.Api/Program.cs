@@ -25,6 +25,7 @@ var builder = WebApplication.CreateBuilder(args);
 
     // Security services
     builder.Services.AddSingleton<LoginRateLimiter>();
+    builder.Services.AddSingleton<RegistrationRateLimiter>();
 
     // CORS — restrict to configured origins
     builder.Services.AddCors(options =>

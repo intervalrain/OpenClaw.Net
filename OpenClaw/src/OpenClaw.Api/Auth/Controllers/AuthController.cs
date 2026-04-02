@@ -20,7 +20,7 @@ namespace OpenClaw.Api.Auth.Controllers;
 /// </summary>
 [AllowAnonymous]
 [ApiVersion("1.0")]
-public class AuthController(ISender _mediator, LoginRateLimiter rateLimiter) : ApiController
+public class AuthController(ISender _mediator, LoginRateLimiter rateLimiter, RegistrationRateLimiter registrationRateLimiter) : ApiController
 {
     /// <summary>
     /// Login with email and password.
@@ -73,21 +73,49 @@ public class AuthController(ISender _mediator, LoginRateLimiter rateLimiter) : A
         return result.Match(Ok, Problem);
     }
 
-    /// <summary>
-    /// Register a new user account (requires admin approval).
-    /// </summary>
-    /// <param name="request">The registration details.</param>
-    /// <returns>Registration confirmation (user will be in pending status).</returns>
-    /// <response code="200">Registration submitted, pending admin approval.</response>
-    /// <response code="400">Invalid request data or email already exists.</response>
     [HttpPost("register")]
-    [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(InitiateRegistrationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        var command = new RegisterCommand(request.Email, request.Password, request.Name);
-        var result = await _mediator.Send(command);
+        var email = request.Email.ToLowerInvariant();
+        if (registrationRateLimiter.IsRegistrationLimited(email))
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { message = "Too many registration attempts. Please try again later." });
 
+        registrationRateLimiter.RecordRegistration(email);
+
+        var command = new InitiateRegistrationCommand(request.Email, request.Password, request.Name);
+        var result = await _mediator.Send(command);
+        return result.Match(Ok, Problem);
+    }
+
+    [HttpPost("register/verify")]
+    [ProducesResponseType(typeof(VerifyRegistrationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> VerifyRegistration([FromBody] VerifyRegistrationRequest request)
+    {
+        var command = new VerifyRegistrationCommand(request.Email, request.Code);
+        var result = await _mediator.Send(command);
+        return result.Match(Ok, Problem);
+    }
+
+    [HttpPost("register/resend")]
+    [ProducesResponseType(typeof(ResendVerificationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationRequest request)
+    {
+        var email = request.Email.ToLowerInvariant();
+        if (registrationRateLimiter.IsResendLimited(email))
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { message = "Too many resend attempts. Please try again later." });
+
+        registrationRateLimiter.RecordResend(email);
+
+        var command = new ResendVerificationCommand(request.Email);
+        var result = await _mediator.Send(command);
         return result.Match(Ok, Problem);
     }
 }
