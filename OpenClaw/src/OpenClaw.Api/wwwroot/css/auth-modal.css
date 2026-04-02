@@ -251,11 +251,111 @@
     text-decoration: underline;
 }
 
+/* Verification Panel */
+.verify-icon {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+    filter: grayscale(1);
+    opacity: 0.8;
+}
+
+.verify-subtitle {
+    text-align: center;
+    color: var(--text-muted, #666);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.verify-email {
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-color, #333);
+    font-size: 0.95rem;
+    margin: 2px 0 20px;
+}
+
+/* 6-digit code input */
+.verify-code-group {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.verify-code-group input {
+    width: 46px;
+    height: 54px;
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    border: 1.5px solid var(--border-color, #e1e5e9);
+    border-radius: 10px;
+    background: var(--card-bg, #fff);
+    color: var(--text-color, #333);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    caret-color: var(--primary-color, #3498db);
+}
+
+.verify-code-group input:focus {
+    outline: none;
+    border-color: var(--primary-color, #3498db);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.12);
+}
+
+.verify-footer {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 0.85rem;
+    color: var(--text-muted, #666);
+}
+
+.verify-resend {
+    background: none;
+    border: none;
+    color: var(--primary-color, #3498db);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0;
+    margin-left: 4px;
+}
+
+.verify-resend:hover:not(:disabled) {
+    text-decoration: underline;
+}
+
+.verify-resend:disabled {
+    color: var(--text-muted, #666);
+    cursor: default;
+}
+
+.verify-back {
+    display: block;
+    margin: 12px auto 0;
+    background: none;
+    border: none;
+    color: var(--text-muted, #666);
+    cursor: pointer;
+    font-size: 0.82rem;
+    padding: 4px 0;
+}
+
+.verify-back:hover {
+    color: var(--text-color, #333);
+}
+
 /* Responsive */
 @media (max-width: 480px) {
     .auth-modal-content {
         margin: 16px;
         padding: 24px;
         max-width: calc(100% - 32px);
+    }
+
+    .verify-code-group input {
+        width: 40px;
+        height: 48px;
+        font-size: 1.2rem;
     }
 }

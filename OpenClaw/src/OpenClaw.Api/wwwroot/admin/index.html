@@ -56,6 +56,7 @@
                 <button class="tab" data-tab="all">All Users</button>
                 <button class="tab" data-tab="providers">Model Providers</button>
                 <button class="tab" data-tab="appconfig">App Config</button>
+                <button class="tab" data-tab="email">Email Settings</button>
                 <button class="tab" data-tab="auditlog">Audit Log</button>
             </div>
 
@@ -93,6 +94,81 @@
                 </div>
                 <div class="user-list" id="appConfigList">
                     <div class="loading">Loading configuration...</div>
+                </div>
+            </section>
+
+            <!-- Email Settings Tab -->
+            <section class="tab-content" id="emailTab">
+                <div class="email-layout">
+                    <!-- Enable Toggle Card -->
+                    <div class="email-card">
+                        <div class="email-card-header">
+                            <div>
+                                <h3>Email Notifications</h3>
+                                <p>Send verification codes and admin alerts via email</p>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="emailEnabled">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Sender Settings Card -->
+                    <div class="email-card">
+                        <div class="email-card-title">Sender</div>
+                        <div class="email-form-grid">
+                            <div class="email-field">
+                                <label for="emailFromEmail">From Email</label>
+                                <input type="email" id="emailFromEmail" placeholder="noreply@example.com">
+                            </div>
+                            <div class="email-field">
+                                <label for="emailFromName">From Name</label>
+                                <input type="text" id="emailFromName" placeholder="OpenClaw">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SMTP Settings Card -->
+                    <div class="email-card">
+                        <div class="email-card-title">SMTP Server</div>
+                        <div class="email-form-grid">
+                            <div class="email-field wide">
+                                <label for="emailSmtpServer">Host</label>
+                                <input type="text" id="emailSmtpServer" placeholder="smtp.gmail.com">
+                            </div>
+                            <div class="email-field narrow">
+                                <label for="emailSmtpPort">Port</label>
+                                <input type="number" id="emailSmtpPort" placeholder="587" value="587">
+                            </div>
+                        </div>
+                        <div class="email-form-grid">
+                            <div class="email-field">
+                                <label for="emailSmtpUsername">Username</label>
+                                <input type="text" id="emailSmtpUsername" placeholder="your-email@gmail.com">
+                            </div>
+                            <div class="email-field">
+                                <label for="emailSmtpPassword">Password</label>
+                                <input type="password" id="emailSmtpPassword" placeholder="App password or SMTP password">
+                            </div>
+                        </div>
+                        <label class="email-checkbox">
+                            <input type="checkbox" id="emailSmtpUseSsl" checked>
+                            <span>Use SSL / TLS</span>
+                        </label>
+                        <div class="email-hint">
+                            Gmail: use <strong>smtp.gmail.com:587</strong> with an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a>
+                        </div>
+                    </div>
+
+                    <!-- Actions Card -->
+                    <div class="email-card email-actions-card">
+                        <div class="email-actions">
+                            <button class="btn btn-primary" id="saveEmailSettings">Save Settings</button>
+                            <button class="btn btn-outline" id="testEmailBtn">Send Test Email</button>
+                        </div>
+                        <div id="emailTestResult" class="email-test-result"></div>
+                    </div>
                 </div>
             </section>
 

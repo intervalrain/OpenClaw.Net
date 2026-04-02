@@ -5,6 +5,7 @@ using ErrorOr;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using OpenClaw.Application.Channels;
 using OpenClaw.Application.Skills;
 using OpenClaw.Channels.Telegram.Errors;
 using OpenClaw.Channels.Telegram.Models;
@@ -31,6 +32,7 @@ public class HandleTelegramMessageCommandHandler(
     ITelegramBotClient client,
     IAgentPipeline pipeline,
     TelegramConversationMapper mapper,
+    ChannelLinkService linkService,
     IConversationRepository repository,
     ISlashCommandParser parser,
     IToolRegistry registry,
@@ -144,7 +146,8 @@ public class HandleTelegramMessageCommandHandler(
 
     private async Task<ErrorOr<HandleTelegramMessageResult>> ProcessAgentMessageAsync(long chatId, string username, string text, CancellationToken cancellationToken)
     {
-        var conversation = await mapper.GetOrCreateConversationAsync(chatId, username, repository, uow, cancellationToken);
+        var resolvedUserId = await linkService.ResolveUserAsync("telegram", chatId.ToString(), cancellationToken);
+        var conversation = await mapper.GetOrCreateConversationAsync(chatId, username, resolvedUserId, repository, uow, cancellationToken);
 
         var history = conversation.Messages.Select(m => m.ToLlmMessage()).ToList();
 
@@ -182,7 +185,7 @@ public class HandleTelegramMessageCommandHandler(
         }
 
         var responseBuilder = new StringBuilder();
-        await foreach (var streamEvent in pipeline.ExecuteStreamAsync(text, history, ct: cancellationToken))
+        await foreach (var streamEvent in pipeline.ExecuteStreamAsync(text, history, userId: resolvedUserId, ct: cancellationToken))
         {
             if (streamEvent.Type == AgentStreamEventType.ContentDelta && streamEvent.Content is not null)
             {

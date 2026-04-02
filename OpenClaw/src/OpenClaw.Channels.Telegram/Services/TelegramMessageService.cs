@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using OpenClaw.Application.Channels;
 using OpenClaw.Application.Skills;
 using OpenClaw.Channels.Telegram.Models;
 using OpenClaw.Contracts.Agents;
@@ -29,6 +30,7 @@ public class TelegramMessageService(
     ITelegramBotClient client,
     IAgentPipeline pipeline,
     TelegramConversationMapper mapper,
+    ChannelLinkService linkService,
     IConversationRepository repository,
     ISlashCommandParser parser,
     IToolRegistry registry,
@@ -78,11 +80,25 @@ public class TelegramMessageService(
                 await SendSafeAsync(chatId, "New conversation started\\. Send me a message\\!", cancellationToken);
                 break;
 
+            case "link":
+                var code = linkService.GenerateVerificationCode("telegram", chatId.ToString(), username);
+                await SendSafeAsync(chatId,
+                    $"Your verification code: `{code}`\n\n" +
+                    "Enter this code in OpenClaw Web UI \\(Settings \\> Channels \\> Link\\) within 5 minutes\\.", cancellationToken);
+                break;
+
+            case "unlink":
+                await SendSafeAsync(chatId,
+                    "To unlink your account, go to OpenClaw Web UI \\> Settings \\> Channels\\.", cancellationToken);
+                break;
+
             case "help":
                 await SendSafeAsync(chatId,
                     "*Available Commands:*\n\n" +
                     "/start \\- Welcome message\n" +
                     "/new \\- Start a new conversation\n" +
+                    "/link \\- Link this chat to your OpenClaw account\n" +
+                    "/unlink \\- Unlink your account\n" +
                     "/help \\- Show this help message\n" +
                     "/skills \\- List available skills\n" +
                     "/`skill\\_name` `args` \\- Execute a skill directly", cancellationToken);
@@ -140,7 +156,8 @@ public class TelegramMessageService(
 
     private async Task ProcessAgentMessageAsync(long chatId, string username, string text, CancellationToken cancellationToken)
     {
-        var conversation = await mapper.GetOrCreateConversationAsync(chatId, username, repository, uow, cancellationToken);
+        var resolvedUserId = await linkService.ResolveUserAsync("telegram", chatId.ToString(), cancellationToken);
+        var conversation = await mapper.GetOrCreateConversationAsync(chatId, username, resolvedUserId, repository, uow, cancellationToken);
 
         var history = conversation.Messages.Select(m => m.ToLlmMessage()).ToList();
 
@@ -178,7 +195,7 @@ public class TelegramMessageService(
         }
 
         var responseBuilder = new StringBuilder();
-        await foreach (var streamEvent in pipeline.ExecuteStreamAsync(text, history, ct: cancellationToken))
+        await foreach (var streamEvent in pipeline.ExecuteStreamAsync(text, history, userId: resolvedUserId, ct: cancellationToken))
         {
             if (streamEvent.Type == AgentStreamEventType.ContentDelta && streamEvent.Content is not null)
             {

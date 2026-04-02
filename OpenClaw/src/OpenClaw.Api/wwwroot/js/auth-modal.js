@@ -1,6 +1,6 @@
 /**
  * Shared Auth Modal Component
- * Provides login and registration functionality across all pages.
+ * Provides login, registration, and email verification functionality.
  * Requires: auth.js to be loaded first
  */
 
@@ -9,17 +9,17 @@ class AuthModal {
         this.modal = null;
         this.currentTab = 'login';
         this.onAuthSuccess = null;
+        this.verifyEmail = null;
+        this.resendCooldown = 0;
         this.init();
     }
 
     init() {
-        // Create modal HTML
         this.createModal();
         this.bindEvents();
     }
 
     createModal() {
-        // Check if modal already exists
         if (document.getElementById('authModal')) {
             this.modal = document.getElementById('authModal');
             return;
@@ -33,7 +33,7 @@ class AuthModal {
                         <button class="auth-modal-close" id="authModalClose">&times;</button>
                     </div>
 
-                    <div class="auth-tabs">
+                    <div class="auth-tabs" id="authTabs">
                         <button class="auth-tab active" data-tab="login">Sign In</button>
                         <button class="auth-tab" data-tab="register">Register</button>
                     </div>
@@ -84,6 +84,32 @@ class AuthModal {
                             <button type="submit" class="auth-submit">Create Account</button>
                         </form>
                     </div>
+
+                    <!-- Verification Panel -->
+                    <div class="auth-panel" id="verifyPanel">
+                        <div class="verify-icon">&#9993;</div>
+                        <p class="verify-subtitle">Enter the 6-digit code sent to</p>
+                        <p class="verify-email" id="verifyEmailDisplay"></p>
+
+                        <form class="auth-form" id="authVerifyForm">
+                            <div class="verify-code-group">
+                                <input type="text" id="verifyCode1" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="one-time-code">
+                                <input type="text" id="verifyCode2" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" id="verifyCode3" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" id="verifyCode4" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" id="verifyCode5" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                                <input type="text" id="verifyCode6" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                            </div>
+                            <div class="auth-message" id="verifyMessage"></div>
+                            <button type="submit" class="auth-submit">Verify</button>
+                        </form>
+
+                        <div class="verify-footer">
+                            <span>Didn't receive the code?</span>
+                            <button class="verify-resend" id="resendCodeBtn">Resend Code</button>
+                        </div>
+                        <button class="verify-back" id="verifyBackBtn">&larr; Change email</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -93,53 +119,113 @@ class AuthModal {
     }
 
     bindEvents() {
-        // Close button
         document.getElementById('authModalClose').addEventListener('click', () => this.hide());
 
-        // Click outside to close
         this.modal.addEventListener('click', (e) => {
-            if (e.target === this.modal) {
-                this.hide();
-            }
+            if (e.target === this.modal) this.hide();
         });
 
-        // ESC key to close
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.modal.classList.contains('show')) {
-                this.hide();
-            }
+            if (e.key === 'Escape' && this.modal.classList.contains('show')) this.hide();
         });
 
-        // Tab switching
         document.querySelectorAll('.auth-tab').forEach(tab => {
             tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
         });
 
-        // Login form
         document.getElementById('authLoginForm').addEventListener('submit', (e) => this.handleLogin(e));
-
-        // Register form
         document.getElementById('authRegisterForm').addEventListener('submit', (e) => this.handleRegister(e));
+        document.getElementById('authVerifyForm').addEventListener('submit', (e) => this.handleVerify(e));
+        document.getElementById('resendCodeBtn').addEventListener('click', () => this.handleResend());
+        document.getElementById('verifyBackBtn').addEventListener('click', () => this.showRegisterPanel());
+
+        // Wire up 6-digit code inputs
+        this.initCodeInputs();
+    }
+
+    initCodeInputs() {
+        const inputs = document.querySelectorAll('.verify-code-group input');
+        inputs.forEach((input, i) => {
+            input.addEventListener('input', (e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                e.target.value = val;
+                if (val && i < inputs.length - 1) {
+                    inputs[i + 1].focus();
+                }
+                // Auto-submit when all 6 digits entered
+                if (i === inputs.length - 1 && val) {
+                    const code = this.getVerifyCode();
+                    if (code.length === 6) {
+                        document.getElementById('authVerifyForm').requestSubmit();
+                    }
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !e.target.value && i > 0) {
+                    inputs[i - 1].focus();
+                }
+            });
+            // Handle paste
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const paste = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+                paste.split('').forEach((char, j) => {
+                    if (inputs[i + j]) inputs[i + j].value = char;
+                });
+                const focusIdx = Math.min(i + paste.length, inputs.length - 1);
+                inputs[focusIdx].focus();
+                if (paste.length === 6) {
+                    document.getElementById('authVerifyForm').requestSubmit();
+                }
+            });
+        });
+    }
+
+    getVerifyCode() {
+        return Array.from(document.querySelectorAll('.verify-code-group input'))
+            .map(i => i.value).join('');
+    }
+
+    clearVerifyCode() {
+        document.querySelectorAll('.verify-code-group input').forEach(i => { i.value = ''; });
+        document.getElementById('verifyCode1').focus();
     }
 
     switchTab(tab) {
         this.currentTab = tab;
 
-        // Update tab buttons
         document.querySelectorAll('.auth-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tab);
         });
 
-        // Update panels
         document.getElementById('loginPanel').classList.toggle('active', tab === 'login');
         document.getElementById('registerPanel').classList.toggle('active', tab === 'register');
+        document.getElementById('verifyPanel').classList.remove('active');
+        document.getElementById('authTabs').style.display = '';
 
-        // Update title
         document.getElementById('authModalTitle').textContent = tab === 'login' ? 'Sign In' : 'Create Account';
 
-        // Clear messages
         document.getElementById('loginMessage').textContent = '';
         document.getElementById('registerMessage').textContent = '';
+    }
+
+    showVerifyPanel(email) {
+        this.verifyEmail = email;
+        document.getElementById('loginPanel').classList.remove('active');
+        document.getElementById('registerPanel').classList.remove('active');
+        document.getElementById('verifyPanel').classList.add('active');
+        document.getElementById('authTabs').style.display = 'none';
+        document.getElementById('authModalTitle').textContent = 'Verify Email';
+        document.getElementById('verifyEmailDisplay').textContent = email;
+        document.getElementById('verifyMessage').textContent = '';
+        this.clearVerifyCode();
+    }
+
+    showRegisterPanel() {
+        document.getElementById('verifyPanel').classList.remove('active');
+        document.getElementById('registerPanel').classList.add('active');
+        document.getElementById('authTabs').style.display = '';
+        document.getElementById('authModalTitle').textContent = 'Create Account';
     }
 
     show(tab = 'login', callback = null) {
@@ -147,7 +233,6 @@ class AuthModal {
         this.switchTab(tab);
         this.modal.classList.add('show');
 
-        // Focus first input
         setTimeout(() => {
             const input = tab === 'login'
                 ? document.getElementById('loginEmail')
@@ -158,13 +243,15 @@ class AuthModal {
 
     hide() {
         this.modal.classList.remove('show');
-        // Reset forms
         document.getElementById('authLoginForm').reset();
         document.getElementById('authRegisterForm').reset();
         document.getElementById('loginMessage').textContent = '';
         document.getElementById('registerMessage').textContent = '';
+        document.getElementById('verifyMessage').textContent = '';
         document.getElementById('authLoginForm').classList.remove('loading');
         document.getElementById('authRegisterForm').classList.remove('loading');
+        document.getElementById('authVerifyForm').classList.remove('loading');
+        this.clearVerifyCode();
     }
 
     async handleLogin(e) {
@@ -192,10 +279,8 @@ class AuthModal {
                 throw new Error(data.detail || data.title || 'Login failed');
             }
 
-            // Save auth data
             saveAuth(data);
 
-            // Success callback or reload
             if (this.onAuthSuccess) {
                 this.hide();
                 this.onAuthSuccess(data);
@@ -223,7 +308,6 @@ class AuthModal {
         messageEl.textContent = '';
         messageEl.className = 'auth-message';
 
-        // Validate passwords match
         if (password !== confirmPassword) {
             messageEl.textContent = 'Passwords do not match';
             messageEl.className = 'auth-message error';
@@ -242,36 +326,18 @@ class AuthModal {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.detail || data.title || 'Registration failed');
+                let errorMsg = data.detail || data.title || 'Registration failed';
+                if (data.errors) {
+                    const messages = Object.values(data.errors).flat();
+                    if (messages.length > 0) errorMsg = messages.join('. ');
+                }
+                throw new Error(errorMsg);
             }
 
             form.classList.remove('loading');
 
-            // Check if registration is pending approval (no token returned)
-            if (data.status === 'Pending' || !data.token) {
-                // Show success message for pending approval
-                messageEl.textContent = data.message || 'Registration submitted. Please wait for admin approval.';
-                messageEl.className = 'auth-message success';
-
-                // Reset form
-                form.reset();
-
-                // Switch to login tab after a delay
-                setTimeout(() => {
-                    this.switchTab('login');
-                }, 3000);
-            } else {
-                // Legacy: auto-login if token is returned (for backwards compatibility)
-                saveAuth(data);
-
-                // Success callback or reload
-                if (this.onAuthSuccess) {
-                    this.hide();
-                    this.onAuthSuccess(data);
-                } else {
-                    window.location.reload();
-                }
-            }
+            // Show verification code panel
+            this.showVerifyPanel(email);
 
         } catch (err) {
             messageEl.textContent = err.message;
@@ -279,12 +345,111 @@ class AuthModal {
             form.classList.remove('loading');
         }
     }
+
+    async handleVerify(e) {
+        e.preventDefault();
+        const form = e.target;
+        const messageEl = document.getElementById('verifyMessage');
+        const code = this.getVerifyCode();
+
+        if (code.length !== 6) {
+            messageEl.textContent = 'Please enter the 6-digit code';
+            messageEl.className = 'auth-message error';
+            return;
+        }
+
+        messageEl.textContent = '';
+        messageEl.className = 'auth-message';
+        form.classList.add('loading');
+
+        try {
+            const response = await fetch('/api/v1/auth/register/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: this.verifyEmail, code })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                let errorMsg = data.detail || data.title || 'Verification failed';
+                if (data.errors) {
+                    const messages = Object.values(data.errors).flat();
+                    if (messages.length > 0) errorMsg = messages.join('. ');
+                }
+                throw new Error(errorMsg);
+            }
+
+            form.classList.remove('loading');
+
+            // Show success message
+            messageEl.textContent = data.message || 'Registration complete! Please wait for admin approval.';
+            messageEl.className = 'auth-message success';
+
+            // Switch to login tab after delay
+            setTimeout(() => {
+                this.switchTab('login');
+                const loginMsg = document.getElementById('loginMessage');
+                loginMsg.textContent = 'Account created. Please wait for admin approval before signing in.';
+                loginMsg.className = 'auth-message success';
+            }, 2500);
+
+        } catch (err) {
+            messageEl.textContent = err.message;
+            messageEl.className = 'auth-message error';
+            form.classList.remove('loading');
+            this.clearVerifyCode();
+        }
+    }
+
+    async handleResend() {
+        const btn = document.getElementById('resendCodeBtn');
+        const messageEl = document.getElementById('verifyMessage');
+
+        if (this.resendCooldown > 0) return;
+
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/api/v1/auth/register/resend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: this.verifyEmail })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || data.title || 'Failed to resend code');
+            }
+
+            messageEl.textContent = 'New code sent!';
+            messageEl.className = 'auth-message success';
+            this.clearVerifyCode();
+
+            // Start cooldown (60s)
+            this.resendCooldown = 60;
+            const interval = setInterval(() => {
+                this.resendCooldown--;
+                btn.textContent = `Resend Code (${this.resendCooldown}s)`;
+                if (this.resendCooldown <= 0) {
+                    clearInterval(interval);
+                    btn.textContent = 'Resend Code';
+                    btn.disabled = false;
+                }
+            }, 1000);
+
+        } catch (err) {
+            messageEl.textContent = err.message;
+            messageEl.className = 'auth-message error';
+            btn.disabled = false;
+        }
+    }
 }
 
 // Global instance
 let authModal = null;
 
-// Initialize immediately if DOM is ready, otherwise wait
 function initAuthModal() {
     if (!authModal) {
         authModal = new AuthModal();
@@ -294,33 +459,20 @@ function initAuthModal() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAuthModal);
 } else {
-    // DOM is already ready
     initAuthModal();
 }
 
 // Public API
 function showLoginModal(callback) {
-    // Ensure modal is initialized
-    if (!authModal) {
-        initAuthModal();
-    }
-    if (authModal) {
-        authModal.show('login', callback);
-    }
+    if (!authModal) initAuthModal();
+    if (authModal) authModal.show('login', callback);
 }
 
 function showRegisterModal(callback) {
-    // Ensure modal is initialized
-    if (!authModal) {
-        initAuthModal();
-    }
-    if (authModal) {
-        authModal.show('register', callback);
-    }
+    if (!authModal) initAuthModal();
+    if (authModal) authModal.show('register', callback);
 }
 
 function hideAuthModal() {
-    if (authModal) {
-        authModal.hide();
-    }
+    if (authModal) authModal.hide();
 }

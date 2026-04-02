@@ -26,6 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 
     // Security services
     builder.Services.AddSingleton<LoginRateLimiter>();
+    builder.Services.AddSingleton<RegistrationRateLimiter>();
 
     // CORS — restrict to configured origins
     builder.Services.AddCors(options =>
@@ -111,7 +112,7 @@ var app = builder.Build();
     // Ensure workspace directories exist
     var workspaceBasePath = Environment.GetEnvironmentVariable("OPENCLAW_WORKSPACE_PATH")
         ?? Path.Combine(AppContext.BaseDirectory, "workspace");
-    Directory.CreateDirectory(Path.Combine(workspaceBasePath, "shared"));
+    Directory.CreateDirectory(workspaceBasePath);
     app.Logger.LogInformation("Workspace base path: {WorkspacePath}", workspaceBasePath);
 
     app.UseWedaCore<AppDbContext>(options =>

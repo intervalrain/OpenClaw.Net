@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initFilters();
     initProviderUI();
     initAppConfigUI();
+    initEmailSettingsUI();
     initEventDelegation();
     await Promise.all([loadUsers(), loadGlobalProviders(), loadAppConfigs()]);
 });
@@ -417,6 +418,16 @@ function showUserDetails(userId) {
                 <div class="value">${new Date(selectedUser.lastLoginAt).toLocaleString()}</div>
             </div>
         ` : ''}
+        ${!isSuperAdminTarget ? `
+            <div class="user-detail">
+                <label>Workspace Quota (MB)</label>
+                <div class="value">
+                    <input type="number" id="userQuotaInput" min="0" max="10240" placeholder="Default (100)"
+                        value="${selectedUser.workspaceQuotaMb || ''}" style="width: 140px; padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); color: var(--text-color);">
+                    <span class="text-muted" style="margin-left: 0.5rem; font-size: 0.8rem;">Empty = system default</span>
+                </div>
+            </div>
+        ` : ''}
     `;
 
     // Setup role checkbox styling
@@ -476,6 +487,23 @@ async function saveUserChanges() {
             if (!rolesResponse.ok) {
                 const error = await rolesResponse.json();
                 throw new Error(error.title || 'Failed to update roles');
+            }
+        }
+
+        // Update workspace quota if changed
+        const quotaInput = document.getElementById('userQuotaInput');
+        if (quotaInput) {
+            const newQuota = quotaInput.value ? parseInt(quotaInput.value) : null;
+            const oldQuota = selectedUser.workspaceQuotaMb || null;
+            if (newQuota !== oldQuota) {
+                const quotaResponse = await authFetch(`${API_BASE}/${selectedUser.id}/quota`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ quotaMb: newQuota })
+                });
+                if (!quotaResponse.ok) {
+                    const error = await quotaResponse.json();
+                    throw new Error(error.title || 'Failed to update quota');
+                }
             }
         }
 
@@ -976,5 +1004,120 @@ document.querySelectorAll('.tab').forEach(tab => {
         if (tab.dataset.tab === 'auditlog' && auditLogs.length === 0) {
             loadAuditLogs();
         }
+        if (tab.dataset.tab === 'email') {
+            loadEmailSettings();
+        }
     });
 });
+
+// ── Email Settings ──
+
+const EMAIL_CONFIG_KEYS = {
+    enabled: 'Email:Enabled',
+    fromEmail: 'Email:FromEmail',
+    fromName: 'Email:FromName',
+    smtpServer: 'Email:SmtpServer',
+    smtpPort: 'Email:SmtpPort',
+    smtpUsername: 'Email:SmtpUsername',
+    smtpPassword: 'Email:SmtpPassword',
+    smtpUseSsl: 'Email:SmtpUseSsl',
+};
+
+function initEmailSettingsUI() {
+    document.getElementById('saveEmailSettings').addEventListener('click', saveEmailSettings);
+    document.getElementById('testEmailBtn').addEventListener('click', sendTestEmail);
+}
+
+async function loadEmailSettings() {
+    try {
+        const res = await authFetch(APP_CONFIG_API);
+        if (!res.ok) return;
+        const configs = await res.json();
+        const configMap = {};
+        configs.forEach(c => { configMap[c.key] = c.value; });
+
+        document.getElementById('emailEnabled').checked = configMap[EMAIL_CONFIG_KEYS.enabled] === 'true';
+        document.getElementById('emailFromEmail').value = configMap[EMAIL_CONFIG_KEYS.fromEmail] || '';
+        document.getElementById('emailFromName').value = configMap[EMAIL_CONFIG_KEYS.fromName] || '';
+        document.getElementById('emailSmtpServer').value = configMap[EMAIL_CONFIG_KEYS.smtpServer] || '';
+        document.getElementById('emailSmtpPort').value = configMap[EMAIL_CONFIG_KEYS.smtpPort] || '587';
+        document.getElementById('emailSmtpUsername').value = configMap[EMAIL_CONFIG_KEYS.smtpUsername] || '';
+        // Don't load password into field for security — show placeholder
+        document.getElementById('emailSmtpPassword').value = '';
+        document.getElementById('emailSmtpPassword').placeholder = configMap[EMAIL_CONFIG_KEYS.smtpPassword] ? '••••••••  (saved)' : 'App password or SMTP password';
+        document.getElementById('emailSmtpUseSsl').checked = configMap[EMAIL_CONFIG_KEYS.smtpUseSsl] !== 'false';
+    } catch (e) {
+        console.error('Failed to load email settings', e);
+    }
+}
+
+async function saveEmailSettings() {
+    const btn = document.getElementById('saveEmailSettings');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        const settings = [
+            { key: EMAIL_CONFIG_KEYS.enabled, value: document.getElementById('emailEnabled').checked ? 'true' : 'false' },
+            { key: EMAIL_CONFIG_KEYS.fromEmail, value: document.getElementById('emailFromEmail').value },
+            { key: EMAIL_CONFIG_KEYS.fromName, value: document.getElementById('emailFromName').value || 'OpenClaw' },
+            { key: EMAIL_CONFIG_KEYS.smtpServer, value: document.getElementById('emailSmtpServer').value },
+            { key: EMAIL_CONFIG_KEYS.smtpPort, value: document.getElementById('emailSmtpPort').value || '587' },
+            { key: EMAIL_CONFIG_KEYS.smtpUsername, value: document.getElementById('emailSmtpUsername').value },
+            { key: EMAIL_CONFIG_KEYS.smtpUseSsl, value: document.getElementById('emailSmtpUseSsl').checked ? 'true' : 'false' },
+        ];
+
+        // Only update password if user entered a new one
+        const pwd = document.getElementById('emailSmtpPassword').value;
+        if (pwd) {
+            settings.push({ key: EMAIL_CONFIG_KEYS.smtpPassword, value: pwd, isSecret: true });
+        }
+
+        for (const s of settings) {
+            await authFetch(`${APP_CONFIG_API}/${encodeURIComponent(s.key)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: s.value, isSecret: s.isSecret || false })
+            });
+        }
+
+        btn.textContent = 'Saved!';
+        setTimeout(() => { btn.textContent = 'Save Settings'; btn.disabled = false; }, 2000);
+    } catch (e) {
+        btn.textContent = 'Save Settings';
+        btn.disabled = false;
+        alert('Failed to save email settings: ' + e.message);
+    }
+}
+
+async function sendTestEmail() {
+    const btn = document.getElementById('testEmailBtn');
+    const result = document.getElementById('emailTestResult');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    result.textContent = '';
+
+    try {
+        const user = getCurrentUser();
+        const res = await authFetch('/api/v1/email/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: user.email })
+        });
+
+        if (res.ok) {
+            result.className = 'email-test-result success';
+            result.textContent = `Test email sent to ${user.email}`;
+        } else {
+            const err = await res.json().catch(() => ({}));
+            result.className = 'email-test-result error';
+            result.textContent = err.message || err.title || 'Failed to send test email';
+        }
+    } catch (e) {
+        result.className = 'email-test-result error';
+        result.textContent = 'Error: ' + e.message;
+    } finally {
+        btn.textContent = 'Send Test Email';
+        btn.disabled = false;
+    }
+}

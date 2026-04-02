@@ -297,6 +297,17 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Channel Account Linking -->
+                        <h4 style="margin-top: 1.5rem;">Linked Accounts</h4>
+                        <p class="setting-hint">Link your external platform accounts to use your model provider and workspace from channels.</p>
+                        <div class="link-account-form">
+                            <input type="text" id="link-code-input" placeholder="Enter 6-digit code from /link command" maxlength="6" class="link-code-input">
+                            <button class="btn btn-primary btn-sm" id="verify-link-btn">Link</button>
+                        </div>
+                        <div id="linked-accounts-list" class="linked-accounts-list">
+                            <!-- Linked accounts will be rendered here -->
+                        </div>
                     </div>
 
                     <!-- Configs Tab -->

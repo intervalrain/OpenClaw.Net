@@ -21,3 +21,5 @@ public abstract class Entity<TId>
 
     public override int GetHashCode() => Id.GetHashCode();
 }
+
+public abstract class Entity(Guid id) : Entity<Guid>(id);
