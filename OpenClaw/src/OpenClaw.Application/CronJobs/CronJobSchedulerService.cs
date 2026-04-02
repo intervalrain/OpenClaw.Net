@@ -3,18 +3,30 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenClaw.Contracts.CronJobs;
+using OpenClaw.Contracts.CronJobs.Events;
 using OpenClaw.Domain.CronJobs;
 using OpenClaw.Domain.CronJobs.Entities;
 using OpenClaw.Domain.CronJobs.Repositories;
 using Weda.Core.Application.Interfaces;
+using Weda.Core.Application.Interfaces.Messaging;
+using Weda.Core.Infrastructure.Messaging.Nats.Locking;
 
 namespace OpenClaw.Application.CronJobs;
 
+/// <summary>
+/// Distributed cron job scheduler.
+/// Uses NATS KV lock for leader election — only one instance schedules.
+/// Publishes due jobs to JetStream for competing consumer execution.
+/// Falls back to in-process execution if NATS is unavailable.
+/// </summary>
 public class CronJobSchedulerService(
     IServiceScopeFactory scopeFactory,
     ILogger<CronJobSchedulerService> logger) : BackgroundService
 {
-    private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(1);
+    private const string LockName = "cronjob_scheduler_leader";
+    private const string SubjectPrefix = "eco1j.weda.{0}.openclaw.cronjob.execute";
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan LockTtl = TimeSpan.FromMinutes(2);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -24,24 +36,40 @@ public class CronJobSchedulerService(
         {
             try
             {
-                await CheckAndExecuteScheduledJobsAsync(stoppingToken);
+                await ScheduleLoopAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error checking scheduled cron jobs");
+                logger.LogError(ex, "Error in cron job scheduler loop");
             }
 
-            await Task.Delay(_checkInterval, stoppingToken);
+            await Task.Delay(CheckInterval, stoppingToken);
         }
     }
 
-    private async Task CheckAndExecuteScheduledJobsAsync(CancellationToken ct)
+    private async Task ScheduleLoopAsync(CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
-        var jobRepo = scope.ServiceProvider.GetRequiredService<ICronJobRepository>();
-        var executor = scope.ServiceProvider.GetRequiredService<ICronJobExecutor>();
-        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
+        // Try to acquire leader lock via NATS KV
+        var distributedLock = scope.ServiceProvider.GetService<NatsKvDistributedLock>();
+        if (distributedLock is not null)
+        {
+            var isLeader = await distributedLock.TryAcquireAsync(LockName, LockTtl, ct);
+            if (!isLeader)
+            {
+                logger.LogDebug("Not the scheduler leader, skipping this cycle");
+                return;
+            }
+        }
+
+        // We are the leader (or NATS unavailable — single instance fallback)
+        var jobRepo = scope.ServiceProvider.GetRequiredService<ICronJobRepository>();
+        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var jobs = await jobRepo.GetScheduledJobsAsync(ct);
 
         foreach (var job in jobs)
@@ -56,20 +84,54 @@ public class CronJobSchedulerService(
 
                 if (schedule is null || !schedule.IsEnabled) continue;
 
-                if (IsDue(schedule, job.LastScheduledAt))
+                if (!IsDue(schedule, job.LastScheduledAt)) continue;
+
+                logger.LogInformation("Dispatching scheduled cron job: {Name} ({Id})", job.Name, job.Id);
+
+                job.MarkScheduledExecution();
+                await uow.SaveChangesAsync(ct);
+
+                // Try to publish to NATS JetStream for distributed execution
+                var published = await TryPublishToNatsAsync(scope, job, ct);
+
+                if (!published)
                 {
-                    logger.LogInformation("Executing scheduled cron job: {Name} ({Id})", job.Name, job.Id);
-
-                    job.MarkScheduledExecution();
-                    await uow.SaveChangesAsync(ct);
-
+                    // Fallback: execute in-process
+                    logger.LogDebug("NATS unavailable, executing cron job in-process: {Id}", job.Id);
+                    var executor = scope.ServiceProvider.GetRequiredService<ICronJobExecutor>();
                     await executor.ExecuteAsync(job, job.CreatedByUserId, ExecutionTrigger.Scheduled, ct);
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to execute scheduled cron job {Id}", job.Id);
+                logger.LogError(ex, "Failed to schedule cron job {Id}", job.Id);
             }
+        }
+    }
+
+    private async Task<bool> TryPublishToNatsAsync(IServiceScope scope, CronJob job, CancellationToken ct)
+    {
+        try
+        {
+            var clientFactory = scope.ServiceProvider.GetService<IJetStreamClientFactory>();
+            if (clientFactory is null) return false;
+
+            var client = clientFactory.Create("bus");
+            var evt = new CronJobExecuteEvent(
+                JobId: job.Id,
+                UserId: job.CreatedByUserId,
+                Trigger: ExecutionTrigger.Scheduled.ToString()
+            );
+
+            var subject = string.Format(SubjectPrefix, job.Id);
+            await client.JsPublishAsync(subject, evt, ct);
+            logger.LogInformation("Published cron job {Id} to NATS subject {Subject}", job.Id, subject);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to publish cron job {Id} to NATS, will fall back to in-process", job.Id);
+            return false;
         }
     }
 
@@ -77,7 +139,6 @@ public class CronJobSchedulerService(
     {
         var now = DateTime.UtcNow;
 
-        // Parse timezone
         TimeZoneInfo tz;
         try
         {
@@ -91,14 +152,11 @@ public class CronJobSchedulerService(
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(now, tz);
         var scheduledTime = schedule.TimeOfDay.ToTimeSpan();
 
-        // Check if we've already run today/this period
         if (lastScheduledAt.HasValue)
         {
             var localLastRun = TimeZoneInfo.ConvertTimeFromUtc(lastScheduledAt.Value, tz);
             if (localLastRun.Date == localNow.Date && localLastRun.TimeOfDay >= scheduledTime)
-            {
                 return false;
-            }
         }
 
         if (localNow.TimeOfDay < scheduledTime) return false;

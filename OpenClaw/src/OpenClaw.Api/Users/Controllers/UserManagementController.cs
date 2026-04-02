@@ -5,6 +5,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security.Models;
 using Weda.Core.Presentation;
 
@@ -12,6 +13,7 @@ using OpenClaw.Api.Security;
 using OpenClaw.Contracts.Users.Commands;
 using OpenClaw.Contracts.Users.Queries;
 using OpenClaw.Contracts.Users.Requests;
+using OpenClaw.Domain.Users.Repositories;
 
 namespace OpenClaw.Api.Users.Controllers;
 
@@ -20,7 +22,10 @@ namespace OpenClaw.Api.Users.Controllers;
 /// </summary>
 [Authorize(Roles = Role.SuperAdmin)]
 [ApiVersion("1.0")]
-public class UserManagementController(ISender _mediator) : ApiController
+public class UserManagementController(
+    ISender _mediator,
+    IUserRepository _userRepository,
+    IUnitOfWork _uow) : ApiController
 {
     /// <summary>
     /// Get all users (with optional status filter).
@@ -137,7 +142,23 @@ public class UserManagementController(ISender _mediator) : ApiController
 
         return result.Match(_ => NoContent(), Problem);
     }
+
+    /// <summary>
+    /// Set workspace quota for a user (in MB). Null = use system default.
+    /// </summary>
+    [HttpPut("{userId:guid}/quota")]
+    public async Task<IActionResult> SetQuota(Guid userId, [FromBody] SetQuotaRequest request, CancellationToken ct)
+    {
+        var user = await _userRepository.GetByIdAsync(userId, ct);
+        if (user is null) return NotFound();
+
+        user.SetWorkspaceQuota(request.QuotaMb);
+        await _uow.SaveChangesAsync(ct);
+
+        return Ok(new { userId, quotaMb = request.QuotaMb });
+    }
 }
 
 public record UpdateUserStatusRequest(string Status);
 public record BanUserRequest(string Reason);
+public record SetQuotaRequest(long? QuotaMb);

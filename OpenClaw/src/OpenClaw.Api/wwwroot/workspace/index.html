@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workspace - OpenClaw</title>
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="workspace.css">
+</head>
+<body>
+    <!-- Top header injected by top-header.js -->
+
+    <div class="container">
+        <div class="workspace-header">
+            <div class="workspace-header-left">
+                <h1>Workspace</h1>
+                <nav class="breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item" data-path="/">/</span>
+                </nav>
+            </div>
+            <div class="workspace-header-actions">
+                <div class="search-box">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" id="searchInput" placeholder="Search files..." class="search-input">
+                </div>
+                <button class="btn btn-outline btn-sm" id="publicBrowseBtn" title="Browse public directories">Public</button>
+                <button class="btn btn-outline btn-sm superadmin-only" id="adminBrowseBtn" title="Browse all user workspaces" style="display:none;">All Users</button>
+                <button class="btn btn-secondary btn-sm" id="newFolderBtn" title="New Folder">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        <line x1="12" y1="11" x2="12" y2="17"/>
+                        <line x1="9" y1="14" x2="15" y2="14"/>
+                    </svg>
+                    New Folder
+                </button>
+                <label class="btn btn-primary btn-sm upload-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Upload
+                    <input type="file" id="fileInput" multiple hidden>
+                </label>
+            </div>
+        </div>
+
+        <!-- Selection Toolbar -->
+        <div class="selection-toolbar" id="selectionToolbar" style="display: none;">
+            <span id="selectionCount">0 selected</span>
+            <button class="btn btn-secondary btn-sm" id="selectAllBtn">Select All</button>
+            <button class="btn btn-danger btn-sm" id="deleteSelectedBtn">Delete Selected</button>
+        </div>
+
+        <!-- Quota bar -->
+        <div class="quota-bar" id="quotaBar" style="display: none;">
+            <div class="quota-info">
+                <span id="quotaText">-</span>
+            </div>
+            <div class="quota-track">
+                <div class="quota-fill" id="quotaFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <main class="main-content">
+            <!-- File list -->
+            <div class="file-list" id="fileList">
+                <div class="loading">Loading files...</div>
+            </div>
+        </main>
+
+        <!-- Preview Panel (slide-in from right) -->
+        <div class="preview-panel" id="previewPanel">
+            <div class="preview-header">
+                <h3 id="previewTitle">Preview</h3>
+                <button class="close-btn" id="closePreview">&times;</button>
+            </div>
+            <div class="preview-body" id="previewBody">
+            </div>
+        </div>
+
+        <!-- Rename Modal -->
+        <div class="modal" id="renameModal">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2 id="renameModalTitle">Rename</h2>
+                    <button class="close-btn" id="closeRenameModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="renameInput" class="rename-input" placeholder="New name">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelRename">Cancel</button>
+                    <button class="btn btn-primary" id="confirmRename">Rename</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Confirm Modal -->
+        <div class="modal" id="deleteModal">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2>Delete</h2>
+                    <button class="close-btn" id="closeDeleteModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete "<span id="deleteFileName"></span>"?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelDelete">Cancel</button>
+                    <button class="btn btn-danger" id="confirmDelete">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal Panel -->
+        <div class="terminal-panel" id="terminalPanel">
+            <div class="terminal-header" id="terminalHeader">
+                <span class="terminal-title">Terminal</span>
+                <div class="terminal-header-actions">
+                    <button class="terminal-btn" id="terminalClearBtn" title="Clear">Clear</button>
+                    <button class="terminal-btn" id="terminalToggleBtn" title="Toggle">_</button>
+                </div>
+            </div>
+            <div class="terminal-body" id="terminalBody">
+                <div class="terminal-output" id="terminalOutput">
+                    <div class="terminal-line system">Welcome to OpenClaw Workspace Terminal. Type 'help' for available commands.</div>
+                </div>
+                <div class="terminal-input-row">
+                    <span class="terminal-prompt" id="terminalPrompt">~$</span>
+                    <input type="text" class="terminal-input" id="terminalInput" placeholder="Enter command..." autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>&copy; 2026 OpenClaw. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="workspace.js"></script>
+</body>
+</html>

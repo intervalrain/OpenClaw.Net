@@ -2431,3 +2431,82 @@ function initAdminNavItems() {
         });
     }
 }
+
+// ===== Channel Account Linking =====
+const BINDING_API = '/api/v1/channel-binding';
+
+async function loadLinkedAccounts() {
+    const list = document.getElementById('linked-accounts-list');
+    if (!list) return;
+
+    try {
+        const res = await authFetch(BINDING_API);
+        if (!res.ok) throw new Error();
+        const bindings = await res.json();
+
+        if (bindings.length === 0) {
+            list.innerHTML = '<p class="setting-hint">No linked accounts. Use /link in Telegram to get a verification code.</p>';
+            return;
+        }
+
+        list.innerHTML = bindings.map(b => `
+            <div class="linked-account-item">
+                <div class="linked-account-info">
+                    <span class="linked-platform">${b.platform}</span>
+                    <span class="linked-user">${b.displayName || b.externalUserId}</span>
+                    <span class="linked-date">${new Date(b.createdAt).toLocaleDateString()}</span>
+                </div>
+                <button class="btn btn-outline btn-sm unlink-btn" data-platform="${b.platform}" data-external-id="${b.externalUserId}">Unlink</button>
+            </div>
+        `).join('');
+
+        list.querySelectorAll('.unlink-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Unlink this account?')) return;
+                const res = await authFetch(`${BINDING_API}/${btn.dataset.platform}/${btn.dataset.externalId}`, { method: 'DELETE' });
+                if (res.ok) loadLinkedAccounts();
+                else alert('Failed to unlink');
+            });
+        });
+    } catch {
+        list.innerHTML = '<p class="setting-hint">Failed to load linked accounts.</p>';
+    }
+}
+
+document.getElementById('verify-link-btn')?.addEventListener('click', async () => {
+    const codeInput = document.getElementById('link-code-input');
+    const code = codeInput.value.trim();
+    if (!code || code.length !== 6) {
+        alert('Please enter a 6-digit code.');
+        return;
+    }
+
+    try {
+        const res = await authFetch(`${BINDING_API}/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            codeInput.value = '';
+            alert(`Linked ${data.platform} account: ${data.displayName || data.externalUserId}`);
+            loadLinkedAccounts();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert(err.detail || err.message || 'Invalid or expired code.');
+        }
+    } catch {
+        alert('Failed to verify code.');
+    }
+});
+
+// Load linked accounts when channels tab is shown
+document.querySelectorAll('[data-settings-tab]')?.forEach(tab => {
+    tab.addEventListener('click', () => {
+        if (tab.dataset.settingsTab === 'channels') {
+            loadLinkedAccounts();
+        }
+    });
+});

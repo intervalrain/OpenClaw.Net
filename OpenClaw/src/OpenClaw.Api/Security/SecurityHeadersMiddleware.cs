@@ -10,7 +10,7 @@ public class SecurityHeadersMiddleware(RequestDelegate next)
         var headers = context.Response.Headers;
 
         // Prevent clickjacking
-        headers["X-Frame-Options"] = "DENY";
+        headers["X-Frame-Options"] = "SAMEORIGIN";
 
         // Prevent MIME-type sniffing
         headers["X-Content-Type-Options"] = "nosniff";
@@ -30,7 +30,7 @@ public class SecurityHeadersMiddleware(RequestDelegate next)
             "connect-src 'self'; " +
             "font-src 'self' https://cdn.jsdelivr.net; " +
             "frame-src 'self'; " +
-            "frame-ancestors 'none';";
+            "frame-ancestors 'self';";
 
         // HSTS — only in production (handled by HTTPS redirection middleware in dev)
         if (!context.Request.Host.Host.Contains("localhost"))

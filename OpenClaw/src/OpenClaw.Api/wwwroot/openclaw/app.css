@@ -2327,3 +2327,64 @@ body {
         right: 16px;
     }
 }
+
+/* Channel Account Linking */
+.link-account-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.link-code-input {
+    width: 140px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg, var(--card-bg));
+    color: var(--text-color);
+    font-family: monospace;
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    text-align: center;
+}
+
+.linked-accounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.linked-account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary, var(--card-bg));
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.linked-account-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.linked-platform {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.linked-user {
+    font-size: 0.9rem;
+}
+
+.linked-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}

@@ -9,6 +9,7 @@ public record UserDto(
     List<string> Roles,
     List<string> Permissions,
     string? WorkspacePath,
+    long? WorkspaceQuotaMb,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     DateTime? LastLoginAt);
