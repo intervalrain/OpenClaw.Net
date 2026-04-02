@@ -119,4 +119,24 @@ public class AuthController(ISender _mediator, LoginRateLimiter rateLimiter, Reg
         var result = await _mediator.Send(command);
         return result.Match(Ok, Problem);
     }
+
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(typeof(ForgotPasswordResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var command = new ForgotPasswordCommand(request.Email, baseUrl);
+        var result = await _mediator.Send(command);
+        return result.Match(Ok, Problem);
+    }
+
+    [HttpPost("reset-password")]
+    [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        var command = new ResetPasswordCommand(request.Token, request.NewPassword);
+        var result = await _mediator.Send(command);
+        return result.Match(Ok, Problem);
+    }
 }

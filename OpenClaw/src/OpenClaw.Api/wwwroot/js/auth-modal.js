@@ -53,6 +53,7 @@ class AuthModal {
                             </div>
                             <div class="auth-message" id="loginMessage"></div>
                             <button type="submit" class="auth-submit">Sign In</button>
+                            <div class="auth-forgot"><button type="button" class="auth-forgot-btn" id="forgotPasswordBtn">Forgot password?</button></div>
                         </form>
                     </div>
 
@@ -110,6 +111,20 @@ class AuthModal {
                         </div>
                         <button class="verify-back" id="verifyBackBtn">&larr; Change email</button>
                     </div>
+
+                    <!-- Forgot Password Panel -->
+                    <div class="auth-panel" id="forgotPanel">
+                        <p class="verify-subtitle">Enter your email to receive a password reset link.</p>
+                        <form class="auth-form" id="authForgotForm">
+                            <div class="auth-form-group">
+                                <label for="forgotEmail">Email</label>
+                                <input type="email" id="forgotEmail" required placeholder="your@email.com" autocomplete="email">
+                            </div>
+                            <div class="auth-message" id="forgotMessage"></div>
+                            <button type="submit" class="auth-submit">Send Reset Link</button>
+                        </form>
+                        <button class="verify-back" id="forgotBackBtn">&larr; Back to sign in</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -138,6 +153,9 @@ class AuthModal {
         document.getElementById('authVerifyForm').addEventListener('submit', (e) => this.handleVerify(e));
         document.getElementById('resendCodeBtn').addEventListener('click', () => this.handleResend());
         document.getElementById('verifyBackBtn').addEventListener('click', () => this.showRegisterPanel());
+        document.getElementById('forgotPasswordBtn').addEventListener('click', () => this.showForgotPanel());
+        document.getElementById('forgotBackBtn').addEventListener('click', () => this.switchTab('login'));
+        document.getElementById('authForgotForm').addEventListener('submit', (e) => this.handleForgotPassword(e));
 
         // Wire up 6-digit code inputs
         this.initCodeInputs();
@@ -201,12 +219,14 @@ class AuthModal {
         document.getElementById('loginPanel').classList.toggle('active', tab === 'login');
         document.getElementById('registerPanel').classList.toggle('active', tab === 'register');
         document.getElementById('verifyPanel').classList.remove('active');
+        document.getElementById('forgotPanel').classList.remove('active');
         document.getElementById('authTabs').style.display = '';
 
         document.getElementById('authModalTitle').textContent = tab === 'login' ? 'Sign In' : 'Create Account';
 
         document.getElementById('loginMessage').textContent = '';
         document.getElementById('registerMessage').textContent = '';
+        document.getElementById('forgotMessage').textContent = '';
     }
 
     showVerifyPanel(email) {
@@ -226,6 +246,17 @@ class AuthModal {
         document.getElementById('registerPanel').classList.add('active');
         document.getElementById('authTabs').style.display = '';
         document.getElementById('authModalTitle').textContent = 'Create Account';
+    }
+
+    showForgotPanel() {
+        document.getElementById('loginPanel').classList.remove('active');
+        document.getElementById('registerPanel').classList.remove('active');
+        document.getElementById('verifyPanel').classList.remove('active');
+        document.getElementById('forgotPanel').classList.add('active');
+        document.getElementById('authTabs').style.display = 'none';
+        document.getElementById('authModalTitle').textContent = 'Forgot Password';
+        document.getElementById('forgotMessage').textContent = '';
+        document.getElementById('forgotEmail').focus();
     }
 
     show(tab = 'login', callback = null) {
@@ -443,6 +474,40 @@ class AuthModal {
             messageEl.textContent = err.message;
             messageEl.className = 'auth-message error';
             btn.disabled = false;
+        }
+    }
+
+    async handleForgotPassword(e) {
+        e.preventDefault();
+        const form = e.target;
+        const messageEl = document.getElementById('forgotMessage');
+        const email = document.getElementById('forgotEmail').value.trim();
+
+        messageEl.textContent = '';
+        messageEl.className = 'auth-message';
+        form.classList.add('loading');
+
+        try {
+            const response = await fetch('/api/v1/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || data.title || 'Request failed');
+            }
+
+            form.classList.remove('loading');
+            messageEl.textContent = data.message || 'If an account exists, a reset link has been sent.';
+            messageEl.className = 'auth-message success';
+
+        } catch (err) {
+            messageEl.textContent = err.message;
+            messageEl.className = 'auth-message error';
+            form.classList.remove('loading');
         }
     }
 }
