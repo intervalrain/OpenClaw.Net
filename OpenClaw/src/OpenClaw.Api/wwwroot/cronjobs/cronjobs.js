@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupAutocomplete('jobContent', 'contentAutocomplete', ['@', '#']);
 
     // Event delegation for dynamic elements
-    document.getElementById('jobList').addEventListener('click', (e) => {
+    document.getElementById('jobsList').addEventListener('click', (e) => {
         const item = e.target.closest('[data-action="select-job"]');
         if (item) selectJob(item.dataset.id);
     });
@@ -109,13 +109,33 @@ async function loadJobs() {
     try {
         const res = await authFetch('/api/v1/cron-job');
         if (!res.ok) throw new Error('Failed to load jobs');
-        jobs = await res.json();
+        const raw = await res.json();
+        // Transform API response: parse scheduleJson/contextJson into schedule/context
+        jobs = raw.map(job => ({
+            ...job,
+            schedule: parseJsonField(job.scheduleJson),
+            context: parseContextJson(job.contextJson)
+        }));
         renderJobsList();
     } catch (err) {
         console.error('loadJobs error:', err);
         jobs = [];
         renderJobsList();
     }
+}
+
+function parseJsonField(jsonStr) {
+    if (!jsonStr) return null;
+    try { return JSON.parse(jsonStr); } catch { return null; }
+}
+
+function parseContextJson(jsonStr) {
+    if (!jsonStr) return '';
+    try {
+        const arr = JSON.parse(jsonStr);
+        if (Array.isArray(arr)) return arr.map(s => `@${s}`).join(' ');
+        return jsonStr;
+    } catch { return jsonStr; }
 }
 
 function renderJobsList() {
@@ -143,7 +163,7 @@ function renderJobsList() {
 function getScheduleLabel(schedule) {
     if (!schedule) return 'No schedule';
     const freq = schedule.frequency || 'Daily';
-    const time = schedule.time || '09:00';
+    const time = schedule.timeOfDay || '09:00';
     const tz = schedule.timezone || 'UTC';
     return `${freq} at ${time} (${tz})`;
 }
@@ -166,7 +186,7 @@ async function selectJob(id) {
     // Schedule
     const sched = job.schedule || {};
     document.getElementById('schedFrequency').value = sched.frequency || 'Daily';
-    document.getElementById('schedTime').value = sched.time || '09:00';
+    document.getElementById('schedTime').value = sched.timeOfDay || '09:00';
     document.getElementById('schedTimezone').value = sched.timezone || 'UTC';
     if (sched.frequency === 'Weekly' && sched.daysOfWeek) {
         document.querySelectorAll('#weeklyDays input[type="checkbox"]').forEach(cb => {
@@ -221,11 +241,16 @@ async function saveJob() {
     }
 
     const schedule = buildScheduleObject();
+    const contextText = document.getElementById('jobContext').value;
+    // Convert "@skill1 @skill2" to JSON array ["skill1", "skill2"]
+    const skillNames = contextText.split(/\s+/)
+        .map(s => s.replace(/^@/, ''))
+        .filter(s => s.length > 0);
     const payload = {
         name,
         wakeMode: document.getElementById('jobWakeMode').value,
-        schedule,
-        context: document.getElementById('jobContext').value,
+        scheduleJson: JSON.stringify(schedule),
+        contextJson: skillNames.length > 0 ? JSON.stringify(skillNames) : null,
         content: document.getElementById('jobContent').value
     };
 
@@ -307,8 +332,9 @@ function buildScheduleObject() {
     const freq = document.getElementById('schedFrequency').value;
     const obj = {
         frequency: freq,
-        time: document.getElementById('schedTime').value,
-        timezone: document.getElementById('schedTimezone').value
+        timeOfDay: document.getElementById('schedTime').value,
+        timezone: document.getElementById('schedTimezone').value,
+        isEnabled: true
     };
 
     if (freq === 'Weekly') {
