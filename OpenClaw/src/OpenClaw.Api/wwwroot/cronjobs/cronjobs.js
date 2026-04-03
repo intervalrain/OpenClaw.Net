@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('runJobBtn').addEventListener('click', runJob);
     document.getElementById('cancelTiBtn').addEventListener('click', cancelToolInstance);
     document.getElementById('saveTiBtn').addEventListener('click', saveToolInstance);
+    document.getElementById('clearExecBtn').addEventListener('click', clearExecutions);
 
     // Schedule frequency change
     document.getElementById('schedFrequency').addEventListener('change', updateScheduleUI);
@@ -50,9 +51,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     document.getElementById('toolInstancesList').addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action]');
-        if (!btn) return;
-        if (btn.dataset.action === 'edit-ti') editToolInstance(btn.dataset.id);
-        else if (btn.dataset.action === 'delete-ti') deleteToolInstance(btn.dataset.id);
+        if (btn) {
+            if (btn.dataset.action === 'edit-ti') editToolInstance(btn.dataset.id);
+            else if (btn.dataset.action === 'delete-ti') deleteToolInstance(btn.dataset.id);
+            return;
+        }
+        // Click anywhere on the row to edit
+        const row = e.target.closest('.ti-item');
+        if (row) editToolInstance(row.dataset.id);
     });
     document.getElementById('executionsList').addEventListener('click', (e) => {
         const item = e.target.closest('[data-action="toggle-exec"]');
@@ -86,7 +92,7 @@ function showToast(message, type = 'info') {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => toast.remove(), 200);
-    }, 3000);
+    }, 5000);
 }
 
 function formatDate(dateStr) {
@@ -313,18 +319,128 @@ async function deleteJob() {
 async function runJob() {
     if (!currentJobId) return;
 
+    // Insert a live execution item at the top
+    const list = document.getElementById('executionsList');
+    const liveId = 'live-exec';
+    const liveHtml = `
+        <div class="exec-item expanded" id="${liveId}">
+            <div class="exec-item-header">
+                <span class="exec-status-badge running">Running</span>
+                <span class="exec-time">${escapeHtml(new Date().toLocaleString())}</span>
+            </div>
+            <div class="exec-item-body" style="display:block">
+                <div class="exec-trace" id="live-trace"></div>
+                <div class="exec-output" id="live-output" style="display:none"></div>
+            </div>
+        </div>`;
+    list.insertAdjacentHTML('afterbegin', liveHtml);
+
     try {
-        const res = await authFetch(`/api/v1/cron-job/${currentJobId}/execute`, {
+        const res = await authFetch(`/api/v1/cron-job/${currentJobId}/execute/stream`, {
             method: 'POST'
         });
         if (!res.ok) throw new Error('Execution failed');
 
-        showToast('Job execution started', 'success');
-        // Reload executions after a brief delay
-        setTimeout(() => loadExecutions(currentJobId), 1000);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            let eventType = 'message';
+            for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                    eventType = line.substring(7).trim();
+                } else if (line.startsWith('data: ')) {
+                    const data = line.substring(6);
+                    try {
+                        const evt = JSON.parse(data);
+                        handleStreamEvent(evt, eventType);
+                    } catch { /* ignore parse errors */ }
+                    eventType = 'message';
+                }
+            }
+        }
     } catch (err) {
-        console.error('runJob error:', err);
+        console.error('runJob stream error:', err);
         showToast(`Run failed: ${err.message}`, 'error');
+    }
+
+    // Reload executions to get the persisted record
+    await loadExecutions(currentJobId);
+}
+
+function handleStreamEvent(evt, eventType) {
+    if (eventType === 'executionId') return;
+
+    const trace = document.getElementById('live-trace');
+    const output = document.getElementById('live-output');
+    const liveEl = document.getElementById('live-exec');
+    if (!trace || !liveEl) return;
+
+    switch (evt.type) {
+        case 'toolCall': {
+            const args = formatJsonCompact(evt.arguments);
+            const step = document.createElement('div');
+            step.className = 'exec-trace-step';
+            step.dataset.tool = evt.toolName;
+            step.innerHTML = `
+                <div class="exec-trace-label">
+                    <span class="exec-trace-index">${trace.children.length + 1}</span>
+                    <span class="exec-trace-tool">${escapeHtml(evt.toolName || '')}</span>
+                    <span class="exec-trace-spinner"></span>
+                </div>
+                <div class="exec-trace-args"><span class="exec-trace-dim">args:</span> ${escapeHtml(args)}</div>
+                <div class="exec-trace-result"></div>`;
+            trace.appendChild(step);
+            liveEl.scrollTop = liveEl.scrollHeight;
+            break;
+        }
+        case 'toolResult': {
+            const steps = trace.querySelectorAll('.exec-trace-step');
+            const lastStep = steps[steps.length - 1];
+            if (lastStep) {
+                const resultEl = lastStep.querySelector('.exec-trace-result');
+                const spinner = lastStep.querySelector('.exec-trace-spinner');
+                if (resultEl) resultEl.innerHTML = `<span class="exec-trace-dim">result:</span> ${escapeHtml(truncate(evt.content || '', 1000))}`;
+                if (spinner) spinner.remove();
+            }
+            break;
+        }
+        case 'content': {
+            if (output && evt.content) {
+                output.style.display = 'block';
+                output.textContent = evt.content;
+            }
+            break;
+        }
+        case 'completed': {
+            const badge = liveEl.querySelector('.exec-status-badge');
+            if (badge) {
+                badge.textContent = 'Completed';
+                badge.className = 'exec-status-badge success';
+            }
+            break;
+        }
+        case 'failed': {
+            const badge = liveEl.querySelector('.exec-status-badge');
+            if (badge) {
+                badge.textContent = 'Failed';
+                badge.className = 'exec-status-badge failed';
+            }
+            if (output && evt.content) {
+                output.style.display = 'block';
+                output.className = 'exec-output exec-error';
+                output.textContent = evt.content;
+            }
+            break;
+        }
     }
 }
 
@@ -366,7 +482,12 @@ async function loadToolInstances() {
     try {
         const res = await authFetch('/api/v1/tool-instance');
         if (!res.ok) throw new Error('Failed to load tool instances');
-        toolInstances = await res.json();
+        const raw = await res.json();
+        // Parse argsJson string into args object for each instance
+        toolInstances = raw.map(ti => ({
+            ...ti,
+            args: parseJsonField(ti.argsJson)
+        }));
         renderToolInstancesList();
     } catch (err) {
         console.error('loadToolInstances error:', err);
@@ -443,12 +564,13 @@ async function saveToolInstance() {
     }
 
     // Gather args from tag editor
-    const args = { ..._toolArgValues }; // saved values from tag editor interactions
-    // Also capture currently visible editor input
-    const activeInput = document.querySelector('#argEditorPanel [data-arg-key]');
-    if (activeInput) {
-        const key = activeInput.dataset.argKey;
-        if (key && activeInput.value) args[key] = activeInput.value;
+    const args = { ..._toolArgValues };
+    // Capture currently visible editor input (the actual input/textarea/select inside the panel)
+    const activeEl = document.querySelector('#argEditorPanel input, #argEditorPanel textarea, #argEditorPanel select');
+    if (activeEl) {
+        const row = activeEl.closest('[data-arg-key]');
+        const key = row?.dataset.argKey || activeEl.dataset.argKey;
+        if (key && activeEl.value) args[key] = activeEl.value;
     }
     // Remove empty values
     Object.keys(args).forEach(k => { if (!args[k]) delete args[k]; });
@@ -755,6 +877,21 @@ async function loadExecutions(jobId) {
     }
 }
 
+async function clearExecutions() {
+    if (!currentJobId) return;
+    if (!confirm('Clear all executions for this job?')) return;
+
+    try {
+        const res = await authFetch(`/api/v1/cron-job/${currentJobId}/executions`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Clear failed');
+        document.getElementById('executionsList').innerHTML = '<div class="exec-empty">No executions yet.</div>';
+        showToast('Executions cleared', 'success');
+    } catch (err) {
+        console.error('clearExecutions error:', err);
+        showToast(`Clear failed: ${err.message}`, 'error');
+    }
+}
+
 function renderExecutions(executions) {
     const list = document.getElementById('executionsList');
 
@@ -769,7 +906,7 @@ function renderExecutions(executions) {
             : status === 'failed' ? 'failed'
             : status === 'running' ? 'running'
             : 'pending';
-        const duration = exec.durationMs ? formatDuration(exec.durationMs) : '';
+        const duration = exec.duration || '';
 
         return `
             <div class="exec-item" data-action="toggle-exec">
@@ -782,11 +919,68 @@ function renderExecutions(executions) {
                     </svg>
                 </div>
                 <div class="exec-item-body">
-                    <div class="exec-output">${escapeHtml(exec.output || exec.result || 'No output')}</div>
+                    ${renderExecutionTrace(exec)}
                 </div>
             </div>
         `;
     }).join('');
+}
+
+function renderExecutionTrace(exec) {
+    const parts = [];
+
+    // Tool calls trace
+    const toolCalls = parseToolCalls(exec.toolCallsJson);
+    if (toolCalls.length > 0) {
+        parts.push('<div class="exec-trace">');
+        toolCalls.forEach((call, i) => {
+            const args = formatJsonCompact(call.args);
+            const result = call.result || '';
+            parts.push(`
+                <div class="exec-trace-step">
+                    <div class="exec-trace-label">
+                        <span class="exec-trace-index">${i + 1}</span>
+                        <span class="exec-trace-tool">${escapeHtml(call.tool)}</span>
+                    </div>
+                    <div class="exec-trace-args"><span class="exec-trace-dim">args:</span> ${escapeHtml(args)}</div>
+                    <div class="exec-trace-result"><span class="exec-trace-dim">result:</span> ${escapeHtml(truncate(result, 1000))}</div>
+                </div>
+            `);
+        });
+        parts.push('</div>');
+    }
+
+    // Final output or error
+    if (exec.errorMessage) {
+        parts.push(`<div class="exec-output exec-error">${escapeHtml(exec.errorMessage)}</div>`);
+    } else if (exec.outputText) {
+        parts.push(`<div class="exec-output">${escapeHtml(exec.outputText)}</div>`);
+    } else if (toolCalls.length === 0) {
+        parts.push('<div class="exec-output">No output</div>');
+    }
+
+    return parts.join('');
+}
+
+function parseToolCalls(json) {
+    if (!json) return [];
+    try {
+        const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+        return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+}
+
+function formatJsonCompact(str) {
+    if (!str) return '{}';
+    try {
+        const obj = typeof str === 'string' ? JSON.parse(str) : str;
+        return JSON.stringify(obj, null, 2);
+    } catch { return str; }
+}
+
+function truncate(str, max) {
+    if (!str || str.length <= max) return str || '';
+    return str.substring(0, max) + '...';
 }
 
 function toggleExecution(el) {

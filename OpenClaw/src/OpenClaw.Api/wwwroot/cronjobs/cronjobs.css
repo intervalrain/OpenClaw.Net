@@ -221,6 +221,7 @@
     border: 1px solid var(--border-color);
     border-radius: 8px;
     transition: border-color 0.15s ease;
+    cursor: pointer;
 }
 
 .ti-item:hover {
@@ -816,6 +817,95 @@
     word-break: break-word;
     max-height: 300px;
     overflow-y: auto;
+}
+
+/* ===== Execution Trace ===== */
+.exec-trace {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.exec-trace-step {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.exec-trace-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.exec-trace-index {
+    background: var(--accent-color, #6366f1);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 600;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.exec-trace-tool {
+    font-weight: 600;
+    color: var(--accent-color, #6366f1);
+}
+
+.exec-trace-args,
+.exec-trace-result {
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: 4px 0;
+}
+
+.exec-trace-args {
+    color: var(--text-secondary, #8b8fa3);
+}
+
+.exec-trace-result {
+    color: var(--text-color);
+    border-top: 1px dashed var(--border-color);
+    padding-top: 6px;
+    margin-top: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.exec-trace-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent-color, #6366f1);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.exec-trace-dim {
+    color: var(--text-secondary, #8b8fa3);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.exec-output.exec-error {
+    color: #ef4444;
 }
 
 /* ===== Toast ===== */
