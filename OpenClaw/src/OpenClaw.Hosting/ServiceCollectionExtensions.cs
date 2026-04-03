@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
+using OpenClaw.Application.AgentActivities;
 using OpenClaw.Application.Agents;
 using OpenClaw.Application.Agents.Middlewares;
 using OpenClaw.Application.CronJobs;
@@ -14,7 +15,9 @@ using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
 using OpenClaw.Channels.Telegram.Extensions;
+using OpenClaw.Domain.AgentActivities.Repositories;
 using OpenClaw.Domain.CronJobs.Repositories;
+using OpenClaw.Infrastructure.AgentActivities.Persistence;
 using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Llm.Ollama;
 using OpenClaw.Infrastructure.Llm.OpenAI;
@@ -115,6 +118,11 @@ public static class ServiceCollectionExtensions
 
         // Channels
         services.AddTelegramChannel(configuration);
+
+        // Agent Activities
+        services.AddScoped<IAgentActivityRepository, AgentActivityRepository>();
+        services.AddSingleton<IAgentActivityBroadcast, AgentActivityBroadcast>();
+        services.AddSingleton<IAgentActivityTracker, AgentActivityTracker>();
 
         // Cron Jobs
         services.AddSingleton<ICronJobExecutor, CronJobExecutor>();

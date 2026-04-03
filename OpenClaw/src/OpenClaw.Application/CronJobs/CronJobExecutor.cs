@@ -5,13 +5,16 @@ using System.Threading.Channels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OpenClaw.Application.AgentActivities;
 using OpenClaw.Contracts.CronJobs;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Domain.AgentActivities;
 using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.CronJobs;
 using OpenClaw.Domain.CronJobs.Entities;
 using OpenClaw.Domain.CronJobs.Repositories;
+using OpenClaw.Domain.Users.Repositories;
 using Weda.Core.Application.Interfaces;
 
 namespace OpenClaw.Application.CronJobs;
@@ -25,6 +28,7 @@ public interface ICronJobExecutor
 
 public class CronJobExecutor(
     IServiceScopeFactory scopeFactory,
+    IAgentActivityTracker activityTracker,
     ILogger<CronJobExecutor> logger) : ICronJobExecutor
 {
     public async Task<Guid> ExecuteAsync(
@@ -63,6 +67,11 @@ public class CronJobExecutor(
                 logger.LogError(ex, "Cron job execution {ExecutionId} failed", execution.Id);
                 await FailExecutionAsync(execution.Id, ex.Message);
                 await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Failed, Content: ex.Message));
+
+                await activityTracker.TrackAsync(
+                    userId ?? Guid.Empty, "System",
+                    ActivityType.CronJob, ActivityStatus.Failed,
+                    job.Id.ToString(), job.Name, ex.Message);
             }
             finally
             {
@@ -102,6 +111,20 @@ public class CronJobExecutor(
         execution.Start();
         await uow.SaveChangesAsync();
 
+        // Resolve user name for activity tracking
+        var userName = "System";
+        if (userId.HasValue)
+        {
+            var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var user = await userRepo.GetByIdAsync(userId.Value);
+            userName = user?.Name ?? "Unknown";
+        }
+
+        await activityTracker.TrackAsync(
+            userId ?? Guid.Empty, userName,
+            ActivityType.CronJob, ActivityStatus.Started,
+            job.Id.ToString(), job.Name);
+
         // 1. Build system prompt from @skill references in context
         var systemPrompt = BuildSystemPrompt(job.ContextJson, skillStore);
 
@@ -137,6 +160,11 @@ public class CronJobExecutor(
                 execution.Complete(output, JsonSerializer.Serialize(toolCallLog));
                 await uow.SaveChangesAsync();
                 await EmitAsync(streamWriter, new CronJobStreamEvent(CronJobStreamEventType.Completed));
+
+                await activityTracker.TrackAsync(
+                    userId ?? Guid.Empty, userName,
+                    ActivityType.CronJob, ActivityStatus.Completed,
+                    job.Id.ToString(), job.Name);
                 return;
             }
 
@@ -144,6 +172,11 @@ public class CronJobExecutor(
 
             foreach (var toolCall in response.ToolCalls!)
             {
+                await activityTracker.TrackAsync(
+                    userId ?? Guid.Empty, userName,
+                    ActivityType.ToolExecution, ActivityStatus.ToolExecuting,
+                    job.Id.ToString(), job.Name, toolCall.Name);
+
                 // Merge pre-filled tool instance args with LLM-provided args
                 var mergedArgs = MergeToolArgs(instanceArgs, toolCall.Name, toolCall.Arguments);
 
@@ -167,6 +200,11 @@ public class CronJobExecutor(
 
                 await EmitAsync(streamWriter, new CronJobStreamEvent(
                     CronJobStreamEventType.ToolResult, ToolName: toolCall.Name, Content: toolResult));
+
+                await activityTracker.TrackAsync(
+                    userId ?? Guid.Empty, userName,
+                    ActivityType.ToolExecution, ActivityStatus.Completed,
+                    job.Id.ToString(), job.Name, toolCall.Name);
 
                 toolCallLog.Add(new { tool = toolCall.Name, args = mergedArgs, result = toolResult });
                 messages.Add(new ChatMessage(ChatRole.Tool, toolResult, toolCall.Id));
