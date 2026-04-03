@@ -56,12 +56,18 @@ public abstract class AgentToolBase<TArgs> : IAgentTool where TArgs : class
 
         foreach (var prop in typeof(TArgs).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
+            var jsonType = GetJsonType(prop.PropertyType);
             var toolProperty = new ToolProperty
             {
-                Type = GetJsonType(prop.PropertyType),
+                Type = jsonType,
                 Description = prop.GetCustomAttribute<DescriptionAttribute>()?.Description,
                 DefaultKey = prop.GetCustomAttribute<DefaultFromAttribute>()?.Key
             };
+
+            if (jsonType == "array")
+            {
+                toolProperty.Items = new ToolProperty { Type = GetArrayItemType(prop.PropertyType) };
+            }
 
             properties[ToCamelCase(prop.Name)] = toolProperty;
 
@@ -93,6 +99,16 @@ public abstract class AgentToolBase<TArgs> : IAgentTool where TArgs : class
             Type t when t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>) => "array",
             _ => "string"
         };
+    }
+
+    private static string GetArrayItemType(Type type)
+    {
+        var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+        if (underlyingType.IsArray)
+            return GetJsonType(underlyingType.GetElementType()!);
+        if (underlyingType.IsGenericType && underlyingType.GetGenericTypeDefinition() == typeof(List<>))
+            return GetJsonType(underlyingType.GetGenericArguments()[0]);
+        return "string";
     }
 
     private static bool IsNullable(PropertyInfo prop, NullabilityInfoContext context)

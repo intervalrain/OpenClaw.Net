@@ -31,4 +31,10 @@ public class CronJobExecutionRepository(AppDbContext context)
             .ToListAsync(ct);
     }
 
+    public async Task DeleteByCronJobIdAsync(Guid cronJobId, CancellationToken ct = default)
+    {
+        await DbContext.Set<CronJobExecution>()
+            .Where(x => x.CronJobId == cronJobId)
+            .ExecuteDeleteAsync(ct);
+    }
 }
