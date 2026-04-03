@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office - OpenClaw.NET</title>
+    <link rel="icon" href="/favicon.png" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="office.css">
+</head>
+<body>
+    <!-- Top header injected by top-header.js -->
+
+    <div class="office-container">
+        <!-- Toolbar -->
+        <div class="office-toolbar">
+            <div class="toolbar-left">
+                <h2>Agent Office</h2>
+                <span class="agent-count" id="agentCount">0 agents</span>
+            </div>
+            <div class="toolbar-right">
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="liveModeBtn" title="Live Mode">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        Live
+                    </button>
+                    <button class="mode-btn" id="replayModeBtn" title="Replay Mode">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        Replay
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Office Floor Plan -->
+        <div class="office-floor" id="officeFloor">
+            <svg id="officeSvg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">
+                <!-- Office background -->
+                <defs>
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border-subtle)" stroke-width="0.5" opacity="0.3"/>
+                    </pattern>
+                    <!-- Desk glow filters -->
+                    <filter id="glowThinking">
+                        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                    <filter id="glowTool">
+                        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                <rect width="1200" height="800" fill="var(--bg-secondary)" rx="8"/>
+                <rect width="1200" height="800" fill="url(#grid)"/>
+
+                <!-- Desks will be generated dynamically -->
+                <g id="desksGroup"></g>
+            </svg>
+
+            <!-- Speech bubbles overlay (HTML, positioned over SVG) -->
+            <div id="bubblesOverlay"></div>
+        </div>
+
+        <!-- Replay Controls (hidden by default) -->
+        <div class="replay-controls hidden" id="replayControls">
+            <div class="replay-time-picker">
+                <label>From:</label>
+                <input type="datetime-local" id="replayFrom">
+                <label>To:</label>
+                <input type="datetime-local" id="replayTo">
+                <button class="btn-small" id="loadReplayBtn">Load</button>
+            </div>
+            <div class="replay-player">
+                <button class="btn-icon" id="replayPlayBtn" title="Play/Pause">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                </button>
+                <input type="range" class="replay-scrubber" id="replayScrubber" min="0" max="100" value="0">
+                <span class="replay-time" id="replayTime">--:--:--</span>
+                <select id="replaySpeed">
+                    <option value="1">1x</option>
+                    <option value="2">2x</option>
+                    <option value="5" selected>5x</option>
+                    <option value="10">10x</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Detail Panel (shown when clicking an agent) -->
+        <div class="detail-panel hidden" id="detailPanel">
+            <div class="detail-header">
+                <div class="detail-avatar" id="detailAvatar"></div>
+                <div class="detail-info">
+                    <h3 id="detailName">Agent Name</h3>
+                    <span class="detail-status" id="detailStatus">Idle</span>
+                </div>
+                <button class="btn-icon detail-close" id="detailClose">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="detail-body">
+                <div class="detail-section">
+                    <h4>Current Activity</h4>
+                    <p id="detailActivity">No activity</p>
+                </div>
+                <div class="detail-section">
+                    <h4>Recent History</h4>
+                    <div id="detailHistory" class="detail-history"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/top-header.js"></script>
+    <script src="office.js"></script>
+</body>
+</html>
