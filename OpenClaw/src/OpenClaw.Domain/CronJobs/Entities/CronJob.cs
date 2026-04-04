@@ -5,8 +5,10 @@ namespace OpenClaw.Domain.CronJobs.Entities;
 /// <summary>
 /// Represents a scheduled cron job that executes a prompt with optional tool context.
 /// </summary>
-public class CronJob : Entity<Guid>, IUserScoped
+public class CronJob : Entity, IUserScoped
 {
+    public Guid WorkspaceId { get; private set; }
+
     public string Name { get; private set; } = string.Empty;
 
     /// <summary>
@@ -53,6 +55,7 @@ public class CronJob : Entity<Guid>, IUserScoped
 
     public static CronJob Create(
         Guid userId,
+        Guid workspaceId,
         string name,
         string scheduleJson,
         string content,
@@ -70,6 +73,7 @@ public class CronJob : Entity<Guid>, IUserScoped
             ContextJson = contextJson,
             Content = content,
             CreatedByUserId = userId,
+            WorkspaceId = workspaceId,
             CreatedAt = DateTime.UtcNow,
             IsActive = true
         };

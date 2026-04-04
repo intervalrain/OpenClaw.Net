@@ -12,13 +12,12 @@ public class ListDirectorySkill : AgentToolBase<ListDirectoryArgs>
 
     public override Task<ToolResult> ExecuteAsync(ListDirectoryArgs args, ToolContext context, CancellationToken ct)
     {
-        var userId = context.UserId ?? Guid.Empty;
+        var wsId = context.WorkspaceId ?? context.UserId ?? Guid.Empty;
         var path = args.Path is null
-            ? PathSecurity.GetUserWorkspacePath(userId)
-            : PathSecurity.ResolveUserPath(args.Path, userId, context.IsSuperAdmin);
+            ? PathSecurity.GetWorkspacePath(wsId)
+            : PathSecurity.ResolveWorkspacePath(args.Path, wsId);
 
-        // Workspace boundary check
-        var pathError = PathSecurity.ValidatePath(path, userId, context.IsSuperAdmin);
+        var pathError = PathSecurity.ValidateWorkspacePath(path, wsId, context.IsSuperAdmin);
         if (pathError is not null)
             return Task.FromResult(ToolResult.Failure(pathError));
 

@@ -25,19 +25,16 @@ public class WriteFileSkill : AgentToolBase<WriteFileArgs>
         if (string.IsNullOrEmpty(args.Path))
             return ToolResult.Failure("Path is required.");
 
-        var userId = context.UserId ?? Guid.Empty;
-        var resolvedPath = PathSecurity.ResolveUserPath(args.Path, userId, context.IsSuperAdmin);
+        var wsId = context.WorkspaceId ?? context.UserId ?? Guid.Empty;
+        var resolvedPath = PathSecurity.ResolveWorkspacePath(args.Path, wsId);
 
-        // Workspace boundary check
-        var pathError = PathSecurity.ValidatePath(resolvedPath, userId, context.IsSuperAdmin);
+        var pathError = PathSecurity.ValidateWorkspacePath(resolvedPath, wsId, context.IsSuperAdmin);
         if (pathError is not null)
             return ToolResult.Failure(pathError);
 
-        // Block writing to shared workspace (read-only for non-SuperAdmin)
         if (!context.IsSuperAdmin && PathSecurity.IsSharedPath(resolvedPath))
             return ToolResult.Failure("The shared workspace is read-only.");
 
-        // Block writing to sensitive files
         var fileName = Path.GetFileName(resolvedPath);
         if (SensitiveFileNames.Contains(fileName))
             return ToolResult.Failure($"Writing to '{fileName}' is not allowed for security reasons.");

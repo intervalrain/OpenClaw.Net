@@ -23,6 +23,7 @@ public class AgentPipeline(
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
+        Guid? workspaceId = null,
         CancellationToken ct = default)
     {
         var context = new AgentContext
@@ -34,7 +35,8 @@ public class AgentPipeline(
                 : await llmProviderFactory.GetProviderAsync(ct),
             Skills = _skillMap.Values.ToList(),
             Options = options,
-            UserId = userId
+            UserId = userId,
+            WorkspaceId = workspaceId
         };
 
 
@@ -61,6 +63,7 @@ public class AgentPipeline(
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
+        Guid? workspaceId = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
@@ -142,7 +145,7 @@ public class AgentPipeline(
             {
                 yield return new AgentStreamEvent(AgentStreamEventType.ToolExecuting, ToolName: toolCall.Name);
 
-                var result = await ExecuteToolCallAsync(toolCall, userId, ct);
+                var result = await ExecuteToolCallAsync(toolCall, userId, workspaceId, ct);
                 messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
 
                 yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, result, toolCall.Name);
@@ -276,7 +279,7 @@ public class AgentPipeline(
 
             foreach (var toolCall in response.ToolCalls!)
             {
-                var result = await ExecuteToolCallAsync(toolCall, context.UserId, ct);
+                var result = await ExecuteToolCallAsync(toolCall, context.UserId, context.WorkspaceId, ct);
                 context.Messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
             }
         }
@@ -284,7 +287,7 @@ public class AgentPipeline(
         return "Max iteration reached";
     }
 
-    private async Task<string> ExecuteToolCallAsync(ToolCall toolCall, Guid? userId, CancellationToken ct)
+    private async Task<string> ExecuteToolCallAsync(ToolCall toolCall, Guid? userId, Guid? workspaceId, CancellationToken ct)
     {
         if (!_skillMap.TryGetValue(toolCall.Name, out var skill))
         {
@@ -294,7 +297,8 @@ public class AgentPipeline(
         var skillContext = new ToolContext(toolCall.Arguments)
         {
             UserId = userId,
-            IsSuperAdmin = false // Agent pipeline always runs as the owning user
+            WorkspaceId = workspaceId,
+            IsSuperAdmin = false
         };
         var result = await skill.ExecuteAsync(skillContext, ct);
         return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";

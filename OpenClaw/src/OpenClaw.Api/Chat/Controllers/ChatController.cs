@@ -16,6 +16,7 @@ using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
 
+using OpenClaw.Contracts.Workspaces;
 using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
@@ -32,6 +33,7 @@ public class ChatController(
     IToolRegistry skillRegistry,
     IToolSettingsService skillSettingsService,
     IAgentActivityTracker activityTracker,
+    ICurrentWorkspaceProvider currentWorkspaceProvider,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -50,7 +52,7 @@ public class ChatController(
         var images = ConvertToImageContent(request.Images);
 
         var userId = GetUserId();
-        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, ct);
+        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, currentWorkspaceProvider.WorkspaceId, ct);
 
         // Save messages to DB
         if (conversation != null)
@@ -111,6 +113,7 @@ public class ChatController(
                 var skillContext = new ToolContext(jsonArgs)
                 {
                     UserId = skillUser.Id,
+                    WorkspaceId = currentWorkspaceProvider.WorkspaceId,
                     IsSuperAdmin = skillUser.Roles.Contains("SuperAdmin")
                 };
                 var skillResult = await skill.ExecuteAsync(skillContext, ct);
@@ -142,7 +145,7 @@ public class ChatController(
             await activityTracker.TrackAsync(streamUserId, currentUser.Name,
                 ActivityType.Chat, ActivityStatus.Started, sourceId, sourceName, ct: ct);
 
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, ct);
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, ct);
 
             await foreach (var evt in eventStream)
             {

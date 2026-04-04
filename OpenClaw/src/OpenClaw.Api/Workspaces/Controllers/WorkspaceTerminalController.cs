@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Contracts.Configuration;
+using OpenClaw.Contracts.Workspaces;
 using OpenClaw.Domain.Users.Repositories;
 using OpenClaw.Tools.FileSystem;
 using Weda.Core.Application.Security;
@@ -15,6 +16,7 @@ namespace OpenClaw.Api.Workspaces.Controllers;
 [Authorize]
 public class WorkspaceTerminalController(
     ICurrentUserProvider currentUserProvider,
+    ICurrentWorkspaceProvider currentWorkspaceProvider,
     IUserRepository userRepository,
     IConfigStore configStore) : ApiController
 {
@@ -58,8 +60,8 @@ public class WorkspaceTerminalController(
 
         // Resolve working directory
         var cwd = string.IsNullOrWhiteSpace(request.Cwd)
-            ? PathSecurity.GetUserWorkspacePath(user.Id)
-            : PathSecurity.ResolveUserPath(request.Cwd.TrimStart('/'), user.Id, isSuperAdmin);
+            ? PathSecurity.GetWorkspacePath(currentWorkspaceProvider.WorkspaceId)
+            : PathSecurity.ResolveWorkspacePath(request.Cwd.TrimStart('/'), currentWorkspaceProvider.WorkspaceId);
 
         var pathError = PathSecurity.ValidatePath(cwd, user.Id, isSuperAdmin);
         if (pathError is not null) return BadRequest(pathError);
@@ -154,7 +156,7 @@ public class WorkspaceTerminalController(
 
     private async Task<string?> CheckQuotaAsync(Guid userId, CancellationToken ct)
     {
-        var workspacePath = PathSecurity.GetUserWorkspacePath(userId);
+        var workspacePath = PathSecurity.GetWorkspacePath(currentWorkspaceProvider.WorkspaceId);
         var currentUsage = GetDirectorySize(workspacePath);
         var quotaMb = await GetQuotaMbAsync(userId, ct);
         var quotaBytes = quotaMb * 1024 * 1024;

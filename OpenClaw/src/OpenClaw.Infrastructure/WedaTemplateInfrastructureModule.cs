@@ -15,6 +15,7 @@ using OpenClaw.Domain.Chat.Repositories;
 using OpenClaw.Domain.Configuration.Repositories;
 using OpenClaw.Domain.Users.Repositories;
 using OpenClaw.Domain.Workspaces.Repositories;
+using OpenClaw.Infrastructure.Workspaces;
 using OpenClaw.Infrastructure.Workspaces.Persistence;
 using OpenClaw.Domain.Skills.Repositories;
 using OpenClaw.Infrastructure.Common.Persistence;
@@ -34,6 +35,7 @@ using OpenClaw.Infrastructure.Skills.Persistence;
 using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Email;
 using OpenClaw.Contracts.Email;
+using OpenClaw.Contracts.Workspaces;
 using OpenClaw.Domain.Auth.Repositories;
 using OpenClaw.Domain.Notifications.Repositories;
 using OpenClaw.Infrastructure.Notifications.Persistence;
@@ -72,6 +74,7 @@ public static class WedaTemplateInfrastructureModule
     {
         services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.Section));
         services.AddScoped<IEmailService, SmtpEmailService>();
+        services.AddScoped<ICurrentWorkspaceProvider, CurrentWorkspaceProvider>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
         return services;
