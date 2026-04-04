@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using OpenClaw.Contracts.Skills;
 
 namespace OpenClaw.Application.HierarchicalAgents;
@@ -18,7 +19,7 @@ public record PioneerCreateArgs(
 /// <summary>
 /// Agent tool that allows the chat LLM to create new agents in a workspace.
 /// </summary>
-public class PioneerCreateTool(IPioneerCreateService createService) : AgentToolBase<PioneerCreateArgs>
+public class PioneerCreateTool(IServiceScopeFactory scopeFactory) : AgentToolBase<PioneerCreateArgs>
 {
     public override string Name => "create_agent";
     public override string Description =>
@@ -53,6 +54,8 @@ public class PioneerCreateTool(IPioneerCreateService createService) : AgentToolB
             WorkflowYaml = args.WorkflowYaml
         };
 
+        using var scope = scopeFactory.CreateScope();
+        var createService = scope.ServiceProvider.GetRequiredService<IPioneerCreateService>();
         var result = await createService.CreateAgentAsync(request, ct);
 
         if (result.IsSuccess)
