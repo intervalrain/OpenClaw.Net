@@ -102,7 +102,14 @@ async function loadAgents() {
 
 function renderAgents() {
     if (!allAgents || allAgents.length === 0) {
-        agentList.innerHTML = '<div class="empty-state"><h3>No agents found</h3><p>No agents are registered yet.</p></div>';
+        agentList.innerHTML = `
+            <div class="empty-state">
+                <h3>No agents yet</h3>
+                <p>Go to <a href="/openclaw/index.html" style="color: var(--primary-color);">Chat</a> and ask the AI to create an agent for you.</p>
+                <p style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-muted);">
+                    Example: "Build me an agent that generates daily work reports from ADO"
+                </p>
+            </div>`;
         return;
     }
 
