@@ -221,6 +221,9 @@ public class AgentPipeline(
             parts.Add(options.SystemPrompt);
         }
 
+        parts.Add("If the user's request involves multiple coordinated steps or a complex multi-step task, " +
+                   "use the `pioneer_plan` tool to decompose and execute it as a DAG workflow.");
+
         if (!string.IsNullOrEmpty(language) && language != "auto")
         {
             var langInstruction = language switch

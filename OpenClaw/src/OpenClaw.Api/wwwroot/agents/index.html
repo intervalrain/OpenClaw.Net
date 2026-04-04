@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agents - OpenClaw</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.png">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="agents.css">
+</head>
+<body>
+    <!-- Top header will be injected by top-header.js -->
+
+    <div class="container">
+        <div class="page-header">
+            <div class="page-title">
+                <h1>Agents</h1>
+                <p class="subtitle">Browse agents, run DAG workflows, and manage definitions</p>
+            </div>
+        </div>
+
+        <main class="main-content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-tab="agents">Agents</button>
+                <button class="tab" data-tab="dagrunner">DAG Runner</button>
+                <button class="tab" data-tab="definitions">Definitions</button>
+            </div>
+
+            <!-- Agents Tab -->
+            <section class="tab-content active" id="agentsTab">
+                <div class="agent-grid" id="agentList">
+                    <div class="loading">Loading agents...</div>
+                </div>
+            </section>
+
+            <!-- DAG Runner Tab -->
+            <section class="tab-content" id="dagrunnerTab">
+                <div class="dag-runner-layout">
+                    <div class="dag-input-section">
+                        <label class="dag-label" for="dagJsonInput">Graph JSON</label>
+                        <textarea id="dagJsonInput" class="dag-textarea" rows="18" placeholder='{
+  "name": "example-workflow",
+  "nodes": [
+    { "id": "step1", "agentName": "list_directory", "input": { "path": "." } },
+    { "id": "step2", "agentName": "read_file" }
+  ],
+  "edges": [
+    { "fromNodeId": "step1", "toNodeId": "step2", "mapping": "$.output" }
+  ]
+}'></textarea>
+                        <button class="btn btn-primary" id="runDagBtn">Run DAG</button>
+                    </div>
+                    <div class="dag-results-section">
+                        <h3 class="dag-results-title">Results</h3>
+                        <div id="dagResults">
+                            <div class="empty-state">
+                                <p>Run a DAG to see results here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Definitions Tab -->
+            <section class="tab-content" id="definitionsTab">
+                <div class="definitions-toolbar" id="definitionsToolbar" style="display: none;">
+                    <button class="btn btn-primary btn-sm" id="reloadDefinitionsBtn">Reload Definitions</button>
+                </div>
+                <div class="definition-list" id="definitionList">
+                    <div class="loading">Loading definitions...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2026 OpenClaw. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Agent Run Modal -->
+    <div class="modal" id="agentRunModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="runModalTitle">Run Agent</h2>
+                <button class="close-btn" id="closeRunModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="agent-modal-desc" id="runModalDescription"></p>
+                <div class="user-detail">
+                    <label>Input (JSON)</label>
+                    <textarea id="agentInput" class="agent-input-textarea" rows="8" placeholder='{ "key": "value" }'></textarea>
+                </div>
+                <div id="agentRunResult" style="display: none;">
+                    <div class="result-summary">
+                        <div class="result-field">
+                            <label>Status</label>
+                            <span id="resultStatus" class="node-status"></span>
+                        </div>
+                        <div class="result-field">
+                            <label>Tokens</label>
+                            <span id="resultTokens">--</span>
+                        </div>
+                    </div>
+                    <div class="result-output-section">
+                        <label>Output</label>
+                        <pre id="resultOutput" class="result-output"></pre>
+                    </div>
+                    <div class="timeline-section">
+                        <label>Timeline</label>
+                        <div id="resultTimeline" class="timeline"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelRunModal">Cancel</button>
+                <button class="btn btn-primary" id="executeAgentBtn">Run</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="agents.js"></script>
+</body>
+</html>

@@ -101,6 +101,9 @@ public static class ServiceCollectionExtensions
         // services.AddSingleton<IAgentTool>(HttpRequestSkill.Default);
         // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
 
+        // Pioneer plan tool (delegates complex tasks to Pioneer Agent + DAG executor)
+        services.AddSingleton<IAgentTool, PioneerPlanTool>();
+
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>
         {
