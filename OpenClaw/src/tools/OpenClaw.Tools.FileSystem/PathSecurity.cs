@@ -1,16 +1,16 @@
 namespace OpenClaw.Tools.FileSystem;
 
 /// <summary>
-/// Per-user workspace filesystem isolation.
+/// Workspace filesystem isolation.
 ///
 /// Workspace layout:
 ///   {basePath}/
-///     shared/        — readable by all users (read-only)
-///     {userId}/      — private workspace per user
+///     shared/              — readable by all users (read-only)
+///     {workspaceId}/       — workspace directory (personal or shared)
 ///
 /// Rules:
-///   - Regular users can only access their own workspace and shared/
-///   - SuperAdmin can access all user workspaces
+///   - Users can only access workspaces they are members of + shared/
+///   - SuperAdmin can access all workspaces
 ///   - Path traversal (../) is always blocked
 ///   - Sensitive system directories are always blocked
 /// </summary>
@@ -24,9 +24,6 @@ public static class PathSecurity
         "C:\\Windows", "C:\\Users", "C:\\ProgramData"
     };
 
-    /// <summary>
-    /// Get the workspace base path from environment or default.
-    /// </summary>
     public static string GetWorkspaceBasePath()
     {
         return Environment.GetEnvironmentVariable("OPENCLAW_WORKSPACE_PATH")
@@ -34,23 +31,26 @@ public static class PathSecurity
     }
 
     /// <summary>
-    /// Get the workspace root for a specific user.
-    /// Creates the directory if it doesn't exist.
+    /// Get the directory for a workspace. Creates if not exists.
     /// </summary>
-    public static string GetUserWorkspacePath(Guid userId)
+    public static string GetWorkspacePath(Guid workspaceId)
     {
         var basePath = GetWorkspaceBasePath();
-        var userPath = Path.Combine(basePath, userId.ToString());
+        var wsPath = Path.Combine(basePath, workspaceId.ToString());
 
-        if (!Directory.Exists(userPath))
-            Directory.CreateDirectory(userPath);
+        if (!Directory.Exists(wsPath))
+            Directory.CreateDirectory(wsPath);
 
-        return userPath;
+        return wsPath;
     }
 
     /// <summary>
-    /// Get the shared workspace path (readable by all users).
+    /// Backward compatible: get workspace path by userId (personal workspace).
+    /// Prefer GetWorkspacePath(workspaceId) for new code.
     /// </summary>
+    public static string GetUserWorkspacePath(Guid userId)
+        => GetWorkspacePath(userId);
+
     public static string GetSharedWorkspacePath()
     {
         var basePath = GetWorkspaceBasePath();
@@ -63,62 +63,45 @@ public static class PathSecurity
     }
 
     /// <summary>
-    /// Resolve a user-relative path to an absolute path within their workspace.
-    /// If the path is already absolute, validates it's within allowed boundaries.
+    /// Resolve a relative path within a workspace to an absolute path.
     /// </summary>
-    public static string ResolveUserPath(string path, Guid userId, bool isSuperAdmin = false)
+    public static string ResolveWorkspacePath(string path, Guid workspaceId)
     {
         if (string.IsNullOrWhiteSpace(path))
-            return GetUserWorkspacePath(userId);
+            return GetWorkspacePath(workspaceId);
 
-        // If relative, resolve against user workspace
         if (!Path.IsPathRooted(path))
-            return Path.GetFullPath(Path.Combine(GetUserWorkspacePath(userId), path));
+            return Path.GetFullPath(Path.Combine(GetWorkspacePath(workspaceId), path));
 
-        // Absolute path — will be validated by ValidatePath
         return Path.GetFullPath(path);
     }
 
     /// <summary>
-    /// Validates that a path is within the user's allowed boundaries.
-    /// Returns null if valid, or an error message if blocked.
+    /// Backward compatible: resolve path by userId.
     /// </summary>
-    public static string? ValidatePath(string? path, Guid userId, bool isSuperAdmin = false)
+    public static string ResolveUserPath(string path, Guid userId, bool isSuperAdmin = false)
+        => ResolveWorkspacePath(path, userId);
+
+    /// <summary>
+    /// Validate that a path is within the workspace's allowed boundaries.
+    /// </summary>
+    public static string? ValidateWorkspacePath(string? path, Guid workspaceId, bool isSuperAdmin = false)
     {
         if (string.IsNullOrWhiteSpace(path))
             return null;
 
-        // Block path traversal sequences
-        var normalized = path.Replace('\\', '/');
-        foreach (var blocked in BlockedPathSegments)
-        {
-            if (normalized.Contains(blocked))
-                return $"Path contains blocked sequence '{blocked}'. Path traversal is not allowed.";
-        }
+        var blockError = CheckBlocked(path);
+        if (blockError is not null) return blockError;
 
-        // Resolve full path
         string fullPath;
-        try
-        {
-            fullPath = Path.GetFullPath(path);
-        }
-        catch (Exception ex)
-        {
-            return $"Invalid path: {ex.Message}";
-        }
+        try { fullPath = Path.GetFullPath(path); }
+        catch (Exception ex) { return $"Invalid path: {ex.Message}"; }
 
-        // Block sensitive system directories
-        foreach (var sensitive in SensitiveDirectories)
-        {
-            if (fullPath.StartsWith(sensitive, StringComparison.OrdinalIgnoreCase))
-                return $"Access to '{sensitive}' is not allowed for security reasons.";
-        }
+        var sensitiveError = CheckSensitive(fullPath);
+        if (sensitiveError is not null) return sensitiveError;
 
         var basePath = Path.GetFullPath(GetWorkspaceBasePath());
-        var userWorkspace = Path.GetFullPath(GetUserWorkspacePath(userId));
-        var sharedWorkspace = Path.GetFullPath(GetSharedWorkspacePath());
 
-        // SuperAdmin can access everything under workspace base
         if (isSuperAdmin)
         {
             if (!fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase))
@@ -126,19 +109,23 @@ public static class PathSecurity
             return null;
         }
 
-        // Regular users: own workspace (read/write) or shared (read-only validated by caller)
-        if (fullPath.StartsWith(userWorkspace, StringComparison.OrdinalIgnoreCase))
+        var workspace = Path.GetFullPath(GetWorkspacePath(workspaceId));
+        if (fullPath.StartsWith(workspace, StringComparison.OrdinalIgnoreCase))
             return null;
 
-        if (fullPath.StartsWith(sharedWorkspace, StringComparison.OrdinalIgnoreCase))
+        var shared = Path.GetFullPath(GetSharedWorkspacePath());
+        if (fullPath.StartsWith(shared, StringComparison.OrdinalIgnoreCase))
             return null;
 
-        return $"Access denied: you can only access your workspace or the shared directory.";
+        return "Access denied: you can only access your workspace or the shared directory.";
     }
 
     /// <summary>
-    /// Check if a path is in the shared workspace (read-only for regular users).
+    /// Backward compatible: validate by userId.
     /// </summary>
+    public static string? ValidatePath(string? path, Guid userId, bool isSuperAdmin = false)
+        => ValidateWorkspacePath(path, userId, isSuperAdmin);
+
     public static bool IsSharedPath(string path)
     {
         var fullPath = Path.GetFullPath(path);
@@ -147,35 +134,45 @@ public static class PathSecurity
     }
 
     /// <summary>
-    /// Legacy validation without user context — blocks everything outside workspace.
-    /// Used only as a safety net; prefer the userId-aware overload.
+    /// Legacy validation without user context.
     /// </summary>
     public static string? ValidatePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
             return null;
 
+        var blockError = CheckBlocked(path);
+        if (blockError is not null) return blockError;
+
+        try
+        {
+            var fullPath = Path.GetFullPath(path);
+            return CheckSensitive(fullPath);
+        }
+        catch (Exception ex)
+        {
+            return $"Invalid path: {ex.Message}";
+        }
+    }
+
+    private static string? CheckBlocked(string path)
+    {
         var normalized = path.Replace('\\', '/');
         foreach (var blocked in BlockedPathSegments)
         {
             if (normalized.Contains(blocked))
                 return $"Path contains blocked sequence '{blocked}'. Path traversal is not allowed.";
         }
+        return null;
+    }
 
-        try
+    private static string? CheckSensitive(string fullPath)
+    {
+        foreach (var sensitive in SensitiveDirectories)
         {
-            var fullPath = Path.GetFullPath(path);
-            foreach (var sensitive in SensitiveDirectories)
-            {
-                if (fullPath.StartsWith(sensitive, StringComparison.OrdinalIgnoreCase))
-                    return $"Access to '{sensitive}' is not allowed for security reasons.";
-            }
+            if (fullPath.StartsWith(sensitive, StringComparison.OrdinalIgnoreCase))
+                return $"Access to '{sensitive}' is not allowed for security reasons.";
         }
-        catch (Exception ex)
-        {
-            return $"Invalid path: {ex.Message}";
-        }
-
         return null;
     }
 }

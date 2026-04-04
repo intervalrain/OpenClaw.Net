@@ -41,7 +41,7 @@ public class TelegramConversationMapper
             : $"{TelegramTitlePrefix}{chatId}";
 
         var userId = resolvedUserId ?? Guid.Empty;
-        var conversation = Conversation.Create(userId, title);
+        var conversation = Conversation.Create(userId, Guid.Empty, title);
         await repository.AddAsync(conversation, ct);
         await uow.SaveChangesAsync(ct);
 

@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Contracts.Configuration;
+using OpenClaw.Contracts.Workspaces;
 using OpenClaw.Domain.Users.Repositories;
 using Weda.Core.Application.Interfaces;
 using OpenClaw.Domain.Workspaces.Entities;
@@ -17,6 +18,7 @@ namespace OpenClaw.Api.Workspaces.Controllers;
 [Authorize]
 public class WorkspaceFileController(
     ICurrentUserProvider currentUserProvider,
+    ICurrentWorkspaceProvider currentWorkspaceProvider,
     IUserRepository userRepository,
     IDirectoryPermissionRepository permissionRepository,
     IConfigStore configStore) : ApiController
@@ -34,11 +36,13 @@ public class WorkspaceFileController(
     /// Resolve the base path for a given scope and relative path.
     /// scope=my (default) → user workspace; scope=admin → workspace root (SuperAdmin only).
     /// </summary>
-    private string ResolveWorkspacePath(string? path, Guid userId, bool isSuperAdmin, string scope = "my")
+    private Guid GetWsId() => currentWorkspaceProvider.WorkspaceId;
+
+    private string ResolveWsPath(string? path, bool isSuperAdmin, string scope = "my")
     {
         var root = scope == "admin" && isSuperAdmin
             ? PathSecurity.GetWorkspaceBasePath()
-            : PathSecurity.GetUserWorkspacePath(userId);
+            : PathSecurity.GetWorkspacePath(GetWsId());
 
         return path is null ? root : Path.GetFullPath(Path.Combine(root, path));
     }
@@ -63,10 +67,10 @@ public class WorkspaceFileController(
             return await ListPublicDirectory(ownerId.Value, path, user.Id, ct);
         }
 
-        var targetUserId = (ownerId.HasValue && isSuperAdmin) ? ownerId.Value : user.Id;
-        var basePath = ResolveWorkspacePath(path, targetUserId, isSuperAdmin, scope);
+        var basePath = ResolveWsPath(path, isSuperAdmin, scope);
+        var wsId = GetWsId();
 
-        var error = PathSecurity.ValidatePath(basePath, targetUserId, isSuperAdmin);
+        var error = PathSecurity.ValidateWorkspacePath(basePath, wsId, isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
         if (!Directory.Exists(basePath))
@@ -134,9 +138,11 @@ public class WorkspaceFileController(
         if (effective == DirectoryVisibility.Private || effective == DirectoryVisibility.Default)
             return Forbid();
 
+        // Cross-user browsing: resolve ownerId's personal workspace
+        // TODO: when shared workspaces exist, browse by workspaceId instead
         var basePath = path is null
-            ? PathSecurity.GetUserWorkspacePath(ownerId)
-            : Path.GetFullPath(Path.Combine(PathSecurity.GetUserWorkspacePath(ownerId), path));
+            ? PathSecurity.GetWorkspacePath(ownerId)
+            : Path.GetFullPath(Path.Combine(PathSecurity.GetWorkspacePath(ownerId), path));
 
         if (!Directory.Exists(basePath))
             return NotFound("Directory not found.");
@@ -203,11 +209,12 @@ public class WorkspaceFileController(
                 return BadRequest("This directory is read-only or private.");
         }
 
+        var wsId = ownerId.HasValue ? ownerId.Value : GetWsId();
         var targetDir = path is null
-            ? PathSecurity.GetUserWorkspacePath(targetUserId)
-            : Path.GetFullPath(Path.Combine(PathSecurity.GetUserWorkspacePath(targetUserId), path));
+            ? PathSecurity.GetWorkspacePath(wsId)
+            : Path.GetFullPath(Path.Combine(PathSecurity.GetWorkspacePath(wsId), path));
 
-        var error = PathSecurity.ValidatePath(targetDir, targetUserId, isSuperAdmin || ownerId.HasValue);
+        var error = PathSecurity.ValidateWorkspacePath(targetDir, wsId, isSuperAdmin || ownerId.HasValue);
         if (error is not null) return BadRequest(error);
 
         // Quota check
@@ -224,7 +231,7 @@ public class WorkspaceFileController(
 
         // Prevent overwriting outside workspace via filename manipulation
         var resolvedFilePath = Path.GetFullPath(filePath);
-        error = PathSecurity.ValidatePath(resolvedFilePath, user.Id, isSuperAdmin);
+        error = PathSecurity.ValidateWorkspacePath(resolvedFilePath, wsId, isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
         await using var stream = new FileStream(resolvedFilePath, FileMode.Create);
@@ -253,7 +260,8 @@ public class WorkspaceFileController(
                 return Forbid();
         }
 
-        var filePath = Path.GetFullPath(Path.Combine(PathSecurity.GetUserWorkspacePath(targetUserId), path));
+        var dlWsId = ownerId.HasValue ? ownerId.Value : GetWsId();
+        var filePath = Path.GetFullPath(Path.Combine(PathSecurity.GetWorkspacePath(dlWsId), path));
 
         if (!System.IO.File.Exists(filePath))
             return NotFound($"File not found. Path: {path}, Resolved: {filePath}");
@@ -272,9 +280,9 @@ public class WorkspaceFileController(
         var normalizedPath = NormalizePath(request.Path) ?? "";
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
-        var dirPath = PathSecurity.ResolveUserPath(normalizedPath, user.Id, isSuperAdmin);
+        var dirPath = PathSecurity.ResolveWorkspacePath(normalizedPath, GetWsId());
 
-        var error = PathSecurity.ValidatePath(dirPath, user.Id, isSuperAdmin);
+        var error = PathSecurity.ValidateWorkspacePath(dirPath, GetWsId(), isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
         Directory.CreateDirectory(dirPath);
@@ -290,9 +298,9 @@ public class WorkspaceFileController(
         path = NormalizePath(path) ?? "";
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
-        var fullPath = PathSecurity.ResolveUserPath(path, user.Id, isSuperAdmin);
+        var fullPath = PathSecurity.ResolveWorkspacePath(path, GetWsId());
 
-        var error = PathSecurity.ValidatePath(fullPath, user.Id, isSuperAdmin);
+        var error = PathSecurity.ValidateWorkspacePath(fullPath, GetWsId(), isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
         if (System.IO.File.Exists(fullPath))
@@ -322,13 +330,14 @@ public class WorkspaceFileController(
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
 
-        var sourcePath = PathSecurity.ResolveUserPath(NormalizePath(request.OldPath) ?? "", user.Id, isSuperAdmin);
-        var destPath = PathSecurity.ResolveUserPath(NormalizePath(request.NewPath) ?? "", user.Id, isSuperAdmin);
+        var wsId = GetWsId();
+        var sourcePath = PathSecurity.ResolveWorkspacePath(NormalizePath(request.OldPath) ?? "", wsId);
+        var destPath = PathSecurity.ResolveWorkspacePath(NormalizePath(request.NewPath) ?? "", wsId);
 
-        var error = PathSecurity.ValidatePath(sourcePath, user.Id, isSuperAdmin);
+        var error = PathSecurity.ValidateWorkspacePath(sourcePath, wsId, isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
-        error = PathSecurity.ValidatePath(destPath, user.Id, isSuperAdmin);
+        error = PathSecurity.ValidateWorkspacePath(destPath, wsId, isSuperAdmin);
         if (error is not null) return BadRequest(error);
 
         if (System.IO.File.Exists(sourcePath))
@@ -354,7 +363,7 @@ public class WorkspaceFileController(
     {
         var user = currentUserProvider.GetCurrentUser();
         var isSuperAdmin = user.Roles.Contains(Role.SuperAdmin);
-        var workspacePath = PathSecurity.GetUserWorkspacePath(user.Id);
+        var workspacePath = PathSecurity.GetWorkspacePath(GetWsId());
         var usedBytes = GetDirectorySize(workspacePath);
 
         if (isSuperAdmin)
@@ -382,7 +391,7 @@ public class WorkspaceFileController(
 
     private async Task<string?> CheckQuotaAsync(Guid userId, long additionalBytes, CancellationToken ct)
     {
-        var workspacePath = PathSecurity.GetUserWorkspacePath(userId);
+        var workspacePath = PathSecurity.GetWorkspacePath(GetWsId());
         var currentUsage = GetDirectorySize(workspacePath);
         var quotaMb = await GetQuotaMbAsync(userId, ct);
         var quotaBytes = quotaMb * 1024 * 1024;

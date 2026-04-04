@@ -11,6 +11,12 @@ public class ToolContext(string? arguments)
     public Guid? UserId { get; init; }
 
     /// <summary>
+    /// The active workspace for this tool execution.
+    /// File operations resolve paths relative to this workspace.
+    /// </summary>
+    public Guid? WorkspaceId { get; init; }
+
+    /// <summary>
     /// Whether the executing user has SuperAdmin privileges.
     /// SuperAdmin can access all user workspaces.
     /// </summary>

@@ -33,18 +33,16 @@ public class ReadFileSkill : AgentToolBase<ReadFileArgs>
         if (string.IsNullOrEmpty(args.Path))
             return ToolResult.Failure("Path is required.");
 
-        var userId = context.UserId ?? Guid.Empty;
-        var resolvedPath = PathSecurity.ResolveUserPath(args.Path, userId, context.IsSuperAdmin);
+        var wsId = context.WorkspaceId ?? context.UserId ?? Guid.Empty;
+        var resolvedPath = PathSecurity.ResolveWorkspacePath(args.Path, wsId);
 
-        // Workspace boundary check
-        var pathError = PathSecurity.ValidatePath(resolvedPath, userId, context.IsSuperAdmin);
+        var pathError = PathSecurity.ValidateWorkspacePath(resolvedPath, wsId, context.IsSuperAdmin);
         if (pathError is not null)
             return ToolResult.Failure(pathError);
 
         if (!File.Exists(resolvedPath))
             return ToolResult.Failure($"File not found: {args.Path}");
 
-        // Check if file is sensitive
         var fileName = Path.GetFileName(resolvedPath);
         if (IsSensitiveFile(fileName))
             return ToolResult.Failure($"Access denied: '{fileName}' is a sensitive file and cannot be read for security reasons.");
@@ -55,13 +53,9 @@ public class ReadFileSkill : AgentToolBase<ReadFileArgs>
 
     private static bool IsSensitiveFile(string fileName)
     {
-        // Check exact match
         if (SensitiveFileNames.Contains(fileName))
-        {
             return true;
-        }
 
-        // Check patterns
         var lowerName = fileName.ToLowerInvariant();
         return SensitivePatterns.Any(pattern => lowerName.Contains(pattern));
     }

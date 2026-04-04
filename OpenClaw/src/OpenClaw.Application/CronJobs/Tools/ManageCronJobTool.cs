@@ -35,7 +35,7 @@ public class ManageCronJobTool(IServiceScopeFactory scopeFactory) : AgentToolBas
 
         return args.Action.ToLowerInvariant() switch
         {
-            "create" => await CreateAsync(args, userId.Value, jobRepo, uow, ct),
+            "create" => await CreateAsync(args, userId.Value, context.WorkspaceId ?? Guid.Empty, jobRepo, uow, ct),
             "list" => await ListAsync(userId.Value, jobRepo, ct),
             "update" => await UpdateAsync(args, userId.Value, jobRepo, uow, ct),
             "delete" => await DeleteAsync(args, userId.Value, jobRepo, uow, ct),
@@ -45,7 +45,7 @@ public class ManageCronJobTool(IServiceScopeFactory scopeFactory) : AgentToolBas
     }
 
     private static async Task<ToolResult> CreateAsync(
-        ManageCronJobArgs args, Guid userId, ICronJobRepository repo, IUnitOfWork uow, CancellationToken ct)
+        ManageCronJobArgs args, Guid userId, Guid workspaceId, ICronJobRepository repo, IUnitOfWork uow, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(args.Name))
             return ToolResult.Failure("Name is required for create.");
@@ -62,6 +62,7 @@ public class ManageCronJobTool(IServiceScopeFactory scopeFactory) : AgentToolBas
 
         var job = CronJob.Create(
             userId,
+            workspaceId,
             args.Name,
             scheduleJson,
             args.Content,

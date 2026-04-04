@@ -29,6 +29,68 @@ public static class DatabaseMigrator
 
         var seeder = scope.ServiceProvider.GetRequiredService<AppDbContextSeeder>();
         await seeder.SeedAsync();
+
+        await EnsurePersonalWorkspacesAsync(dbContext, logger);
+        await MigrateWorkspaceDirectoriesAsync(dbContext, logger);
+    }
+
+    /// <summary>
+    /// Ensure every user has a personal workspace. Legacy users created before
+    /// the workspace feature won't have one.
+    /// </summary>
+    private static async Task EnsurePersonalWorkspacesAsync(AppDbContext dbContext, ILogger logger)
+    {
+        var usersWithoutWorkspace = await dbContext.Set<Domain.Users.Entities.User>()
+            .Where(u => !dbContext.Set<Domain.Workspaces.Entities.Workspace>()
+                .Any(w => w.OwnerUserId == u.Id && w.IsPersonal))
+            .ToListAsync();
+
+        foreach (var user in usersWithoutWorkspace)
+        {
+            var ws = Domain.Workspaces.Entities.Workspace.CreatePersonal(user.Id, user.Name);
+            await dbContext.Set<Domain.Workspaces.Entities.Workspace>().AddAsync(ws);
+            logger.LogInformation("Created personal workspace for legacy user {UserId} ({Name})", user.Id, user.Name);
+        }
+
+        if (usersWithoutWorkspace.Count > 0)
+            await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// One-time migration: rename workspace directories from {userId} to {workspaceId}.
+    /// Idempotent — skips if directory already matches workspaceId.
+    /// </summary>
+    private static async Task MigrateWorkspaceDirectoriesAsync(AppDbContext dbContext, ILogger logger)
+    {
+        var basePath = Environment.GetEnvironmentVariable("OPENCLAW_WORKSPACE_PATH")
+            ?? Path.Combine(AppContext.BaseDirectory, "workspace");
+
+        if (!Directory.Exists(basePath)) return;
+
+        var personalWorkspaces = await dbContext.Set<Domain.Workspaces.Entities.Workspace>()
+            .Where(w => w.IsPersonal)
+            .Select(w => new { w.Id, w.OwnerUserId })
+            .ToListAsync();
+
+        foreach (var ws in personalWorkspaces)
+        {
+            var userDir = Path.Combine(basePath, ws.OwnerUserId.ToString());
+            var wsDir = Path.Combine(basePath, ws.Id.ToString());
+
+            // Already migrated or no user dir exists
+            if (Directory.Exists(wsDir) || !Directory.Exists(userDir))
+                continue;
+
+            try
+            {
+                Directory.Move(userDir, wsDir);
+                logger.LogInformation("Migrated workspace directory: {UserId} -> {WorkspaceId}", ws.OwnerUserId, ws.Id);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to migrate workspace directory for user {UserId}", ws.OwnerUserId);
+            }
+        }
     }
 
     /// <summary>

@@ -11,6 +11,7 @@ public interface IAgentPipeline
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
+        Guid? workspaceId = null,
         CancellationToken ct = default);
 
     IAsyncEnumerable<AgentStreamEvent> ExecuteStreamAsync(
@@ -19,5 +20,6 @@ public interface IAgentPipeline
         string? language = null,
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
+        Guid? workspaceId = null,
         CancellationToken ct = default);
 }
