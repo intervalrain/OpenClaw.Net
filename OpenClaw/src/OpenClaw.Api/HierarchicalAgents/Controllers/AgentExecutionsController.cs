@@ -3,6 +3,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Application.HierarchicalAgents;
 using OpenClaw.Contracts.HierarchicalAgents;
+using OpenClaw.Contracts.Workspaces;
 using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
 
@@ -13,8 +14,11 @@ public class AgentExecutionsController(
     IAgentRegistry agentRegistry,
     IDagExecutor dagExecutor,
     ICurrentUserProvider currentUserProvider,
+    ICurrentWorkspaceProvider currentWorkspaceProvider,
     IServiceProvider serviceProvider) : ApiController
 {
+    private Guid WorkspaceId => currentWorkspaceProvider.WorkspaceId;
+
     /// <summary>
     /// Executes a single agent by name with the given input.
     /// </summary>
@@ -24,7 +28,7 @@ public class AgentExecutionsController(
         [FromBody] JsonDocument input,
         CancellationToken ct)
     {
-        var agent = agentRegistry.GetAgent(agentName);
+        var agent = agentRegistry.GetAgent(agentName, WorkspaceId);
         if (agent is null)
             return NotFound(new { error = $"Agent '{agentName}' not found." });
 

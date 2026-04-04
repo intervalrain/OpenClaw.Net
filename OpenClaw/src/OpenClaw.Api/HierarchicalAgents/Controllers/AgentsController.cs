@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Contracts.HierarchicalAgents;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Contracts.Workspaces;
 using Weda.Core.Application.Security.Models;
 using Weda.Core.Presentation;
 
@@ -11,15 +12,18 @@ namespace OpenClaw.Api.HierarchicalAgents.Controllers;
 [ApiVersion("1.0")]
 public class AgentsController(
     IAgentRegistry agentRegistry,
-    IAgentStore agentStore) : ApiController
+    IAgentStore agentStore,
+    ICurrentWorkspaceProvider currentWorkspaceProvider) : ApiController
 {
+    private Guid WorkspaceId => currentWorkspaceProvider.WorkspaceId;
+
     /// <summary>
-    /// Lists all registered agents (code-defined, tool-wrapped, and file-defined).
+    /// Lists all agents: built-in + workspace-scoped.
     /// </summary>
     [HttpGet]
     public IActionResult ListAgents()
     {
-        var agents = agentRegistry.GetAll()
+        var agents = agentRegistry.GetAll(WorkspaceId)
             .Select(a => new
             {
                 a.Name,
@@ -35,12 +39,12 @@ public class AgentsController(
     }
 
     /// <summary>
-    /// Gets a specific agent by name.
+    /// Gets a specific agent by name (checks workspace agents first).
     /// </summary>
     [HttpGet("{name}")]
     public IActionResult GetAgent(string name)
     {
-        var agent = agentRegistry.GetAgent(name);
+        var agent = agentRegistry.GetAgent(name, WorkspaceId);
         if (agent is null)
             return NotFound();
 
@@ -57,12 +61,12 @@ public class AgentsController(
     }
 
     /// <summary>
-    /// Lists all file-defined agent definitions (AGENT.md).
+    /// Lists all file-defined agent definitions (AGENT.md) for the current workspace.
     /// </summary>
     [HttpGet("definitions")]
     public IActionResult ListDefinitions()
     {
-        var definitions = agentStore.GetAllAgents()
+        var definitions = agentStore.GetAllAgents(WorkspaceId)
             .Select(d => new
             {
                 d.Name,
@@ -80,21 +84,18 @@ public class AgentsController(
     }
 
     /// <summary>
-    /// Reloads agent definitions from disk.
+    /// Reloads agent definitions from disk for the current workspace.
     /// </summary>
     [HttpPost("definitions/reload")]
     [Authorize(Policy = Policy.AdminOrAbove)]
     public async Task<IActionResult> ReloadDefinitions(CancellationToken ct)
     {
-        await agentStore.ReloadAsync(ct);
+        await agentStore.ReloadAsync(WorkspaceId, ct);
 
-        // Re-register file-defined agents
-        foreach (var definition in agentStore.GetAllAgents())
+        return Ok(new
         {
-            agentRegistry.Register(
-                new OpenClaw.Application.HierarchicalAgents.FileDefinedAgent(definition));
-        }
-
-        return Ok(new { message = "Agent definitions reloaded.", count = agentStore.GetAllAgents().Count });
+            message = "Agent definitions reloaded.",
+            count = agentStore.GetAllAgents(WorkspaceId).Count
+        });
     }
 }

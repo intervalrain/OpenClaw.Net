@@ -101,9 +101,6 @@ public static class ServiceCollectionExtensions
         // services.AddSingleton<IAgentTool>(HttpRequestSkill.Default);
         // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
 
-        // Pioneer plan tool (delegates complex tasks to Pioneer Agent + DAG executor)
-        services.AddSingleton<IAgentTool, PioneerPlanTool>();
-
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>
         {
@@ -121,18 +118,11 @@ public static class ServiceCollectionExtensions
             return pipeline;
         });
 
-        // Agent definition files (AGENT.md)
-        var agentsDir = configuration["Agents:Directory"] ?? "agents";
-        if (!Path.IsPathRooted(agentsDir))
-        {
-            agentsDir = Path.GetFullPath(agentsDir, Directory.GetCurrentDirectory());
-        }
+        // Workspace-scoped agent definition files (AGENT.md)
         services.AddSingleton<IAgentStore>(sp =>
         {
             var agentStoreLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FileAgentStore>>();
-            var store = new FileAgentStore(agentsDir, agentStoreLogger);
-            store.ReloadAsync().GetAwaiter().GetResult();
-            return store;
+            return new FileAgentStore(agentStoreLogger);
         });
 
         // Hierarchical Agent Architecture
@@ -239,27 +229,13 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IAgentRegistry>(sp =>
         {
-            // Collect explicitly registered IAgent instances
-            var agents = sp.GetServices<IAgent>().ToList();
+            // Register only built-in agents (e.g. PioneerAgent).
+            // Workspace-scoped agents (from AGENT.md files) are loaded on-demand
+            // via IAgentStore when GetAgent/GetAll is called with a workspaceId.
+            var builtInAgents = sp.GetServices<IAgent>().ToList();
+            var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
 
-            // Wrap all IAgentTool instances as ToolAgents for backward compatibility
-            var tools = sp.GetServices<IAgentTool>();
-            foreach (var tool in tools)
-            {
-                agents.Add(new ToolAgent(tool));
-            }
-
-            // Load file-defined agents from AGENT.md files
-            var agentStore = sp.GetService<IAgentStore>();
-            if (agentStore is not null)
-            {
-                foreach (var definition in agentStore.GetAllAgents())
-                {
-                    agents.Add(new FileDefinedAgent(definition));
-                }
-            }
-
-            return new AgentRegistry(agents);
+            return new AgentRegistry(builtInAgents, scopeFactory);
         });
 
         return services;

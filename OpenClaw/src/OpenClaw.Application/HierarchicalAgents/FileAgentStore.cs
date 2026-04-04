@@ -1,32 +1,36 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using OpenClaw.Contracts.Skills;
 
 namespace OpenClaw.Application.HierarchicalAgents;
 
 /// <summary>
-/// Loads agent definitions from AGENT.md files in a directory.
-/// Expected structure:
-///   agents/{name}/AGENT.md
-///   agents/{name}/reference/   (optional - reference docs)
-///   agents/{name}/scripts/     (optional - scripts)
+/// Loads agent definitions from AGENT.md files within workspace directories.
+/// Expected structure per workspace:
+///   {workspacePath}/agents/{name}/AGENT.md
+///   {workspacePath}/agents/{name}/reference/   (optional)
+///   {workspacePath}/agents/{name}/scripts/     (optional)
 /// </summary>
-public class FileAgentStore(string agentsDirectory, ILogger<FileAgentStore> logger) : IAgentStore
+public class FileAgentStore(ILogger<FileAgentStore> logger) : IAgentStore
 {
-    private List<AgentDefinition> _agents = [];
+    private readonly ConcurrentDictionary<Guid, List<AgentDefinition>> _cache = new();
 
-    public IReadOnlyList<AgentDefinition> GetAllAgents() => _agents;
+    public IReadOnlyList<AgentDefinition> GetAllAgents(Guid workspaceId)
+        => _cache.GetValueOrDefault(workspaceId) ?? [];
 
-    public AgentDefinition? GetAgent(string name)
-        => _agents.FirstOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    public AgentDefinition? GetAgent(string name, Guid workspaceId)
+        => GetAllAgents(workspaceId)
+            .FirstOrDefault(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
-    public async Task ReloadAsync(CancellationToken ct = default)
+    public async Task ReloadAsync(Guid workspaceId, CancellationToken ct = default)
     {
+        var agentsDirectory = GetWorkspaceAgentsDirectory(workspaceId);
         var newAgents = new List<AgentDefinition>();
 
         if (!Directory.Exists(agentsDirectory))
         {
-            logger.LogWarning("Agents directory not found: {Dir}", agentsDirectory);
-            _agents = newAgents;
+            logger.LogDebug("Workspace agents directory not found: {Dir}", agentsDirectory);
+            _cache[workspaceId] = newAgents;
             return;
         }
 
@@ -69,8 +73,21 @@ public class FileAgentStore(string agentsDirectory, ILogger<FileAgentStore> logg
             }
         }
 
-        _agents = newAgents;
-        logger.LogInformation("Loaded {Count} agents from {Dir}", newAgents.Count, agentsDirectory);
+        _cache[workspaceId] = newAgents;
+        logger.LogInformation(
+            "Loaded {Count} agents for workspace {WorkspaceId} from {Dir}",
+            newAgents.Count, workspaceId, agentsDirectory);
+    }
+
+    /// <summary>
+    /// Resolves the agents directory for a given workspace.
+    /// Layout: {workspaceBasePath}/{workspaceId}/agents/
+    /// </summary>
+    internal static string GetWorkspaceAgentsDirectory(Guid workspaceId)
+    {
+        var basePath = Environment.GetEnvironmentVariable("OPENCLAW_WORKSPACE_PATH")
+            ?? Path.Combine(AppContext.BaseDirectory, "workspace");
+        return Path.Combine(basePath, workspaceId.ToString(), "agents");
     }
 
     private static async Task<List<SkillResource>> LoadResourcesAsync(string dir, CancellationToken ct)
