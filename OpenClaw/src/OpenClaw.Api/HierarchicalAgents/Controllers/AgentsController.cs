@@ -1,7 +1,9 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenClaw.Contracts.HierarchicalAgents;
 using OpenClaw.Contracts.Skills;
+using Weda.Core.Application.Security.Models;
 using Weda.Core.Presentation;
 
 namespace OpenClaw.Api.HierarchicalAgents.Controllers;
@@ -81,6 +83,7 @@ public class AgentsController(
     /// Reloads agent definitions from disk.
     /// </summary>
     [HttpPost("definitions/reload")]
+    [Authorize(Policy = Policy.AdminOrAbove)]
     public async Task<IActionResult> ReloadDefinitions(CancellationToken ct)
     {
         await agentStore.ReloadAsync(ct);

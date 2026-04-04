@@ -32,7 +32,7 @@ public class AgentExecutionsController(
         {
             Input = input,
             Services = serviceProvider,
-            Options = new AgentExecutionOptions(),
+            Options = new AgentExecutionOptions { BudgetLimit = 100_000 },
             UserId = GetUserId()
         };
 
@@ -82,7 +82,7 @@ public class AgentExecutionsController(
 
         var timeline = new AgentExecutionTimeline();
         var userId = GetUserId();
-        var result = await dagExecutor.ExecuteAsync(graph, new AgentExecutionOptions(), userId, timeline, ct);
+        var result = await dagExecutor.ExecuteAsync(graph, new AgentExecutionOptions { BudgetLimit = 100_000 }, userId, timeline, ct);
 
         return Ok(new
         {

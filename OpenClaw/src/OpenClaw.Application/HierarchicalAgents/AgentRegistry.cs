@@ -1,10 +1,11 @@
+using System.Collections.Concurrent;
 using OpenClaw.Contracts.HierarchicalAgents;
 
 namespace OpenClaw.Application.HierarchicalAgents;
 
 public class AgentRegistry : IAgentRegistry
 {
-    private readonly Dictionary<string, IAgent> _agents = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, IAgent> _agents = new(StringComparer.OrdinalIgnoreCase);
 
     public AgentRegistry(IEnumerable<IAgent> agents)
     {

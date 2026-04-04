@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using OpenClaw.Contracts.HierarchicalAgents;
 using OpenClaw.Domain.Users.Repositories;
@@ -7,8 +8,13 @@ namespace OpenClaw.Application.HierarchicalAgents;
 /// <summary>
 /// Resolves user preferences and injects them into agent system prompts.
 /// </summary>
-public static class PreferenceInjector
+public static partial class PreferenceInjector
 {
+    private const int MaxPreferenceValueLength = 500;
+
+    [GeneratedRegex(@"<[^>]+>")]
+    private static partial Regex HtmlTagPattern();
+
     /// <summary>
     /// Appends user preferences to a system prompt if a UserId is available.
     /// Returns the original prompt if no user context or no preferences found.
@@ -30,7 +36,7 @@ public static class PreferenceInjector
             return systemPrompt;
 
         var prefLines = preferences
-            .Select(p => $"- {p.Key}: {p.Value}")
+            .Select(p => $"- {SanitizeValue(p.Key)}: {SanitizeValue(p.Value ?? string.Empty)}")
             .ToList();
 
         var prefSection = $"""
@@ -42,5 +48,23 @@ public static class PreferenceInjector
             """;
 
         return systemPrompt + prefSection;
+    }
+
+    /// <summary>
+    /// Strips XML/HTML-like tags and truncates excessively long values.
+    /// </summary>
+    internal static string SanitizeValue(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value;
+
+        // Strip XML/HTML-like tags
+        var sanitized = HtmlTagPattern().Replace(value, string.Empty);
+
+        // Truncate if excessively long
+        if (sanitized.Length > MaxPreferenceValueLength)
+            sanitized = sanitized[..MaxPreferenceValueLength] + "...";
+
+        return sanitized;
     }
 }

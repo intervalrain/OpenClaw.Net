@@ -54,8 +54,21 @@ public class DagExecutor(
 
             var readyNodes = graph.Nodes.Where(n => n.Status == TaskNodeStatus.Ready).ToList();
 
-            // Execute all ready nodes in parallel
-            var tasks = readyNodes.Select(node => ExecuteNodeAsync(node, graph, nodeMap, options, userId, timeline, ct));
+            // Execute ready nodes in parallel with a concurrency cap
+            var maxParallelism = Math.Max(1, options.MaxParallelism);
+            using var semaphore = new SemaphoreSlim(maxParallelism, maxParallelism);
+            var tasks = readyNodes.Select(async node =>
+            {
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    await ExecuteNodeAsync(node, graph, nodeMap, options, userId, timeline, ct);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
             await Task.WhenAll(tasks);
 
             // After execution, check downstream nodes for readiness
