@@ -132,6 +132,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDagExecutor, DagExecutor>();
         services.AddScoped<DagExecutionEngine>();
 
+        // Pioneer agent creation (allows LLM to create agents in workspaces)
+        services.AddScoped<IPioneerCreateService, PioneerCreateService>();
+        services.AddSingleton<IAgentTool, PioneerCreateTool>();
+
+        // Script execution (allows agents to run Python/Shell/Node.js scripts)
+        services.AddSingleton<IScriptExecutor, ScriptExecutor>();
+        services.AddSingleton<IAgentTool, RunScriptTool>();
+
         // Channels
         services.AddTelegramChannel(configuration);
 

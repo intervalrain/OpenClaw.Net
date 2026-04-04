@@ -66,6 +66,14 @@ public class FileDefinedAgent : AgentBase
                 tools.Add(tool);
         }
 
+        // If the agent has a scripts/ directory, make run_script available
+        if (_definition.Scripts is { Count: > 0 })
+        {
+            var runScriptTool = toolRegistry.GetSkill("run_script");
+            if (runScriptTool is not null && tools.All(t => t.Name != "run_script"))
+                tools.Add(runScriptTool);
+        }
+
         var toolDefinitions = tools
             .Select(t => new ToolDefinition(t.Name, t.Description, t.Parameters))
             .ToList();

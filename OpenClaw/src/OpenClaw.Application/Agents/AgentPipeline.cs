@@ -224,6 +224,9 @@ public class AgentPipeline(
         parts.Add("If the user's request involves multiple coordinated steps or a complex multi-step task, " +
                    "use the `pioneer_plan` tool to decompose and execute it as a DAG workflow.");
 
+        parts.Add("When a user asks you to set up a recurring or complex workflow, use the create_agent tool to create " +
+                   "a reusable agent with AGENT.md and scripts. The agent will be stored in the workspace for future use.");
+
         if (!string.IsNullOrEmpty(language) && language != "auto")
         {
             var langInstruction = language switch
