@@ -8,9 +8,11 @@ using OpenClaw.Application.AgentActivities;
 using OpenClaw.Application.Agents;
 using OpenClaw.Application.Agents.Middlewares;
 using OpenClaw.Application.CronJobs;
+using OpenClaw.Application.HierarchicalAgents;
 using OpenClaw.Application.Llm;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
+using OpenClaw.Contracts.HierarchicalAgents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
@@ -116,6 +118,28 @@ public static class ServiceCollectionExtensions
             return pipeline;
         });
 
+        // Workspace-scoped agent definition files (AGENT.md)
+        services.AddSingleton<IAgentStore>(sp =>
+        {
+            var agentStoreLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FileAgentStore>>();
+            return new FileAgentStore(agentStoreLogger);
+        });
+
+        // Hierarchical Agent Architecture
+        services.AddSingleton<IAgent, PioneerAgent>();
+        services.AddAgentRegistry();
+        services.AddScoped<IExecutionEngine, SimpleExecutionEngine>();
+        services.AddScoped<IDagExecutor, DagExecutor>();
+        services.AddScoped<DagExecutionEngine>();
+
+        // Pioneer agent creation (allows LLM to create agents in workspaces)
+        services.AddScoped<IPioneerCreateService, PioneerCreateService>();
+        services.AddSingleton<IAgentTool, PioneerCreateTool>();
+
+        // Script execution (allows agents to run Python/Shell/Node.js scripts)
+        services.AddSingleton<IScriptExecutor, ScriptExecutor>();
+        services.AddSingleton<IAgentTool, RunScriptTool>();
+
         // Channels
         services.AddTelegramChannel(configuration);
 
@@ -204,6 +228,22 @@ public static class ServiceCollectionExtensions
             var store = new FileSkillStore(skillsDir, logger);
             store.ReloadAsync().GetAwaiter().GetResult();
             return store;
+        });
+
+        return services;
+    }
+
+    private static IServiceCollection AddAgentRegistry(this IServiceCollection services)
+    {
+        services.AddSingleton<IAgentRegistry>(sp =>
+        {
+            // Register only built-in agents (e.g. PioneerAgent).
+            // Workspace-scoped agents (from AGENT.md files) are loaded on-demand
+            // via IAgentStore when GetAgent/GetAll is called with a workspaceId.
+            var builtInAgents = sp.GetServices<IAgent>().ToList();
+            var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+
+            return new AgentRegistry(builtInAgents, scopeFactory);
         });
 
         return services;
