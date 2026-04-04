@@ -11,6 +11,13 @@ public interface IDagExecutor
         AgentExecutionOptions options,
         Guid? userId = null,
         CancellationToken ct = default);
+
+    Task<DagExecutionResult> ExecuteAsync(
+        TaskGraph graph,
+        AgentExecutionOptions options,
+        Guid? userId,
+        AgentExecutionTimeline? timeline,
+        CancellationToken ct = default);
 }
 
 public record DagExecutionResult

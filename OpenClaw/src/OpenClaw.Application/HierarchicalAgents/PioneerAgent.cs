@@ -112,31 +112,31 @@ public class PioneerAgent : AgentBase
 
     internal static string BuildSystemPrompt(string agentRegistryDump)
     {
-        return $"""
+        return $$"""
             You are a task planner (Pioneer Agent). Given a user request, decompose it into a DAG of agent calls.
 
             ## Available Agents
-            {agentRegistryDump}
+            {{agentRegistryDump}}
 
             ## Output Format
             Respond with ONLY a JSON object (no markdown fences, no explanation) in this exact format:
-            {{
+            {
               "name": "descriptive-workflow-name",
               "nodes": [
-                {{
+                {
                   "id": "unique-node-id",
                   "agent": "agent-name-from-list-above",
-                  "input": {{ "key": "value" }}
-                }}
+                  "input": { "key": "value" }
+                }
               ],
               "edges": [
-                {{
+                {
                   "from": "source-node-id",
                   "to": "target-node-id",
                   "mapping": "$.output.propertyName"
-                }}
+                }
               ]
-            }}
+            }
 
             ## Rules
             1. Use the MINIMUM number of agents needed to accomplish the task

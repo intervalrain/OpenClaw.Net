@@ -121,7 +121,7 @@ public class ToolAgentTests
         var result = await agent.ExecuteAsync(grandchildContext);
 
         result.Status.ShouldBe(AgentResultStatus.Failed);
-        result.ErrorMessage.ShouldContain("Max agent depth");
+        result.ErrorMessage!.ShouldContain("Max agent depth");
     }
 
     private static IAgentTool CreateMockTool(string name, string description = "A test tool")

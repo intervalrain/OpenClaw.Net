@@ -126,7 +126,7 @@ public class DagExecutorTests
 
         result.IsSuccess.ShouldBeFalse();
         graph.Nodes[0].Status.ShouldBe(TaskNodeStatus.Failed);
-        graph.Nodes[0].ErrorMessage.ShouldContain("not found");
+        graph.Nodes[0].ErrorMessage!.ShouldContain("not found");
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class DagExecutorTests
         var result = await _executor.ExecuteAsync(graph, new AgentExecutionOptions());
 
         result.IsSuccess.ShouldBeFalse();
-        result.ErrorMessage.ShouldContain("at least one node");
+        result.ErrorMessage!.ShouldContain("at least one node");
     }
 
     [Fact]

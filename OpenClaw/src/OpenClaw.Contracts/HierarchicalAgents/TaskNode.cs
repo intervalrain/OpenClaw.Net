@@ -9,7 +9,7 @@ public class TaskNode
 {
     public required string Id { get; init; }
     public required string AgentName { get; init; }
-    public JsonDocument? Input { get; init; }
+    public JsonDocument? Input { get; set; }
 
     public TaskNodeStatus Status { get; set; } = TaskNodeStatus.Pending;
     public JsonDocument? Output { get; set; }

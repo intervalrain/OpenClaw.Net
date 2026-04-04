@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OpenClaw.Contracts.HierarchicalAgents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Domain.Chat.Enums;
 
 namespace OpenClaw.Application.HierarchicalAgents;
 

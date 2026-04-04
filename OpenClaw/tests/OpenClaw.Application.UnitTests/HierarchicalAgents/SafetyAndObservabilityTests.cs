@@ -26,7 +26,7 @@ public class SafetyAndObservabilityTests
         var result = await agent.ExecuteAsync(context);
 
         result.Status.ShouldBe(AgentResultStatus.Failed);
-        result.ErrorMessage.ShouldContain("budget exhausted");
+        result.ErrorMessage!.ShouldContain("budget exhausted");
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class SafetyAndObservabilityTests
         var result = await slowAgent.ExecuteAsync(context);
 
         result.Status.ShouldBe(AgentResultStatus.Failed);
-        result.ErrorMessage.ShouldContain("timed out");
+        result.ErrorMessage!.ShouldContain("timed out");
     }
 
     // --- Test Helpers ---
