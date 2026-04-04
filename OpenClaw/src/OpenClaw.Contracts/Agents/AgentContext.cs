@@ -11,6 +11,7 @@ public class AgentContext
     public required IReadOnlyList<IAgentTool> Skills { get; init; }
     public required AgentPipelineOptions Options { get; init; }
     public Guid? UserId { get; init; }
+    public Guid? WorkspaceId { get; init; }
     public List<ChatMessage> Messages { get; } = [];
     public Dictionary<string, object> Items { get; } = [];
 }

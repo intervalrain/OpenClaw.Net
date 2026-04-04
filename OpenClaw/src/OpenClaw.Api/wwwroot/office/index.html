@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Village - OpenClaw.NET</title>
+    <link rel="icon" href="/favicon.png" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/home.css">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <link rel="stylesheet" href="office.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+    <div class="village-container">
+        <div class="village-toolbar">
+            <div class="toolbar-left">
+                <h2>Agent Village</h2>
+                <span class="agent-count" id="agentCount">0 agents</span>
+                <span class="live-indicator"><span class="live-dot"></span> Live</span>
+            </div>
+            <div class="toolbar-right">
+                <span style="font-size:11px;color:var(--text-muted);">Arrow keys to move camera</span>
+            </div>
+        </div>
+        <div id="game-container"></div>
+
+        <!-- Detail Panel -->
+        <div class="detail-panel hidden" id="detailPanel">
+            <div class="detail-header">
+                <div class="detail-avatar" id="detailAvatar"></div>
+                <div class="detail-info">
+                    <h3 id="detailName">Agent</h3>
+                    <span class="detail-status" id="detailStatus">Idle</span>
+                </div>
+                <button class="btn-icon detail-close" id="detailClose">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="detail-body">
+                <div class="detail-section">
+                    <h4>Current Activity</h4>
+                    <p id="detailActivity">No activity</p>
+                </div>
+                <div class="detail-section">
+                    <h4>Recent History</h4>
+                    <div id="detailHistory" class="detail-history"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="office.js"></script>
+</body>
+</html>

@@ -24,6 +24,7 @@ public class CreateCronJobCommandHandler(
 
         var job = CronJob.Create(
             request.UserId,
+            Guid.Empty,
             request.Name,
             request.ScheduleJson ?? string.Empty,
             request.Content,

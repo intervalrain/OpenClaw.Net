@@ -13,7 +13,23 @@ function getAuthHeaders() {
     if (token) {
         headers['Authorization'] = 'Bearer ' + token;
     }
+    const wsId = localStorage.getItem('activeWorkspaceId');
+    if (wsId) {
+        headers['X-Workspace-Id'] = wsId;
+    }
     return headers;
+}
+
+function getActiveWorkspaceId() {
+    return localStorage.getItem('activeWorkspaceId');
+}
+
+function setActiveWorkspaceId(id) {
+    if (id) {
+        localStorage.setItem('activeWorkspaceId', id);
+    } else {
+        localStorage.removeItem('activeWorkspaceId');
+    }
 }
 
 // Get current user

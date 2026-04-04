@@ -6,6 +6,7 @@ using OpenClaw.Contracts.Chat.Requests;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Repositories;
 
+using OpenClaw.Contracts.Workspaces;
 using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
@@ -16,6 +17,7 @@ namespace OpenClaw.Api.Chat.Controllers;
 public class ConversationController(
     IConversationRepository repository,
     ICurrentUserProvider currentUserProvider,
+    ICurrentWorkspaceProvider currentWorkspaceProvider,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -47,7 +49,7 @@ public class ConversationController(
     public async Task<IActionResult> Create([FromBody] CreateConversationRequest? request, CancellationToken ct)
     {
         var userId = GetUserId();
-        var conversation = Conversation.Create(userId, request?.Title);
+        var conversation = Conversation.Create(userId, currentWorkspaceProvider.WorkspaceId, request?.Title);
         await repository.AddAsync(conversation);
         await uow.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(GetById), new { id = conversation.Id }, new { conversation.Id, conversation.Title });

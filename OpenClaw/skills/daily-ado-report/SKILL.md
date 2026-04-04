@@ -1,7 +1,7 @@
 ---
 name: daily-ado-report
 description: Generate a daily work item summary report from Azure DevOps. Use when user asks for daily report, sprint status, or work item summary.
-tools: [azure_devops]
+tools: [azure_devops, write_file]
 ---
 
 ## Instructions

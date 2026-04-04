@@ -12,6 +12,7 @@ function createTopHeader(activePage = '') {
         if (path.includes('/openclaw')) activePage = 'chat';
         else if (path.includes('/workspace')) activePage = 'workspace';
         else if (path.includes('/cronjobs')) activePage = 'cronjobs';
+        else if (path.includes('/office')) activePage = 'office';
         else if (path.includes('/wiki')) activePage = 'wiki';
         else if (path.includes('/wedally')) activePage = 'wedally';
     }
@@ -37,6 +38,14 @@ function createTopHeader(activePage = '') {
                         <polyline points="12 6 12 12 16 14"/>
                     </svg>
                     <span>Cron Jobs</span>
+                </a>
+                <a href="/office/index.html" class="nav-link ${activePage === 'office' ? 'active' : ''}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="7" width="20" height="14" rx="2"/>
+                        <path d="M16 7V5a4 4 0 0 0-8 0v2"/>
+                        <circle cx="12" cy="14" r="2"/>
+                    </svg>
+                    <span>Office</span>
                 </a>
                 <a href="/wiki/index.html" class="nav-link ${activePage === 'wiki' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -74,24 +83,6 @@ function createTopHeader(activePage = '') {
                     <span>API</span>
                 </a>
                 <div class="nav-spacer"></div>
-                <div class="nav-notification" id="navNotification" style="display: none;">
-                    <button class="notification-bell" id="notificationBell" title="Notifications">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                        <span class="notification-badge" id="notificationBadge"></span>
-                    </button>
-                    <div class="notification-dropdown" id="notificationDropdown">
-                        <div class="notification-dropdown-header">
-                            <span>Notifications</span>
-                            <button class="notification-mark-all" id="markAllReadBtn">Mark all read</button>
-                        </div>
-                        <div class="notification-list" id="notificationList">
-                            <div class="notification-empty">No notifications</div>
-                        </div>
-                    </div>
-                </div>
                 <button class="theme-toggle" id="themeToggle" title="Toggle theme">
                     <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"/>
@@ -251,180 +242,6 @@ function initTopHeader(activePage = '') {
 
     // Initialize theme toggle
     initTheme();
-
-    // Initialize notifications
-    initNotifications();
-}
-
-// ── Notification System ──
-
-const NOTIFICATION_API = '/api/v1/notification';
-let notificationPollTimer = null;
-let lastNotificationCount = -1; // -1 = first poll (skip toast)
-
-function initNotifications() {
-    if (typeof isAuthenticated !== 'function' || !isAuthenticated()) return;
-
-    const bellEl = document.getElementById('navNotification');
-    if (bellEl) bellEl.style.display = '';
-
-    document.getElementById('notificationBell')?.addEventListener('click', toggleNotificationDropdown);
-    document.getElementById('markAllReadBtn')?.addEventListener('click', markAllRead);
-
-    // Close dropdown on outside click
-    document.addEventListener('click', (e) => {
-        const dropdown = document.getElementById('notificationDropdown');
-        const bell = document.getElementById('navNotification');
-        if (dropdown?.classList.contains('open') && bell && !bell.contains(e.target)) {
-            dropdown.classList.remove('open');
-        }
-    });
-
-    // Initial load + poll
-    pollNotifications();
-    notificationPollTimer = setInterval(pollNotifications, 30000);
-}
-
-async function pollNotifications() {
-    if (typeof authFetch !== 'function') return;
-
-    try {
-        const res = await authFetch(`${NOTIFICATION_API}/unread-count`);
-        if (!res.ok) return;
-        const { count } = await res.json();
-
-        const badge = document.getElementById('notificationBadge');
-        if (badge) {
-            badge.textContent = count > 0 ? (count > 99 ? '99+' : count) : '';
-            badge.style.display = count > 0 ? 'flex' : 'none';
-        }
-
-        // Show toast for new notifications
-        // Show toast when new notifications arrive (skip first poll)
-        if (lastNotificationCount >= 0 && count > lastNotificationCount) {
-            const diff = count - lastNotificationCount;
-            showToast(`${diff} new notification${diff > 1 ? 's' : ''}`, 'info');
-        }
-        lastNotificationCount = count;
-    } catch { /* ignore */ }
-}
-
-function toggleNotificationDropdown() {
-    const dropdown = document.getElementById('notificationDropdown');
-    if (!dropdown) return;
-
-    const isOpen = dropdown.classList.toggle('open');
-    if (isOpen) loadNotifications();
-}
-
-async function loadNotifications() {
-    if (typeof authFetch !== 'function') return;
-
-    const list = document.getElementById('notificationList');
-    if (!list) return;
-
-    try {
-        const res = await authFetch(NOTIFICATION_API);
-        if (!res.ok) return;
-        const notifications = await res.json();
-
-        if (notifications.length === 0) {
-            list.innerHTML = '<div class="notification-empty">No notifications</div>';
-            return;
-        }
-
-        list.innerHTML = notifications.map(n => `
-            <div class="notification-item ${n.isRead ? '' : 'unread'}" data-id="${n.id}" ${n.link ? `data-link="${escapeHtml(n.link)}"` : ''}>
-                <div class="notification-item-title">${escapeHtml(n.title)}</div>
-                <div class="notification-item-msg">${escapeHtml(n.message)}</div>
-                <div class="notification-item-time">${timeAgo(n.createdAt)}</div>
-            </div>
-        `).join('');
-
-        // Click to mark as read + navigate
-        list.querySelectorAll('.notification-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = item.dataset.id;
-                const link = item.dataset.link;
-                if (!item.classList.contains('unread') && !link) return;
-
-                markAsRead(id, item);
-                if (link) {
-                    document.getElementById('notificationDropdown')?.classList.remove('open');
-                    window.location.href = link;
-                }
-            });
-        });
-    } catch { /* ignore */ }
-}
-
-async function markAsRead(id, el) {
-    if (typeof authFetch !== 'function') return;
-
-    try {
-        await authFetch(`${NOTIFICATION_API}/${id}/read`, { method: 'PUT' });
-        el?.classList.remove('unread');
-        pollNotifications();
-    } catch { /* ignore */ }
-}
-
-async function markAllRead() {
-    if (typeof authFetch !== 'function') return;
-
-    try {
-        await authFetch(`${NOTIFICATION_API}/read-all`, { method: 'PUT' });
-        document.querySelectorAll('.notification-item.unread').forEach(el => el.classList.remove('unread'));
-        pollNotifications();
-    } catch { /* ignore */ }
-}
-
-// ── Toast Notifications ──
-
-function ensureToastContainer() {
-    let container = document.getElementById('toastContainer');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'toast-container';
-        document.body.appendChild(container);
-    }
-    return container;
-}
-
-function showToast(message, type = 'info', duration = 4000) {
-    const container = ensureToastContainer();
-
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    container.appendChild(toast);
-
-    // Trigger animation
-    requestAnimationFrame(() => toast.classList.add('show'));
-
-    setTimeout(() => {
-        toast.classList.remove('show');
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, duration);
-}
-
-// ── Helpers ──
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-function timeAgo(dateStr) {
-    const now = Date.now();
-    const date = new Date(dateStr).getTime();
-    const diff = Math.floor((now - date) / 1000);
-
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
 }
 
 // Auto-initialize when DOM is ready

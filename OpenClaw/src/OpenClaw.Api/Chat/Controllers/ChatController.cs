@@ -4,16 +4,19 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
+using OpenClaw.Application.AgentActivities;
 using OpenClaw.Application.Skills;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Chat.Requests;
 using OpenClaw.Contracts.Chat.Responses;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Domain.AgentActivities;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
 
+using OpenClaw.Contracts.Workspaces;
 using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
@@ -29,6 +32,8 @@ public class ChatController(
     ISlashCommandParser slashCommandParser,
     IToolRegistry skillRegistry,
     IToolSettingsService skillSettingsService,
+    IAgentActivityTracker activityTracker,
+    ICurrentWorkspaceProvider currentWorkspaceProvider,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -47,7 +52,7 @@ public class ChatController(
         var images = ConvertToImageContent(request.Images);
 
         var userId = GetUserId();
-        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, ct);
+        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, currentWorkspaceProvider.WorkspaceId, ct);
 
         // Save messages to DB
         if (conversation != null)
@@ -103,12 +108,13 @@ public class ChatController(
                 }
 
                 // Execute skill first
-                var currentUser = currentUserProvider.GetCurrentUser();
+                var skillUser = currentUserProvider.GetCurrentUser();
                 var jsonArgs = slashCommandParser.ConvertToJson(command, skill);
                 var skillContext = new ToolContext(jsonArgs)
                 {
-                    UserId = currentUser.Id,
-                    IsSuperAdmin = currentUser.Roles.Contains("SuperAdmin")
+                    UserId = skillUser.Id,
+                    WorkspaceId = currentWorkspaceProvider.WorkspaceId,
+                    IsSuperAdmin = skillUser.Roles.Contains("SuperAdmin")
                 };
                 var skillResult = await skill.ExecuteAsync(skillContext, ct);
 
@@ -132,7 +138,14 @@ public class ChatController(
 
             // Stream LLM response with history (including any injected skill results)
             var streamUserId = GetUserId();
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, ct);
+            var currentUser = currentUserProvider.GetCurrentUser();
+            var sourceId = request.ConversationId?.ToString();
+            var sourceName = conversation?.Title;
+
+            await activityTracker.TrackAsync(streamUserId, currentUser.Name,
+                ActivityType.Chat, ActivityStatus.Started, sourceId, sourceName, ct: ct);
+
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, ct);
 
             await foreach (var evt in eventStream)
             {
@@ -140,12 +153,32 @@ public class ChatController(
                 await Response.WriteAsync($"data: {data}\n\n", ct);
                 await Response.Body.FlushAsync(ct);
 
+                // Track activity based on stream events
+                switch (evt.Type)
+                {
+                    case AgentStreamEventType.Thinking:
+                        await activityTracker.TrackAsync(streamUserId, currentUser.Name,
+                            ActivityType.Chat, ActivityStatus.Thinking, sourceId, sourceName, ct: ct);
+                        break;
+                    case AgentStreamEventType.ToolExecuting:
+                        await activityTracker.TrackAsync(streamUserId, currentUser.Name,
+                            ActivityType.ToolExecution, ActivityStatus.ToolExecuting, sourceId, sourceName, evt.ToolName, ct);
+                        break;
+                    case AgentStreamEventType.ToolCompleted:
+                        await activityTracker.TrackAsync(streamUserId, currentUser.Name,
+                            ActivityType.ToolExecution, ActivityStatus.Completed, sourceId, sourceName, evt.ToolName, ct);
+                        break;
+                }
+
                 // Accumulate assistant response
                 if (evt.Type == AgentStreamEventType.ContentDelta && evt.Content != null)
                 {
                     assistantResponse += evt.Content;
                 }
             }
+
+            await activityTracker.TrackAsync(streamUserId, currentUser.Name,
+                ActivityType.Chat, ActivityStatus.Completed, sourceId, sourceName, ct: ct);
 
             // Save messages directly to DB (EF Core tracks changes automatically)
             if (conversation != null)
@@ -165,7 +198,17 @@ public class ChatController(
         }
         catch (OperationCanceledException)
         {
-            // Client disconnected, ignore
+            // Client disconnected — track as completed (not failed)
+            var cancelUser = currentUserProvider.GetCurrentUser();
+            await activityTracker.TrackAsync(GetUserId(), cancelUser.Name,
+                ActivityType.Chat, ActivityStatus.Completed, request.ConversationId?.ToString(), detail: "Client disconnected");
+        }
+        catch (Exception ex)
+        {
+            var errorUser = currentUserProvider.GetCurrentUser();
+            await activityTracker.TrackAsync(GetUserId(), errorUser.Name,
+                ActivityType.Chat, ActivityStatus.Failed, request.ConversationId?.ToString(), detail: ex.Message);
+            throw;
         }
     }
 

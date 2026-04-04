@@ -1,0 +1,87 @@
+/* ===== Agent Village — Phaser 3 ===== */
+
+.village-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 48px);
+    position: relative;
+    overflow: hidden;
+    background: #1a1a2e;
+}
+
+.village-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-color);
+    flex-shrink: 0;
+    z-index: 10;
+}
+.toolbar-left { display: flex; align-items: center; gap: 12px; }
+.toolbar-left h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-color); }
+.toolbar-right { display: flex; align-items: center; gap: 8px; }
+.agent-count { font-size: 13px; color: var(--text-muted); background: var(--bg-tertiary); padding: 2px 10px; border-radius: 12px; }
+.live-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: livePulse 2s ease-in-out infinite; }
+@keyframes livePulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+#game-container {
+    flex: 1;
+    overflow: hidden;
+}
+#game-container canvas {
+    display: block;
+}
+
+/* ===== Detail Panel ===== */
+.detail-panel {
+    position: absolute;
+    right: 0; top: 42px; bottom: 0;
+    width: 300px;
+    background: var(--bg-color);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.3);
+    animation: slideIn 0.2s ease-out;
+}
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+.detail-header { display: flex; align-items: center; gap: 12px; padding: 14px; border-bottom: 1px solid var(--border-color); }
+.detail-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--bg-tertiary);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; color: var(--text-color); flex-shrink: 0;
+}
+.detail-info { flex: 1; min-width: 0; }
+.detail-info h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text-color); }
+.detail-status {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    display: inline-block; margin-top: 3px;
+    background: var(--bg-tertiary); color: var(--text-muted);
+}
+.detail-close { flex-shrink: 0; }
+.detail-body { flex: 1; overflow-y: auto; padding: 14px; }
+.detail-section { margin-bottom: 16px; }
+.detail-section h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.detail-section p { margin: 0; font-size: 12px; color: var(--text-color); line-height: 1.5; }
+.detail-history { display: flex; flex-direction: column; gap: 4px; }
+.history-item {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 5px 7px; border-radius: 5px;
+    background: var(--bg-tertiary); font-size: 11px;
+}
+.history-item .time { color: var(--text-muted); font-family: monospace; flex-shrink: 0; }
+.history-item .desc { color: var(--text-color); }
+
+.hidden { display: none !important; }
+.btn-icon {
+    display: flex; align-items: center; justify-content: center;
+    padding: 6px; border: none; border-radius: 6px;
+    background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.btn-icon:hover { background: var(--bg-tertiary); color: var(--text-color); }
