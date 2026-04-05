@@ -54,6 +54,8 @@ public class OllamaLlmProvider : ILlmProvider
             }
         }
 
+        // OllamaSharp ChatDoneResponseStream has usage but ChatResponseStream does not;
+        // non-streaming aggregation doesn't expose it, so usage is null here.
         return ToChatResponse(sb.ToString(), toolCalls);
     }
 
@@ -98,6 +100,8 @@ public class OllamaLlmProvider : ILlmProvider
                     }
                 }
 
+                // ChatResponseStream doesn't expose token counts; ChatDoneResponseStream does
+                // but the streaming API only yields ChatResponseStream.
                 yield return new ChatResponseChunk(IsComplete: true);
             }
         }
@@ -144,7 +148,7 @@ public class OllamaLlmProvider : ILlmProvider
         };
     }
 
-    private static LlmChatResponse ToChatResponse(string content, List<Message.ToolCall>? toolCalls)
+    private static LlmChatResponse ToChatResponse(string content, List<Message.ToolCall>? toolCalls, LlmUsage? usage = null)
     {
         var mappedToolCalls = toolCalls?
             .Select(tc => new ToolCall(
@@ -155,6 +159,7 @@ public class OllamaLlmProvider : ILlmProvider
 
         return new LlmChatResponse(
             string.IsNullOrEmpty(content) ? null : content,
-            mappedToolCalls);
+            mappedToolCalls,
+            usage);
     }
 }

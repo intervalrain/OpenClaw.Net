@@ -109,12 +109,15 @@ public class AgentPipeline(
             ? await llmProviderFactory.GetProviderAsync(userId.Value, ct: ct)
             : await llmProviderFactory.GetProviderAsync(ct);
 
+        var totalUsage = LlmUsage.Empty;
+
         for (int i = 0; i < options.MaxIterations; i++)
         {
             yield return new AgentStreamEvent(AgentStreamEventType.Thinking);
 
             var contentBuilder = new System.Text.StringBuilder();
             var toolCalls = new List<ToolCall>();
+            LlmUsage? iterationUsage = null;
 
             await foreach (var chunk in llmProvider.ChatStreamAsync(messages, toolDefinitions, ct))
             {
@@ -128,6 +131,12 @@ public class AgentPipeline(
                 {
                     toolCalls.Add(chunk.ToolCall);
                 }
+
+                if (chunk.Usage is not null)
+                {
+                    iterationUsage = chunk.Usage;
+                    totalUsage += chunk.Usage;
+                }
             }
 
             var content = contentBuilder.ToString();
@@ -136,6 +145,7 @@ public class AgentPipeline(
             {
                 messages.Add(new ChatMessage(ChatRole.Assistant, content));
                 yield return new AgentStreamEvent(AgentStreamEventType.Completed, content);
+                yield return new AgentStreamEvent(AgentStreamEventType.UsageReport, Usage: totalUsage);
                 yield break;
             }
 
@@ -153,6 +163,7 @@ public class AgentPipeline(
         }
 
         yield return new AgentStreamEvent(AgentStreamEventType.Error, "Max iteration reached");
+        yield return new AgentStreamEvent(AgentStreamEventType.UsageReport, Usage: totalUsage);
     }
 
     /// <summary>

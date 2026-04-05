@@ -17,6 +17,14 @@ let pendingImages = []; // Array of { base64Data, mimeType, previewUrl }
 // AbortController for stopping inference
 let currentAbortController = null;
 
+// Token usage tracking (session-scoped)
+const tokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    callCount: 0,
+    history: [] // { message, inputTokens, outputTokens, timestamp }
+};
+
 // Configure marked.js
 marked.setOptions({
     highlight: function(code, lang) {
@@ -669,6 +677,21 @@ async function sendMessage() {
                             }
                             // Create approval UI inline in chat
                             handleApprovalRequired(event.executionId, event.approvalRequest);
+                            break;
+
+                        case 'UsageReport':
+                            if (event.usage) {
+                                const u = event.usage;
+                                tokenUsage.inputTokens += (u.inputTokens || 0);
+                                tokenUsage.outputTokens += (u.outputTokens || 0);
+                                tokenUsage.callCount++;
+                                tokenUsage.history.push({
+                                    message: accumulatedContent?.substring(0, 60) || '(tool call)',
+                                    inputTokens: u.inputTokens || 0,
+                                    outputTokens: u.outputTokens || 0,
+                                    timestamp: new Date()
+                                });
+                            }
                             break;
                     }
                 } catch (parseError) {
@@ -2510,3 +2533,60 @@ document.querySelectorAll('[data-settings-tab]')?.forEach(tab => {
         }
     });
 });
+
+// ── Token Usage Modal ──
+
+function formatTokenCount(n) {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return n.toLocaleString();
+}
+
+function openTokenUsageModal() {
+    const modal = document.getElementById('token-usage-modal');
+    if (!modal) return;
+
+    // Update stats
+    document.getElementById('usage-input-tokens').textContent = formatTokenCount(tokenUsage.inputTokens);
+    document.getElementById('usage-output-tokens').textContent = formatTokenCount(tokenUsage.outputTokens);
+    document.getElementById('usage-total-tokens').textContent = formatTokenCount(tokenUsage.inputTokens + tokenUsage.outputTokens);
+    document.getElementById('usage-call-count').textContent = tokenUsage.callCount;
+
+    // Rough cost estimate (GPT-4o pricing: $2.50/1M input, $10/1M output)
+    const cost = (tokenUsage.inputTokens * 2.5 + tokenUsage.outputTokens * 10) / 1_000_000;
+    document.getElementById('usage-estimated-cost').textContent = cost < 0.01 && cost > 0 ? '< $0.01' : `$${cost.toFixed(2)}`;
+
+    // Render history
+    const historyList = document.getElementById('usage-history-list');
+    if (tokenUsage.history.length === 0) {
+        historyList.innerHTML = '<div class="usage-empty">No usage data yet. Send a message to start tracking.</div>';
+    } else {
+        historyList.innerHTML = tokenUsage.history.map((h, i) => `
+            <div class="usage-history-item">
+                <span class="usage-history-msg" title="${h.message}">#${i + 1} ${h.message || '...'}</span>
+                <span class="usage-history-tokens">${formatTokenCount(h.inputTokens)} in / ${formatTokenCount(h.outputTokens)} out</span>
+            </div>
+        `).reverse().join('');
+    }
+
+    modal.classList.add('active');
+}
+
+function closeTokenUsageModal() {
+    const modal = document.getElementById('token-usage-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function resetTokenUsage() {
+    tokenUsage.inputTokens = 0;
+    tokenUsage.outputTokens = 0;
+    tokenUsage.callCount = 0;
+    tokenUsage.history = [];
+    openTokenUsageModal(); // refresh UI
+}
+
+// Wire up modal buttons
+document.getElementById('token-usage-close')?.addEventListener('click', closeTokenUsageModal);
+document.getElementById('token-usage-done')?.addEventListener('click', closeTokenUsageModal);
+document.getElementById('token-usage-reset')?.addEventListener('click', resetTokenUsage);
+document.getElementById('token-usage-modal')?.querySelector('.modal-overlay')?.addEventListener('click', closeTokenUsageModal);

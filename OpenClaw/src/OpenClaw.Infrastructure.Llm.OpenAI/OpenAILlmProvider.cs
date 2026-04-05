@@ -131,7 +131,13 @@ public class OpenAILlmProvider : ILlmProvider
                     }
                 }
 
-                yield return new ChatResponseChunk(IsComplete: true);
+                var usage = update.Usage is not null
+                    ? new LlmUsage(
+                        InputTokens: update.Usage.InputTokenCount,
+                        OutputTokens: update.Usage.OutputTokenCount)
+                    : null;
+
+                yield return new ChatResponseChunk(IsComplete: true, Usage: usage);
             }
         }
     }
@@ -189,8 +195,15 @@ public class OpenAILlmProvider : ILlmProvider
             .Select(tc => new ToolCall(tc.Id, tc.FunctionName, tc.FunctionArguments.ToString()))
             .ToList();
 
+        var usage = completion.Usage is not null
+            ? new LlmUsage(
+                InputTokens: completion.Usage.InputTokenCount,
+                OutputTokens: completion.Usage.OutputTokenCount)
+            : null;
+
         return new LlmChatResponse(
             completion.Content?.FirstOrDefault()?.Text,
-            toolCalls);
+            toolCalls,
+            usage);
     }
 }
