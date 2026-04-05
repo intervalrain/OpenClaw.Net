@@ -34,6 +34,7 @@ public class ChatController(
     IToolSettingsService skillSettingsService,
     IAgentActivityTracker activityTracker,
     ICurrentWorkspaceProvider currentWorkspaceProvider,
+    IContextCompressor contextCompressor,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -235,77 +236,11 @@ public class ChatController(
         var history = conversation.Messages.Select(m => m.ToLlmMessage()).ToList();
         var isFirstMessage = conversation.Messages.Count == 0;
 
-        // Compact history if too long
-        history = await CompactHistoryIfNeededAsync(history, ct);
+        // Compact history using refreshing agent compressor
+        var llmProvider = await llmProviderFactory.GetProviderAsync(GetUserId(), ct: ct);
+        history = await contextCompressor.CompressIfNeededAsync(history, llmProvider, ct: ct);
 
         return (conversation, history, isFirstMessage);
-    }
-
-    private const int MaxTokenEstimate = 4000; // ~4k tokens for context
-    private const int RecentMessagesToKeep = 6; // Keep last 3 exchanges (6 messages)
-
-    private async Task<List<ChatMessage>> CompactHistoryIfNeededAsync(
-        List<ChatMessage> history,
-        CancellationToken ct)
-    {
-        if (history.Count <= RecentMessagesToKeep)
-            return history;
-
-        // Estimate tokens (rough: 1 token ≈ 4 chars for English, 1.5 chars for Chinese)
-        var totalChars = history.Sum(m => m.Content?.Length ?? 0);
-        var estimatedTokens = totalChars / 2; // Conservative estimate
-
-        if (estimatedTokens <= MaxTokenEstimate)
-            return history;
-
-        // Split into old messages (to summarize) and recent messages (to keep)
-        var oldMessages = history.Take(history.Count - RecentMessagesToKeep).ToList();
-        var recentMessages = history.Skip(history.Count - RecentMessagesToKeep).ToList();
-
-        // Summarize old messages
-        var summary = await SummarizeConversationAsync(oldMessages, ct);
-
-        // Return summary + recent messages
-        var compacted = new List<ChatMessage>
-        {
-            new(ChatRole.System, $"[Previous conversation summary]\n{summary}")
-        };
-        compacted.AddRange(recentMessages);
-
-        return compacted;
-    }
-
-    private async Task<string> SummarizeConversationAsync(
-        List<ChatMessage> messages,
-        CancellationToken ct)
-    {
-        const string systemPrompt = """
-            Summarize the following conversation concisely.
-            Focus on key topics discussed, decisions made, and important context.
-            Keep the summary under 500 characters.
-            Use the same language as the conversation.
-            """;
-
-        var conversationText = string.Join("\n", messages.Select(m =>
-            $"{(m.Role == ChatRole.User ? "User" : "Assistant")}: {m.Content}"));
-
-        var summaryMessages = new List<ChatMessage>
-        {
-            new(ChatRole.System, systemPrompt),
-            new(ChatRole.User, conversationText)
-        };
-
-        try
-        {
-            var llmProvider = await llmProviderFactory.GetProviderAsync(GetUserId(), ct: ct);
-            var response = await llmProvider.ChatAsync(summaryMessages, ct: ct);
-            return response.Content ?? "Previous conversation context.";
-        }
-        catch
-        {
-            // Fallback: just truncate
-            return conversationText.Length > 500 ? conversationText[..500] + "..." : conversationText;
-        }
     }
 
     private async Task<string> GenerateTitleAsync(

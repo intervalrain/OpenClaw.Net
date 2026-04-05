@@ -10,6 +10,7 @@ public class ModelProvider : Entity<Guid>
     public string ModelName { get; private set; } = string.Empty;
     public string? EncryptedApiKey { get; private set; }
     public string? Description { get; private set; }
+    public int? MaxContextTokens { get; private set; }
     public bool AllowUserOverride { get; private set; }
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -25,7 +26,8 @@ public class ModelProvider : Entity<Guid>
         string? encryptedApiKey,
         string? description = null,
         bool allowUserOverride = true,
-        bool isActive = false)
+        bool isActive = false,
+        int? maxContextTokens = null)
     {
         return new ModelProvider
         {
@@ -35,6 +37,7 @@ public class ModelProvider : Entity<Guid>
             ModelName = modelName,
             EncryptedApiKey = encryptedApiKey,
             Description = description,
+            MaxContextTokens = maxContextTokens,
             AllowUserOverride = allowUserOverride,
             IsActive = isActive,
             CreatedAt = DateTime.UtcNow

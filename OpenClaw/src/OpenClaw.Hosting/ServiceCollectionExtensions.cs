@@ -72,10 +72,11 @@ public static class ServiceCollectionExtensions
         });
 
         // LLM Provider Factories (keyed) - for dynamic creation with custom params
-        services.AddKeyedSingleton<Func<string, string, ILlmProvider>>("ollama",
-            (_, _) => (url, model) => new OllamaLlmProvider(url, model));
-        services.AddKeyedSingleton<Func<string, string, ILlmProvider>>("openai",
-            (_, _) => (apiKey, model) => new OpenAILlmProvider(apiKey, model));
+        // maxContextTokens: DB value > hardcode lookup > conservative default
+        services.AddKeyedSingleton<Func<string, string, int?, ILlmProvider>>("ollama",
+            (_, _) => (url, model, maxCtx) => new OllamaLlmProvider(url, model, maxCtx));
+        services.AddKeyedSingleton<Func<string, string, int?, ILlmProvider>>("openai",
+            (_, _) => (apiKey, model, maxCtx) => new OpenAILlmProvider(apiKey, model, maxCtx));
 
         // Default LLM Provider (resolved from config)
         services.AddSingleton<ILlmProvider>(sp =>
@@ -98,6 +99,9 @@ public static class ServiceCollectionExtensions
         // services.AddSingleton<IAgentTool>(ExecuteCommandSkill.Default);
         // services.AddSingleton<IAgentTool>(HttpRequestSkill.Default);
         // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
+
+        // Context compression (refreshing agent approach)
+        services.AddSingleton<IContextCompressor, RefreshingAgentCompressor>();
 
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>

@@ -57,7 +57,8 @@ public class LlmProviderFactory(
             userProvider.Name,
             userProvider.Url,
             userProvider.ModelName,
-            userProvider.EncryptedApiKey);
+            userProvider.EncryptedApiKey,
+            userProvider.MaxContextTokens);
     }
 
     private ILlmProvider CreateFromGlobalProvider(ModelProvider provider)
@@ -67,11 +68,13 @@ public class LlmProviderFactory(
             provider.Name,
             provider.Url,
             provider.ModelName,
-            provider.EncryptedApiKey);
+            provider.EncryptedApiKey,
+            provider.MaxContextTokens);
     }
 
     private ILlmProvider CreateFromProviderConfig(
-        string type, string name, string url, string modelName, string? encryptedApiKey)
+        string type, string name, string url, string modelName, string? encryptedApiKey,
+        int? maxContextTokens = null)
     {
         string? apiKey = null;
         if (!string.IsNullOrEmpty(encryptedApiKey))
@@ -88,18 +91,18 @@ public class LlmProviderFactory(
 
         return type.ToLowerInvariant() switch
         {
-            "ollama" => CreateProvider("ollama", url, modelName),
+            "ollama" => CreateProvider("ollama", url, modelName, maxContextTokens),
             "openai" or "anthropic" or "custom" when apiKey is not null
-                => CreateProvider("openai", apiKey, modelName),
+                => CreateProvider("openai", apiKey, modelName, maxContextTokens),
             "openai" or "anthropic" or "custom"
                 => throw new InvalidOperationException($"API key is required for provider '{name}' but decryption failed or key is missing."),
             _ => throw new NotSupportedException($"Provider type '{type}' is not supported.")
         };
     }
 
-    private ILlmProvider CreateProvider(string type, string urlOrApiKey, string model)
+    private ILlmProvider CreateProvider(string type, string urlOrApiKey, string model, int? maxContextTokens = null)
     {
-        var factory = sp.GetRequiredKeyedService<Func<string, string, ILlmProvider>>(type);
-        return factory(urlOrApiKey, model);
+        var factory = sp.GetRequiredKeyedService<Func<string, string, int?, ILlmProvider>>(type);
+        return factory(urlOrApiKey, model, maxContextTokens);
     }
 }
