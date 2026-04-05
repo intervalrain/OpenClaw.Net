@@ -100,6 +100,9 @@ public static class ServiceCollectionExtensions
         // services.AddSingleton<IAgentTool>(HttpRequestSkill.Default);
         // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
 
+        // Model context resolver: DB app-config > Ollama API / LiteLLM JSON > default
+        services.AddSingleton<IModelContextResolver, ModelContextResolver>();
+
         // Context compression (refreshing agent approach)
         services.AddSingleton<IContextCompressor, RefreshingAgentCompressor>();
 

@@ -24,38 +24,9 @@ public class OpenAILlmProvider : ILlmProvider
     {
         _client = new OpenAIClient(apiKey);
         _model = model;
-        MaxContextTokens = maxContextTokens ?? LookupContextWindow(model);
+        // Temporary default until resolved by IModelContextResolver
+        MaxContextTokens = maxContextTokens ?? 128_000;
     }
-
-    /// <summary>
-    /// Hardcode fallback for known OpenAI models (updated 2026-04).
-    /// Overridden when user/admin sets MaxContextTokens in DB.
-    /// Source: https://github.com/taylorwilsdon/llm-context-limits
-    /// </summary>
-    private static int LookupContextWindow(string model) => model.ToLowerInvariant() switch
-    {
-        // GPT-5.4 series
-        var m when m.Contains("gpt-5.4") && !m.Contains("mini") && !m.Contains("nano") => 1_050_000,
-        var m when m.Contains("gpt-5.4-mini") || m.Contains("gpt-5.4-nano") => 400_000,
-        // GPT-5.x series (5.0 / 5.1 / 5.2 / codex)
-        var m when m.Contains("gpt-5") => 400_000,
-        // GPT-4.1 series
-        var m when m.Contains("gpt-4.1") => 1_047_576,
-        // GPT-4o series
-        var m when m.Contains("gpt-4o") => 128_000,
-        // GPT-4 legacy
-        var m when m.Contains("gpt-4-turbo") => 128_000,
-        var m when m.Contains("gpt-4") => 8_192,
-        // GPT-3.5
-        var m when m.Contains("gpt-3.5") => 16_385,
-        // o-series reasoning models
-        var m when m.Contains("o4-mini") => 200_000,
-        var m when m.Contains("o3") => 200_000,
-        var m when m.Contains("o1-mini") => 128_000,
-        var m when m.Contains("o1") => 200_000,
-        // Unknown — conservative default
-        _ => 128_000
-    };
 
     public OpenAILlmProvider(IConfigStore config)
         : this(

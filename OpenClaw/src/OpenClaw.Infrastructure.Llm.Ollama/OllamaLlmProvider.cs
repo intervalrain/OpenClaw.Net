@@ -22,24 +22,9 @@ public class OllamaLlmProvider : ILlmProvider
     {
         _client = new OllamaApiClient(url);
         _model = model;
-        MaxContextTokens = maxContextTokens ?? LookupContextWindow(model);
+        // Temporary default until resolved by IModelContextResolver
+        MaxContextTokens = maxContextTokens ?? 4_096;
     }
-
-    /// <summary>
-    /// Hardcode fallback for known Ollama models.
-    /// Overridden when user/admin sets MaxContextTokens in DB.
-    /// </summary>
-    private static int LookupContextWindow(string model) => model.ToLowerInvariant() switch
-    {
-        var m when m.Contains("llama3") => 128_000,
-        var m when m.Contains("qwen2.5") => 32_768,
-        var m when m.Contains("qwen3") => 32_768,
-        var m when m.Contains("mistral") => 32_768,
-        var m when m.Contains("gemma") => 8_192,
-        var m when m.Contains("phi") => 16_384,
-        var m when m.Contains("deepseek") => 64_000,
-        _ => 4_096
-    };
 
     public OllamaLlmProvider(IConfigStore config)
         : this(
