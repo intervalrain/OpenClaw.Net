@@ -104,6 +104,9 @@ public static class ServiceCollectionExtensions
         // Model context resolver: DB app-config > Ollama API / LiteLLM JSON > default
         services.AddSingleton<IModelContextResolver, ModelContextResolver>();
 
+        // Agent hooks (event-driven extensibility, fire-and-forget)
+        services.AddSingleton<AgentHookExecutor>();
+
         // System prompt assembly (composable context providers)
         services.AddSingleton<IContextProvider, BaseSystemPromptProvider>(sp =>
             new BaseSystemPromptProvider(sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value));
