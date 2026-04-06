@@ -104,6 +104,9 @@ public static class ServiceCollectionExtensions
         // Model context resolver: DB app-config > Ollama API / LiteLLM JSON > default
         services.AddSingleton<IModelContextResolver, ModelContextResolver>();
 
+        // Structured output validation tool
+        services.AddSingleton<IAgentTool, StructuredOutputTool>();
+
         // Agent hooks (event-driven extensibility, fire-and-forget)
         services.AddSingleton<AgentHookExecutor>();
 
