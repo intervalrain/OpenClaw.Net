@@ -110,7 +110,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAgentPipeline>(sp =>
         {
             var llmProviderFactory = sp.GetRequiredService<ILlmProviderFactory>();
-            var skills = sp.GetServices<IAgentTool>();
+            var baseSkills = sp.GetServices<IAgentTool>().ToList();
+
+            // Register spawn_agent tool for sub-agent support
+            var subAgentTool = new SubAgentTool(llmProviderFactory, baseSkills);
+            var skills = baseSkills.Concat<IAgentTool>([subAgentTool]);
+
             var options = sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value;
 
             var pipeline = new AgentPipelineBuilder(sp)
