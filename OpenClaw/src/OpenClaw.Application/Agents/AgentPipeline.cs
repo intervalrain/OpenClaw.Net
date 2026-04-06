@@ -121,6 +121,19 @@ public class AgentPipeline(
             ];
         }
 
+        // Plan mode: register enter/exit tools and track state
+        var planContext = new PlanModeContext();
+        var enterPlanTool = new EnterPlanModeTool { Context = planContext };
+        var exitPlanTool = new ExitPlanModeTool { Context = planContext };
+        _skillMap.TryAdd(enterPlanTool.Name, enterPlanTool);
+        _skillMap.TryAdd(exitPlanTool.Name, exitPlanTool);
+        if (toolDefinitions == allToolDefinitions) // not in deferred mode
+        {
+            toolDefinitions.Add(new ToolDefinition(enterPlanTool.Name, enterPlanTool.Description, enterPlanTool.Parameters));
+            toolDefinitions.Add(new ToolDefinition(exitPlanTool.Name, exitPlanTool.Description, exitPlanTool.Parameters));
+        }
+        var fullToolDefinitions = toolDefinitions.ToList(); // snapshot for restoring after plan mode
+
         var llmProvider = userId.HasValue
             ? await llmProviderFactory.GetProviderAsync(userId.Value, ct: ct)
             : await llmProviderFactory.GetProviderAsync(ct);
@@ -129,6 +142,13 @@ public class AgentPipeline(
 
         for (int i = 0; i < options.MaxIterations; i++)
         {
+            // In plan mode, filter tool definitions to read-only subset
+            var iterationTools = planContext.State == PlanModeState.Planning
+                ? toolDefinitions.Where(t => planContext.IsToolAllowed(t.Name)).ToList()
+                : (planContext.State == PlanModeState.Approved
+                    ? fullToolDefinitions  // restore all tools after plan approved
+                    : toolDefinitions);
+
             yield return new AgentStreamEvent(AgentStreamEventType.Thinking);
 
             var contentBuilder = new System.Text.StringBuilder();
@@ -136,7 +156,7 @@ public class AgentPipeline(
             LlmUsage? iterationUsage = null;
 
             var streamLogger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentPipeline>.Instance;
-            await foreach (var chunk in LlmRetryHelper.StreamWithRetryAsync(llmProvider, messages, toolDefinitions, streamLogger, ct: ct))
+            await foreach (var chunk in LlmRetryHelper.StreamWithRetryAsync(llmProvider, messages, iterationTools, streamLogger, ct: ct))
             {
                 if (chunk.ContentDelta is not null)
                 {
@@ -170,6 +190,15 @@ public class AgentPipeline(
 
             foreach (var toolCall in toolCalls)
             {
+                // Block disallowed tools in plan mode
+                if (!planContext.IsToolAllowed(toolCall.Name))
+                {
+                    var blocked = $"Tool '{toolCall.Name}' is not available in plan mode. Use read-only tools only.";
+                    messages.Add(new ChatMessage(ChatRole.Tool, blocked, toolCall.Id));
+                    yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, blocked, toolCall.Name);
+                    continue;
+                }
+
                 yield return new AgentStreamEvent(AgentStreamEventType.ToolExecuting, ToolName: toolCall.Name);
 
                 // Stream progress if tool supports it, otherwise blocking execution
