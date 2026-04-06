@@ -104,6 +104,9 @@ public static class ServiceCollectionExtensions
         // Model context resolver: DB app-config > Ollama API / LiteLLM JSON > default
         services.AddSingleton<IModelContextResolver, ModelContextResolver>();
 
+        // Feature flags (runtime, DB-backed, per-workspace overrides)
+        services.AddSingleton<IFeatureFlags, ConfigStoreFeatureFlags>();
+
         // Structured output validation tool
         services.AddSingleton<IAgentTool, StructuredOutputTool>();
 
