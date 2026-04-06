@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
@@ -12,7 +13,8 @@ public class AgentPipeline(
     IEnumerable<IAgentTool> skills,
     AgentPipelineOptions options,
     ISkillStore? skillStore = null,
-    IReadOnlyList<IAgentMiddleware>? middlewares = null) : IAgentPipeline
+    IReadOnlyList<IAgentMiddleware>? middlewares = null,
+    ILogger<AgentPipeline>? logger = null) : IAgentPipeline
 {
     private readonly Dictionary<string, IAgentTool> _skillMap = skills.ToDictionary(s => s.Name);
     private readonly IReadOnlyList<IAgentMiddleware> _middlewares = middlewares ?? [];
@@ -119,7 +121,8 @@ public class AgentPipeline(
             var toolCalls = new List<ToolCall>();
             LlmUsage? iterationUsage = null;
 
-            await foreach (var chunk in llmProvider.ChatStreamAsync(messages, toolDefinitions, ct))
+            var streamLogger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentPipeline>.Instance;
+            await foreach (var chunk in LlmRetryHelper.StreamWithRetryAsync(llmProvider, messages, toolDefinitions, streamLogger, ct: ct))
             {
                 if (chunk.ContentDelta is not null)
                 {

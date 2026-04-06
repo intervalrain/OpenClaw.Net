@@ -115,7 +115,8 @@ public static class ServiceCollectionExtensions
 
             var pipeline = new AgentPipelineBuilder(sp)
                 .Use<ErrorHandlingMiddleware>()
-                .Use<SecretRedactionMiddleware>()  // Redact secrets before logging
+                .Use<RetryMiddleware>()             // Retry transient LLM errors (inside error handling)
+                .Use<SecretRedactionMiddleware>()    // Redact secrets before logging
                 .Use<LoggingMiddleware>()
                 .Use<TimeoutMiddleware>()
                 .Build(llmProviderFactory, skills, options);
