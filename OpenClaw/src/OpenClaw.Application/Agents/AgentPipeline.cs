@@ -26,6 +26,7 @@ public class AgentPipeline(
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
         Guid? workspaceId = null,
+        IReadOnlyList<string>? userRoles = null,
         CancellationToken ct = default)
     {
         var context = new AgentContext
@@ -38,7 +39,8 @@ public class AgentPipeline(
             Skills = _skillMap.Values.ToList(),
             Options = options,
             UserId = userId,
-            WorkspaceId = workspaceId
+            WorkspaceId = workspaceId,
+            UserRoles = userRoles ?? []
         };
 
 
@@ -66,6 +68,7 @@ public class AgentPipeline(
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
         Guid? workspaceId = null,
+        IReadOnlyList<string>? userRoles = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
@@ -199,6 +202,22 @@ public class AgentPipeline(
                     continue;
                 }
 
+                // Permission check
+                if (_skillMap.TryGetValue(toolCall.Name, out var permTool))
+                {
+                    var permContext = new ToolContext(toolCall.Arguments)
+                    {
+                        UserId = userId, WorkspaceId = workspaceId, Roles = userRoles ?? []
+                    };
+                    if (!ToolPermissionChecker.HasPermission(permTool, permContext))
+                    {
+                        var denied = ToolPermissionChecker.GetDenialMessage(permTool);
+                        messages.Add(new ChatMessage(ChatRole.Tool, denied, toolCall.Id));
+                        yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, denied, toolCall.Name);
+                        continue;
+                    }
+                }
+
                 yield return new AgentStreamEvent(AgentStreamEventType.ToolExecuting, ToolName: toolCall.Name);
 
                 // Stream progress if tool supports it, otherwise blocking execution
@@ -206,7 +225,7 @@ public class AgentPipeline(
                 {
                     var toolContext = new ToolContext(toolCall.Arguments)
                     {
-                        UserId = userId, WorkspaceId = workspaceId, IsSuperAdmin = false
+                        UserId = userId, WorkspaceId = workspaceId, Roles = userRoles ?? []
                     };
                     string resultText = "";
                     await foreach (var progress in streamingTool.ExecuteStreamAsync(toolContext, ct))
@@ -229,7 +248,7 @@ public class AgentPipeline(
                 }
                 else
                 {
-                    var result = await ExecuteToolCallAsync(toolCall, userId, workspaceId, ct);
+                    var result = await ExecuteToolCallAsync(toolCall, userId, workspaceId, userRoles, ct);
                     messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
                     yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, result, toolCall.Name);
                 }
@@ -364,7 +383,7 @@ public class AgentPipeline(
 
             foreach (var toolCall in response.ToolCalls!)
             {
-                var result = await ExecuteToolCallAsync(toolCall, context.UserId, context.WorkspaceId, ct);
+                var result = await ExecuteToolCallAsync(toolCall, context.UserId, context.WorkspaceId, context.UserRoles, ct);
                 context.Messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
             }
         }
@@ -372,7 +391,7 @@ public class AgentPipeline(
         return "Max iteration reached";
     }
 
-    private async Task<string> ExecuteToolCallAsync(ToolCall toolCall, Guid? userId, Guid? workspaceId, CancellationToken ct)
+    private async Task<string> ExecuteToolCallAsync(ToolCall toolCall, Guid? userId, Guid? workspaceId, IReadOnlyList<string>? userRoles, CancellationToken ct)
     {
         if (!_skillMap.TryGetValue(toolCall.Name, out var skill))
         {
@@ -383,7 +402,7 @@ public class AgentPipeline(
         {
             UserId = userId,
             WorkspaceId = workspaceId,
-            IsSuperAdmin = false
+            Roles = userRoles ?? []
         };
         var result = await skill.ExecuteAsync(skillContext, ct);
         return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";

@@ -53,7 +53,8 @@ public class ChatController(
         var images = ConvertToImageContent(request.Images);
 
         var userId = GetUserId();
-        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, currentWorkspaceProvider.WorkspaceId, ct);
+        var currentUser = currentUserProvider.GetCurrentUser();
+        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, ct);
 
         // Save messages to DB
         if (conversation != null)
@@ -115,7 +116,7 @@ public class ChatController(
                 {
                     UserId = skillUser.Id,
                     WorkspaceId = currentWorkspaceProvider.WorkspaceId,
-                    IsSuperAdmin = skillUser.Roles.Contains("SuperAdmin")
+                    Roles = skillUser.Roles
                 };
                 var skillResult = await skill.ExecuteAsync(skillContext, ct);
 
@@ -146,7 +147,7 @@ public class ChatController(
             await activityTracker.TrackAsync(streamUserId, currentUser.Name,
                 ActivityType.Chat, ActivityStatus.Started, sourceId, sourceName, ct: ct);
 
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, ct);
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, ct);
 
             await foreach (var evt in eventStream)
             {
