@@ -94,17 +94,31 @@ public class AgentPipeline(
         // Add user message with images if present
         messages.Add(new ChatMessage(ChatRole.User, processedInput, Images: images));
 
-        var toolDefinitions = _skillMap.Values
+        var allToolDefinitions = _skillMap.Values
             .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
             .ToList();
 
         // Add skill-specific tools that aren't already in the tool list
         foreach (var extraTool in extraTools)
         {
-            if (!toolDefinitions.Any(t => t.Name == extraTool.Name))
+            if (!allToolDefinitions.Any(t => t.Name == extraTool.Name))
             {
-                toolDefinitions.Add(extraTool);
+                allToolDefinitions.Add(extraTool);
             }
+        }
+
+        // Deferred tool loading: when tool count exceeds threshold, only send tool_search
+        // to the LLM. The LLM discovers tools on demand. All tools remain dispatchable.
+        var toolDefinitions = allToolDefinitions;
+        ToolSearchTool? toolSearchTool = null;
+        if (options.DeferredToolThreshold > 0 && allToolDefinitions.Count > options.DeferredToolThreshold)
+        {
+            toolSearchTool = new ToolSearchTool(_skillMap.Values);
+            _skillMap.TryAdd(toolSearchTool.Name, toolSearchTool);
+            toolDefinitions =
+            [
+                new ToolDefinition(toolSearchTool.Name, toolSearchTool.Description, toolSearchTool.Parameters)
+            ];
         }
 
         var llmProvider = userId.HasValue
