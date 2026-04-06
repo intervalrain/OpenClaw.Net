@@ -7,6 +7,7 @@ public enum AgentStreamEventType
 {
     Thinking,
     ToolExecuting,
+    ToolProgress,
     ToolCompleted,
     ContentDelta,
     Completed,

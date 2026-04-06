@@ -312,7 +312,7 @@ function createStatusIndicator() {
     return indicator;
 }
 
-function updateStatusIndicator(indicator, type, toolName) {
+function updateStatusIndicator(indicator, type, toolName, progressMessage) {
     const textEl = indicator.querySelector('.status-text');
     switch (type) {
         case 'Thinking':
@@ -320,6 +320,11 @@ function updateStatusIndicator(indicator, type, toolName) {
             break;
         case 'ToolExecuting':
             textEl.textContent = `Executing: ${toolName}...`;
+            break;
+        case 'ToolProgress':
+            textEl.textContent = progressMessage
+                ? `${toolName}: ${progressMessage}`
+                : `Executing: ${toolName}...`;
             break;
         case 'ToolCompleted':
             textEl.textContent = `Completed: ${toolName}`;
@@ -624,6 +629,12 @@ async function sendMessage() {
                             // Hide streaming message during tool execution
                             if (streamingMessage) {
                                 streamingMessage.style.display = 'none';
+                            }
+                            break;
+
+                        case 'ToolProgress':
+                            if (statusIndicator) {
+                                updateStatusIndicator(statusIndicator, 'ToolProgress', event.toolName, event.content);
                             }
                             break;
 

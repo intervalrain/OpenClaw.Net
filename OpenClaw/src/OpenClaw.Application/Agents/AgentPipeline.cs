@@ -158,10 +158,38 @@ public class AgentPipeline(
             {
                 yield return new AgentStreamEvent(AgentStreamEventType.ToolExecuting, ToolName: toolCall.Name);
 
-                var result = await ExecuteToolCallAsync(toolCall, userId, workspaceId, ct);
-                messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
-
-                yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, result, toolCall.Name);
+                // Stream progress if tool supports it, otherwise blocking execution
+                if (_skillMap.TryGetValue(toolCall.Name, out var tool) && tool is IStreamingAgentTool streamingTool)
+                {
+                    var toolContext = new ToolContext(toolCall.Arguments)
+                    {
+                        UserId = userId, WorkspaceId = workspaceId, IsSuperAdmin = false
+                    };
+                    string resultText = "";
+                    await foreach (var progress in streamingTool.ExecuteStreamAsync(toolContext, ct))
+                    {
+                        switch (progress.Type)
+                        {
+                            case ToolProgressType.InProgress:
+                                yield return new AgentStreamEvent(AgentStreamEventType.ToolProgress, progress.Message, toolCall.Name);
+                                break;
+                            case ToolProgressType.Completed:
+                                resultText = progress.Result?.Output ?? "";
+                                break;
+                            case ToolProgressType.Failed:
+                                resultText = $"Error: {progress.Result?.Error ?? progress.Message}";
+                                break;
+                        }
+                    }
+                    messages.Add(new ChatMessage(ChatRole.Tool, resultText, toolCall.Id));
+                    yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, resultText, toolCall.Name);
+                }
+                else
+                {
+                    var result = await ExecuteToolCallAsync(toolCall, userId, workspaceId, ct);
+                    messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
+                    yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, result, toolCall.Name);
+                }
             }
         }
 
