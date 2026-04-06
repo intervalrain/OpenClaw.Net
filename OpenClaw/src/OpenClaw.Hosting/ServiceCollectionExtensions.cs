@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 
 using OpenClaw.Application.AgentActivities;
 using OpenClaw.Application.Agents;
+using OpenClaw.Application.Agents.ContextProviders;
 using OpenClaw.Application.Agents.Middlewares;
 using OpenClaw.Application.CronJobs;
 using OpenClaw.Application.Llm;
@@ -102,6 +103,12 @@ public static class ServiceCollectionExtensions
 
         // Model context resolver: DB app-config > Ollama API / LiteLLM JSON > default
         services.AddSingleton<IModelContextResolver, ModelContextResolver>();
+
+        // System prompt assembly (composable context providers)
+        services.AddSingleton<IContextProvider, BaseSystemPromptProvider>(sp =>
+            new BaseSystemPromptProvider(sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value));
+        services.AddSingleton<IContextProvider, LanguageProvider>();
+        services.AddSingleton<SystemPromptAssembler>();
 
         // Context compression (refreshing agent approach)
         services.AddSingleton<IContextCompressor, RefreshingAgentCompressor>();

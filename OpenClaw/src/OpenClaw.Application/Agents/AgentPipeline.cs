@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Application.Agents.ContextProviders;
 using OpenClaw.Domain.Chat.Enums;
 
 namespace OpenClaw.Application.Agents;
@@ -14,7 +15,8 @@ public class AgentPipeline(
     AgentPipelineOptions options,
     ISkillStore? skillStore = null,
     IReadOnlyList<IAgentMiddleware>? middlewares = null,
-    ILogger<AgentPipeline>? logger = null) : IAgentPipeline
+    ILogger<AgentPipeline>? logger = null,
+    SystemPromptAssembler? promptAssembler = null) : IAgentPipeline
 {
     private readonly Dictionary<string, IAgentTool> _skillMap = skills.ToDictionary(s => s.Name);
     private readonly IReadOnlyList<IAgentMiddleware> _middlewares = middlewares ?? [];
@@ -43,8 +45,7 @@ public class AgentPipeline(
             UserRoles = userRoles ?? []
         };
 
-
-        var systemPrompt = BuildSystemPrompt(language);
+        var systemPrompt = await AssembleSystemPromptAsync(language, userInput, userId, workspaceId, userRoles, ct);
 
         if (!string.IsNullOrEmpty(systemPrompt))
         {
@@ -73,7 +74,7 @@ public class AgentPipeline(
     {
         var messages = new List<ChatMessage>();
 
-        var systemPrompt = BuildSystemPrompt(language);
+        var systemPrompt = await AssembleSystemPromptAsync(language, userInput, userId, workspaceId, userRoles, ct);
 
         if (!string.IsNullOrEmpty(systemPrompt))
         {
@@ -316,14 +317,26 @@ public class AgentPipeline(
         return (userInput, skillPrompt, extraTools);
     }
 
-    private string BuildSystemPrompt(string? language)
+    private async Task<string> AssembleSystemPromptAsync(
+        string? language, string? userInput, Guid? userId, Guid? workspaceId,
+        IReadOnlyList<string>? userRoles, CancellationToken ct)
     {
-        var parts = new List<string>();
-
-        if (options.SystemPrompt is not null)
+        if (promptAssembler is not null)
         {
-            parts.Add(options.SystemPrompt);
+            return await promptAssembler.AssembleAsync(new ContextProviderRequest
+            {
+                Language = language,
+                UserInput = userInput,
+                UserId = userId,
+                WorkspaceId = workspaceId,
+                UserRoles = userRoles
+            }, ct);
         }
+
+        // Fallback: inline assembly (for SubAgentTool which doesn't have DI)
+        var parts = new List<string>();
+        if (options.SystemPrompt is not null)
+            parts.Add(options.SystemPrompt);
 
         if (!string.IsNullOrEmpty(language) && language != "auto")
         {
@@ -335,11 +348,8 @@ public class AgentPipeline(
                 "kr" => "Always response in Korean.",
                 _ => null
             };
-
             if (langInstruction != null)
-            {
                 parts.Add(langInstruction);
-            }
         }
 
         return string.Join("\n\n", parts);
