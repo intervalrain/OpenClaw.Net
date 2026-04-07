@@ -55,6 +55,9 @@ public class AppDbContext : WedaDbContext
         modelBuilder.Entity<CronJob>()
             .HasQueryFilter(e => IsSuperAdmin || e.CreatedByUserId == CurrentUserId);
 
+        modelBuilder.Entity<CronJobExecution>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
+
         modelBuilder.Entity<ToolInstance>()
             .HasQueryFilter(e => IsSuperAdmin || e.CreatedByUserId == CurrentUserId);
 
