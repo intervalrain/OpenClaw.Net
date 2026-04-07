@@ -1035,9 +1035,29 @@ const EMAIL_CONFIG_KEYS = {
     smtpUseSsl: 'Email:SmtpUseSsl',
 };
 
+let emailVerified = false;
+
 function initEmailSettingsUI() {
     document.getElementById('saveEmailSettings').addEventListener('click', saveEmailSettings);
     document.getElementById('testEmailBtn').addEventListener('click', sendTestEmail);
+
+    // Reset verified state when any email field changes
+    const emailFields = ['emailEnabled', 'emailFromEmail', 'emailFromName',
+        'emailSmtpServer', 'emailSmtpPort', 'emailSmtpUsername', 'emailSmtpPassword', 'emailSmtpUseSsl'];
+    emailFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', resetEmailVerified);
+        if (el) el.addEventListener('change', resetEmailVerified);
+    });
+}
+
+function resetEmailVerified() {
+    emailVerified = false;
+    const saveBtn = document.getElementById('saveEmailSettings');
+    saveBtn.disabled = true;
+    saveBtn.title = 'Test email first to verify settings';
+    const result = document.getElementById('emailTestResult');
+    if (result) { result.textContent = ''; result.className = 'email-test-result'; }
 }
 
 async function loadEmailSettings() {
@@ -1094,7 +1114,8 @@ async function saveEmailSettings() {
         }
 
         btn.textContent = 'Saved!';
-        setTimeout(() => { btn.textContent = 'Save Settings'; btn.disabled = false; }, 2000);
+        emailVerified = false;
+        setTimeout(() => { btn.textContent = 'Save Settings'; btn.disabled = true; btn.title = 'Test email first to verify settings'; }, 2000);
     } catch (e) {
         btn.textContent = 'Save Settings';
         btn.disabled = false;
@@ -1105,6 +1126,20 @@ async function saveEmailSettings() {
 async function sendTestEmail() {
     const btn = document.getElementById('testEmailBtn');
     const result = document.getElementById('emailTestResult');
+
+    const server = document.getElementById('emailSmtpServer').value;
+    const password = document.getElementById('emailSmtpPassword').value;
+    if (!server) {
+        result.className = 'email-test-result error';
+        result.textContent = 'SMTP server is required';
+        return;
+    }
+    if (!password) {
+        result.className = 'email-test-result error';
+        result.textContent = 'Password is required for testing (re-enter even if previously saved)';
+        return;
+    }
+
     btn.disabled = true;
     btn.textContent = 'Sending...';
     result.textContent = '';
@@ -1114,16 +1149,30 @@ async function sendTestEmail() {
         const res = await authFetch('/api/v1/email/test', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: user.email })
+            body: JSON.stringify({
+                to: user.email,
+                smtpServer: document.getElementById('emailSmtpServer').value,
+                smtpPort: parseInt(document.getElementById('emailSmtpPort').value) || 587,
+                smtpUsername: document.getElementById('emailSmtpUsername').value,
+                smtpPassword: document.getElementById('emailSmtpPassword').value,
+                useSsl: document.getElementById('emailSmtpUseSsl').checked,
+                fromEmail: document.getElementById('emailFromEmail').value || undefined,
+                fromName: document.getElementById('emailFromName').value || undefined
+            })
         });
 
         if (res.ok) {
             result.className = 'email-test-result success';
             result.textContent = `Test email sent to ${user.email}`;
+            emailVerified = true;
+            const saveBtn = document.getElementById('saveEmailSettings');
+            saveBtn.disabled = false;
+            saveBtn.title = '';
         } else {
             const err = await res.json().catch(() => ({}));
             result.className = 'email-test-result error';
             result.textContent = err.message || err.title || 'Failed to send test email';
+            emailVerified = false;
         }
     } catch (e) {
         result.className = 'email-test-result error';
