@@ -102,10 +102,12 @@ public static class ServiceCollectionExtensions
         // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
 
         // Model context resolver: DB app-config > Ollama API / LiteLLM JSON > default
-        services.AddSingleton<IModelContextResolver, ModelContextResolver>();
+        // Scoped because it depends on IConfigStore (scoped, uses DbContext)
+        services.AddScoped<IModelContextResolver, ModelContextResolver>();
 
         // Feature flags (runtime, DB-backed, per-workspace overrides)
-        services.AddSingleton<IFeatureFlags, ConfigStoreFeatureFlags>();
+        // Scoped because it depends on IConfigStore (scoped, uses DbContext)
+        services.AddScoped<IFeatureFlags, ConfigStoreFeatureFlags>();
 
         // Structured output validation tool
         services.AddSingleton<IAgentTool, StructuredOutputTool>();
