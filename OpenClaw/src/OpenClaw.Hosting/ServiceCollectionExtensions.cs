@@ -17,7 +17,9 @@ using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
 using OpenClaw.Channels.Telegram.Extensions;
 using OpenClaw.Domain.AgentActivities.Repositories;
+using OpenClaw.Domain.Agents.Repositories;
 using OpenClaw.Domain.CronJobs.Repositories;
+using OpenClaw.Infrastructure.Agents.Persistence;
 using OpenClaw.Infrastructure.AgentActivities.Persistence;
 using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Llm.Ollama;
@@ -121,6 +123,9 @@ public static class ServiceCollectionExtensions
             new BaseSystemPromptProvider(sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value));
         services.AddSingleton<IContextProvider, LanguageProvider>();
         services.AddSingleton<SystemPromptAssembler>();
+
+        // Agent definitions (CRUD, DAG)
+        services.AddScoped<IAgentDefinitionRepository, AgentDefinitionRepository>();
 
         // Context compression (refreshing agent approach)
         services.AddSingleton<IContextCompressor, RefreshingAgentCompressor>();
