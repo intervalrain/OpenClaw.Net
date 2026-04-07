@@ -57,6 +57,7 @@ public static class ServiceCollectionExtensions
         // Middlewares
         services.AddSingleton<LoggingMiddleware>();
         services.AddSingleton<ErrorHandlingMiddleware>();
+        services.AddSingleton<RetryMiddleware>();
         services.AddSingleton<TimeoutMiddleware>();
         services.AddSingleton<SecretRedactionMiddleware>();
 
