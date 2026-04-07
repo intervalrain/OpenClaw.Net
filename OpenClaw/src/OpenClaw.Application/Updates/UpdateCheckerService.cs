@@ -190,8 +190,15 @@ public class UpdateCheckerService(
         {
             await SetStatusAsync(configStore, "pulling", $"Pulling latest image for {targetVersion}...");
 
-            // docker compose pull api
-            var pullResult = await RunDockerCommandAsync("docker compose pull api");
+            // Detect compose project name from container label
+            var projResult = await RunDockerCommandAsync(
+                "docker inspect openclaw-api --format '{{index .Config.Labels \"com.docker.compose.project\"}}'");
+            var projectName = projResult.Output.Trim().Trim('\'');
+            if (string.IsNullOrEmpty(projectName)) projectName = "openclaw";
+
+            var compose = $"docker compose -p {projectName}";
+
+            var pullResult = await RunDockerCommandAsync($"{compose} pull api");
             if (pullResult.ExitCode != 0)
             {
                 await SetStatusAsync(configStore, "failed", $"Pull failed: {pullResult.Error}");
@@ -200,8 +207,8 @@ public class UpdateCheckerService(
 
             await SetStatusAsync(configStore, "restarting", "Restarting container with new image...");
 
-            // docker compose up -d --no-deps api (recreates only the api container)
-            _ = RunDockerCommandAsync("docker compose up -d --no-deps api");
+            // Recreate only the api container with new image
+            _ = RunDockerCommandAsync($"{compose} up -d --no-deps api");
 
             // Note: this process will be killed when the container restarts.
             // The new container will read UPDATE_STATUS=restarting from DB.
