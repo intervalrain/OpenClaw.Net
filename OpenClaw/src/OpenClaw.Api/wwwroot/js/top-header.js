@@ -12,7 +12,8 @@ function createTopHeader(activePage = '') {
         if (path.includes('/openclaw')) activePage = 'chat';
         else if (path.includes('/workspace')) activePage = 'workspace';
         else if (path.includes('/cronjobs')) activePage = 'cronjobs';
-        else if (path.includes('/office')) activePage = 'office';
+        else if (path.includes('/agents')) activePage = 'agents';
+        else if (path.includes('/office')) activePage = 'village';
         else if (path.includes('/wiki')) activePage = 'wiki';
         else if (path.includes('/wedally')) activePage = 'wedally';
     }
@@ -39,13 +40,21 @@ function createTopHeader(activePage = '') {
                     </svg>
                     <span>Cron Jobs</span>
                 </a>
-                <a href="/office/index.html" class="nav-link ${activePage === 'office' ? 'active' : ''}">
+                <a href="/agents/index.html" class="nav-link ${activePage === 'agents' ? 'active' : ''}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    <span>Agents</span>
+                </a>
+                <a href="/office/index.html" class="nav-link ${activePage === 'village' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="7" width="20" height="14" rx="2"/>
                         <path d="M16 7V5a4 4 0 0 0-8 0v2"/>
                         <circle cx="12" cy="14" r="2"/>
                     </svg>
-                    <span>Office</span>
+                    <span>Village</span>
                 </a>
                 <a href="/wiki/index.html" class="nav-link ${activePage === 'wiki' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
