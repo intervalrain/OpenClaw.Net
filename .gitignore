@@ -517,3 +517,6 @@ docs/**/.*
 
 # Docker runtime data
 **/.data/
+
+claude-code/
+**/*.lscache

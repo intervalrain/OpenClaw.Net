@@ -1043,6 +1043,112 @@ body {
     border-top: 1px solid var(--border-subtle);
 }
 
+/* ── Token Usage Modal ── */
+
+.token-usage-modal-content {
+    max-width: 520px;
+}
+
+.usage-session-section,
+.usage-history-section {
+    margin-bottom: 20px;
+}
+
+.usage-session-section h4,
+.usage-history-section h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 12px;
+}
+
+.usage-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.usage-stat-card {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+
+.usage-stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-stat-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.usage-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 0.84rem;
+}
+
+.usage-detail-label {
+    color: var(--text-muted);
+}
+
+.usage-detail-value {
+    color: var(--text-color);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-history-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.usage-empty {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    text-align: center;
+    padding: 20px;
+}
+
+.usage-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+}
+
+.usage-history-item:last-child {
+    border-bottom: none;
+}
+
+.usage-history-msg {
+    color: var(--text-color);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.usage-history-tokens {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 /* Buttons */
 .btn {
     padding: 10px 20px;

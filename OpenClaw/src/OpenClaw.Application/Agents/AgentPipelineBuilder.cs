@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
+using OpenClaw.Application.Agents.ContextProviders;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
@@ -28,6 +30,8 @@ public class AgentPipelineBuilder(IServiceProvider _serviceProvider)
         AgentPipelineOptions options)
     {
         var skillStore = _serviceProvider.GetService<ISkillStore>();
-        return new AgentPipeline(llmProviderFactory, skills, options, skillStore, _middlewares);
+        var logger = _serviceProvider.GetService<ILogger<AgentPipeline>>();
+        var assembler = _serviceProvider.GetService<ContextProviders.SystemPromptAssembler>();
+        return new AgentPipeline(llmProviderFactory, skills, options, skillStore, _middlewares, logger, assembler);
     }
 }

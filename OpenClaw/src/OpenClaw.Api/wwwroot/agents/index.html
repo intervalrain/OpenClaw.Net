@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agents - OpenClaw.NET</title>
+    <link rel="icon" href="/favicon.png" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/top-header.css">
+    <link rel="stylesheet" href="/agents/agents.css">
+    <link rel="stylesheet" href="/css/auth-modal.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+<body>
+    <!-- Top header injected by top-header.js -->
+
+    <div class="agents-layout">
+        <!-- Sidebar: Agent list -->
+        <aside class="agents-sidebar">
+            <div class="sidebar-header">
+                <h3>Agents</h3>
+                <button class="btn-icon" id="create-agent-btn" title="New Agent">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="agent-list" class="agent-list"></div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="agents-main">
+            <!-- Tab bar -->
+            <div class="tab-bar">
+                <button class="tab active" data-tab="detail">Editor</button>
+                <button class="tab" data-tab="dag">DAG</button>
+            </div>
+
+            <!-- Editor panel -->
+            <div id="detail-panel" class="panel active">
+                <div class="empty-state" id="empty-state">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    </svg>
+                    <p>Select an agent or create a new one</p>
+                </div>
+                <div id="agent-editor" class="agent-editor" style="display: none;">
+                    <div class="editor-header">
+                        <input type="text" id="agent-name" class="editor-name" placeholder="Agent Name">
+                        <div class="editor-actions">
+                            <button class="btn btn-outline btn-sm" id="delete-agent-btn">Delete</button>
+                            <button class="btn btn-primary btn-sm" id="save-agent-btn">Save</button>
+                        </div>
+                    </div>
+                    <div class="editor-field">
+                        <label>Description</label>
+                        <input type="text" id="agent-description" placeholder="What this agent does">
+                    </div>
+                    <div class="editor-field">
+                        <label>System Prompt</label>
+                        <textarea id="agent-system-prompt" rows="8" placeholder="Instructions for the agent..."></textarea>
+                    </div>
+                    <div class="editor-field">
+                        <label>Tools</label>
+                        <div id="tool-selector" class="tool-selector"></div>
+                    </div>
+                    <div class="editor-field">
+                        <label>Sub-Agents</label>
+                        <div id="subagent-selector" class="tool-selector"></div>
+                    </div>
+                    <div class="editor-field">
+                        <label>Max Iterations</label>
+                        <input type="number" id="agent-max-iterations" value="10" min="1" max="50">
+                    </div>
+                </div>
+            </div>
+
+            <!-- DAG panel -->
+            <div id="dag-panel" class="panel">
+                <div id="mermaid-container" class="mermaid-container">
+                    <div id="dag-chart"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/auth-modal.js"></script>
+    <script src="/js/top-header.js"></script>
+    <script src="/agents/agents.js"></script>
+</body>
+</html>

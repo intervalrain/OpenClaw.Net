@@ -17,6 +17,14 @@ let pendingImages = []; // Array of { base64Data, mimeType, previewUrl }
 // AbortController for stopping inference
 let currentAbortController = null;
 
+// Token usage tracking (session-scoped)
+const tokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    callCount: 0,
+    history: [] // { message, inputTokens, outputTokens, timestamp }
+};
+
 // Configure marked.js
 marked.setOptions({
     highlight: function(code, lang) {
@@ -304,7 +312,7 @@ function createStatusIndicator() {
     return indicator;
 }
 
-function updateStatusIndicator(indicator, type, toolName) {
+function updateStatusIndicator(indicator, type, toolName, progressMessage) {
     const textEl = indicator.querySelector('.status-text');
     switch (type) {
         case 'Thinking':
@@ -312,6 +320,11 @@ function updateStatusIndicator(indicator, type, toolName) {
             break;
         case 'ToolExecuting':
             textEl.textContent = `Executing: ${toolName}...`;
+            break;
+        case 'ToolProgress':
+            textEl.textContent = progressMessage
+                ? `${toolName}: ${progressMessage}`
+                : `Executing: ${toolName}...`;
             break;
         case 'ToolCompleted':
             textEl.textContent = `Completed: ${toolName}`;
@@ -619,6 +632,12 @@ async function sendMessage() {
                             }
                             break;
 
+                        case 'ToolProgress':
+                            if (statusIndicator) {
+                                updateStatusIndicator(statusIndicator, 'ToolProgress', event.toolName, event.content);
+                            }
+                            break;
+
                         case 'ToolCompleted':
                             if (statusIndicator) {
                                 updateStatusIndicator(statusIndicator, 'ToolCompleted', event.toolName);
@@ -669,6 +688,21 @@ async function sendMessage() {
                             }
                             // Create approval UI inline in chat
                             handleApprovalRequired(event.executionId, event.approvalRequest);
+                            break;
+
+                        case 'UsageReport':
+                            if (event.usage) {
+                                const u = event.usage;
+                                tokenUsage.inputTokens += (u.inputTokens || 0);
+                                tokenUsage.outputTokens += (u.outputTokens || 0);
+                                tokenUsage.callCount++;
+                                tokenUsage.history.push({
+                                    message: accumulatedContent?.substring(0, 60) || '(tool call)',
+                                    inputTokens: u.inputTokens || 0,
+                                    outputTokens: u.outputTokens || 0,
+                                    timestamp: new Date()
+                                });
+                            }
                             break;
                     }
                 } catch (parseError) {
@@ -1020,7 +1054,7 @@ async function openSettingsModal() {
     document.getElementById('language-select').value = settings.language;
 
     // Load providers, skills, channel settings, app configs, and preferences from backend
-    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences()]);
+    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences(), loadAgentList()]);
     renderModelList();
     renderSkillsList();
     renderTelegramSettings();
@@ -1679,25 +1713,31 @@ function initPreferenceManagement() {
     if (valueInput) valueInput.addEventListener('keydown', handleEnter);
 }
 
-// Slash Command Autocomplete
+// Slash Command Autocomplete — invokes Agents (not tools)
 let autocompleteIndex = -1;
-let filteredSkills = [];
+let filteredAgents = [];
+let agentList = []; // loaded from /api/v1/agents
+
+async function loadAgentList() {
+    try {
+        const res = await authFetch('/api/v1/agents');
+        if (res.ok) agentList = await res.json();
+    } catch {}
+}
 
 function handleAutocompleteInput() {
     const value = userInputEl.value;
     const cursorPos = userInputEl.selectionStart;
 
-    // Check if we're typing a slash command at the start
     if (value.startsWith('/') && cursorPos <= value.indexOf(' ') + 1 || (value.startsWith('/') && !value.includes(' '))) {
         const query = value.slice(1).split(' ')[0].toLowerCase();
 
-        // Filter enabled skills
-        filteredSkills = skills
-            .filter(s => s.isEnabled && s.name.toLowerCase().includes(query))
-            .slice(0, 6); // Max 6 suggestions
+        filteredAgents = agentList
+            .filter(a => a.name.toLowerCase().includes(query))
+            .slice(0, 6);
 
-        if (filteredSkills.length > 0) {
-            showAutocomplete(filteredSkills);
+        if (filteredAgents.length > 0) {
+            showAutocomplete(filteredAgents);
         } else {
             hideAutocomplete();
         }
@@ -1706,20 +1746,19 @@ function handleAutocompleteInput() {
     }
 }
 
-function showAutocomplete(skillList) {
+function showAutocomplete(items) {
     const dropdown = document.getElementById('autocomplete-dropdown');
     autocompleteIndex = -1;
 
-    dropdown.innerHTML = skillList.map((s, i) => `
-        <div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(s.name)}">
-            <span class="autocomplete-command">/${escapeHtml(s.name)}</span>
-            <span class="autocomplete-desc">${escapeHtml(s.description)}</span>
+    dropdown.innerHTML = items.map((a, i) => `
+        <div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(a.name)}">
+            <span class="autocomplete-command">/${escapeHtml(a.name)}</span>
+            <span class="autocomplete-desc">${escapeHtml(a.description || '')}</span>
         </div>
     `).join('');
 
     dropdown.classList.add('visible');
 
-    // Add click handlers
     dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
         item.addEventListener('click', () => {
             autocompleteIndex = parseInt(item.dataset.index);
@@ -1736,7 +1775,7 @@ function hideAutocomplete() {
     const dropdown = document.getElementById('autocomplete-dropdown');
     dropdown.classList.remove('visible');
     autocompleteIndex = -1;
-    filteredSkills = [];
+    filteredAgents = [];
 }
 
 function isAutocompleteVisible() {
@@ -1744,11 +1783,11 @@ function isAutocompleteVisible() {
 }
 
 function navigateAutocomplete(direction) {
-    if (filteredSkills.length === 0) return;
+    if (filteredAgents.length === 0) return;
 
     autocompleteIndex += direction;
-    if (autocompleteIndex < 0) autocompleteIndex = filteredSkills.length - 1;
-    if (autocompleteIndex >= filteredSkills.length) autocompleteIndex = 0;
+    if (autocompleteIndex < 0) autocompleteIndex = filteredAgents.length - 1;
+    if (autocompleteIndex >= filteredAgents.length) autocompleteIndex = 0;
 
     updateAutocompleteSelection();
 }
@@ -1761,26 +1800,24 @@ function updateAutocompleteSelection() {
 }
 
 function getSelectedAutocompleteItem() {
-    if (autocompleteIndex >= 0 && autocompleteIndex < filteredSkills.length) {
-        return filteredSkills[autocompleteIndex];
+    if (autocompleteIndex >= 0 && autocompleteIndex < filteredAgents.length) {
+        return filteredAgents[autocompleteIndex];
     }
     return null;
 }
 
 function selectAutocompleteItem() {
-    const skill = getSelectedAutocompleteItem();
-    if (!skill) return;
+    const agent = getSelectedAutocompleteItem();
+    if (!agent) return;
 
-    // Replace the current slash command with selected one
     const currentValue = userInputEl.value;
     const spaceIndex = currentValue.indexOf(' ');
     const args = spaceIndex > 0 ? currentValue.slice(spaceIndex) : ' ';
 
-    userInputEl.value = `/${skill.name}${args}`;
+    userInputEl.value = `/${agent.name}${args}`;
     userInputEl.focus();
 
-    // Move cursor after the command
-    const newCursorPos = skill.name.length + 2; // +2 for '/' and space
+    const newCursorPos = agent.name.length + 2;
     userInputEl.setSelectionRange(newCursorPos, newCursorPos);
 
     hideAutocomplete();
@@ -2510,3 +2547,60 @@ document.querySelectorAll('[data-settings-tab]')?.forEach(tab => {
         }
     });
 });
+
+// ── Token Usage Modal ──
+
+function formatTokenCount(n) {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return n.toLocaleString();
+}
+
+function openTokenUsageModal() {
+    const modal = document.getElementById('token-usage-modal');
+    if (!modal) return;
+
+    // Update stats
+    document.getElementById('usage-input-tokens').textContent = formatTokenCount(tokenUsage.inputTokens);
+    document.getElementById('usage-output-tokens').textContent = formatTokenCount(tokenUsage.outputTokens);
+    document.getElementById('usage-total-tokens').textContent = formatTokenCount(tokenUsage.inputTokens + tokenUsage.outputTokens);
+    document.getElementById('usage-call-count').textContent = tokenUsage.callCount;
+
+    // Rough cost estimate (GPT-4o pricing: $2.50/1M input, $10/1M output)
+    const cost = (tokenUsage.inputTokens * 2.5 + tokenUsage.outputTokens * 10) / 1_000_000;
+    document.getElementById('usage-estimated-cost').textContent = cost < 0.01 && cost > 0 ? '< $0.01' : `$${cost.toFixed(2)}`;
+
+    // Render history
+    const historyList = document.getElementById('usage-history-list');
+    if (tokenUsage.history.length === 0) {
+        historyList.innerHTML = '<div class="usage-empty">No usage data yet. Send a message to start tracking.</div>';
+    } else {
+        historyList.innerHTML = tokenUsage.history.map((h, i) => `
+            <div class="usage-history-item">
+                <span class="usage-history-msg" title="${h.message}">#${i + 1} ${h.message || '...'}</span>
+                <span class="usage-history-tokens">${formatTokenCount(h.inputTokens)} in / ${formatTokenCount(h.outputTokens)} out</span>
+            </div>
+        `).reverse().join('');
+    }
+
+    modal.classList.add('active');
+}
+
+function closeTokenUsageModal() {
+    const modal = document.getElementById('token-usage-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function resetTokenUsage() {
+    tokenUsage.inputTokens = 0;
+    tokenUsage.outputTokens = 0;
+    tokenUsage.callCount = 0;
+    tokenUsage.history = [];
+    openTokenUsageModal(); // refresh UI
+}
+
+// Wire up modal buttons
+document.getElementById('token-usage-close')?.addEventListener('click', closeTokenUsageModal);
+document.getElementById('token-usage-done')?.addEventListener('click', closeTokenUsageModal);
+document.getElementById('token-usage-reset')?.addEventListener('click', resetTokenUsage);
+document.getElementById('token-usage-modal')?.querySelector('.modal-overlay')?.addEventListener('click', closeTokenUsageModal);

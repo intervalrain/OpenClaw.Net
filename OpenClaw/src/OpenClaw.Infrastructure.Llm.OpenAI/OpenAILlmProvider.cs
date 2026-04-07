@@ -15,13 +15,17 @@ namespace OpenClaw.Infrastructure.Llm.OpenAI;
 public class OpenAILlmProvider : ILlmProvider
 {
     public string Name => "OpenAI";
+    public int MaxContextTokens { get; }
+
     private readonly OpenAIClient _client;
     private readonly string _model;
 
-    public OpenAILlmProvider(string apiKey, string model)
+    public OpenAILlmProvider(string apiKey, string model, int? maxContextTokens = null)
     {
         _client = new OpenAIClient(apiKey);
         _model = model;
+        // Temporary default until resolved by IModelContextResolver
+        MaxContextTokens = maxContextTokens ?? 128_000;
     }
 
     public OpenAILlmProvider(IConfigStore config)
@@ -131,7 +135,13 @@ public class OpenAILlmProvider : ILlmProvider
                     }
                 }
 
-                yield return new ChatResponseChunk(IsComplete: true);
+                var usage = update.Usage is not null
+                    ? new LlmUsage(
+                        InputTokens: update.Usage.InputTokenCount,
+                        OutputTokens: update.Usage.OutputTokenCount)
+                    : null;
+
+                yield return new ChatResponseChunk(IsComplete: true, Usage: usage);
             }
         }
     }
@@ -189,8 +199,15 @@ public class OpenAILlmProvider : ILlmProvider
             .Select(tc => new ToolCall(tc.Id, tc.FunctionName, tc.FunctionArguments.ToString()))
             .ToList();
 
+        var usage = completion.Usage is not null
+            ? new LlmUsage(
+                InputTokens: completion.Usage.InputTokenCount,
+                OutputTokens: completion.Usage.OutputTokenCount)
+            : null;
+
         return new LlmChatResponse(
             completion.Content?.FirstOrDefault()?.Text,
-            toolCalls);
+            toolCalls,
+            usage);
     }
 }

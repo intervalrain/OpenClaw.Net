@@ -12,7 +12,8 @@ function createTopHeader(activePage = '') {
         if (path.includes('/openclaw')) activePage = 'chat';
         else if (path.includes('/workspace')) activePage = 'workspace';
         else if (path.includes('/cronjobs')) activePage = 'cronjobs';
-        else if (path.includes('/office')) activePage = 'office';
+        else if (path.includes('/agents')) activePage = 'agents';
+        else if (path.includes('/office')) activePage = 'village';
         else if (path.includes('/wiki')) activePage = 'wiki';
         else if (path.includes('/wedally')) activePage = 'wedally';
     }
@@ -39,13 +40,21 @@ function createTopHeader(activePage = '') {
                     </svg>
                     <span>Cron Jobs</span>
                 </a>
-                <a href="/office/index.html" class="nav-link ${activePage === 'office' ? 'active' : ''}">
+                <a href="/agents/index.html" class="nav-link ${activePage === 'agents' ? 'active' : ''}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    <span>Agents</span>
+                </a>
+                <a href="/office/index.html" class="nav-link ${activePage === 'village' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="7" width="20" height="14" rx="2"/>
                         <path d="M16 7V5a4 4 0 0 0-8 0v2"/>
                         <circle cx="12" cy="14" r="2"/>
                     </svg>
-                    <span>Office</span>
+                    <span>Village</span>
                 </a>
                 <a href="/wiki/index.html" class="nav-link ${activePage === 'wiki' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -118,10 +127,43 @@ function updateNavUserArea() {
         const user = getCurrentUser();
         if (isAuthenticated() && user) {
             userArea.innerHTML = `
-                <span class="user-name">${user.name || user.email}</span>
-                <span class="logout-link" id="navLogoutBtn">Logout</span>
+                <div class="nav-user-menu">
+                    <button class="nav-user-btn" id="navUserBtn">
+                        <span class="user-name">${user.name || user.email}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <div class="nav-user-dropdown" id="navUserDropdown">
+                        <button class="nav-dropdown-item" id="navTokenUsageBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                            </svg>
+                            <span>Token Usage</span>
+                        </button>
+                        <div class="nav-dropdown-divider"></div>
+                        <button class="nav-dropdown-item nav-dropdown-logout" id="navLogoutBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </div>
             `;
+            document.getElementById('navUserBtn').addEventListener('click', toggleNavUserDropdown);
             document.getElementById('navLogoutBtn').addEventListener('click', handleNavLogout);
+            document.getElementById('navTokenUsageBtn').addEventListener('click', () => {
+                closeNavUserDropdown();
+                if (typeof openTokenUsageModal === 'function') openTokenUsageModal();
+            });
+            // Close dropdown on outside click
+            document.addEventListener('click', (e) => {
+                const menu = document.querySelector('.nav-user-menu');
+                if (menu && !menu.contains(e.target)) closeNavUserDropdown();
+            });
         } else {
             userArea.innerHTML = `
                 <span class="logout-link" id="navLoginBtn">Login</span>
@@ -132,6 +174,16 @@ function updateNavUserArea() {
 
     // Show admin-only items if user has admin role
     showAdminNavItems();
+}
+
+function toggleNavUserDropdown() {
+    const dropdown = document.getElementById('navUserDropdown');
+    if (dropdown) dropdown.classList.toggle('open');
+}
+
+function closeNavUserDropdown() {
+    const dropdown = document.getElementById('navUserDropdown');
+    if (dropdown) dropdown.classList.remove('open');
 }
 
 function showAdminNavItems() {

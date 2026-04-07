@@ -12,6 +12,7 @@ using OpenClaw.Contracts.Chat.Responses;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Domain.AgentActivities;
+using OpenClaw.Domain.Agents.Repositories;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
@@ -30,10 +31,10 @@ public class ChatController(
     ICurrentUserProvider currentUserProvider,
     ILlmProviderFactory llmProviderFactory,
     ISlashCommandParser slashCommandParser,
-    IToolRegistry skillRegistry,
-    IToolSettingsService skillSettingsService,
     IAgentActivityTracker activityTracker,
     ICurrentWorkspaceProvider currentWorkspaceProvider,
+    IContextCompressor contextCompressor,
+    IAgentDefinitionRepository agentDefinitionRepo,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -52,7 +53,8 @@ public class ChatController(
         var images = ConvertToImageContent(request.Images);
 
         var userId = GetUserId();
-        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, currentWorkspaceProvider.WorkspaceId, ct);
+        var currentUser = currentUserProvider.GetCurrentUser();
+        var response = await pipeline.ExecuteAsync(request.Message, history, request.Language, images, userId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, ct);
 
         // Save messages to DB
         if (conversation != null)
@@ -93,44 +95,24 @@ public class ChatController(
 
             if (slashCommandParser.TryParse(request.Message, out var command))
             {
-                var skill = skillRegistry.GetSkill(command!.SkillName);
-                if (skill == null)
+                // Slash commands invoke agents (AgentDefinition from DB)
+                var agent = await agentDefinitionRepo.GetByNameAsync(command!.SkillName, ct);
+                if (agent == null)
                 {
-                    var availableSkills = string.Join(", ", skillRegistry.GetAllSkills().Select(s => s.Name));
-                    await WriteErrorEventAsync($"Skill '{command.SkillName}' not found. Available skills: {availableSkills}", ct);
+                    var availableAgents = (await agentDefinitionRepo.GetAllAsync(ct)).Select(a => a.Name);
+                    await WriteErrorEventAsync($"Agent '{command.SkillName}' not found. Available: {string.Join(", ", availableAgents)}", ct);
                     return;
                 }
 
-                if (!await skillSettingsService.IsEnabledAsync(command.SkillName, ct))
-                {
-                    await WriteErrorEventAsync($"Skill '{command.SkillName}' is disabled.", ct);
-                    return;
-                }
+                // Mount agent: inject its system prompt into history
+                history.Insert(0, new ChatMessage(
+                    ChatRole.System,
+                    $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
 
-                // Execute skill first
-                var skillUser = currentUserProvider.GetCurrentUser();
-                var jsonArgs = slashCommandParser.ConvertToJson(command, skill);
-                var skillContext = new ToolContext(jsonArgs)
-                {
-                    UserId = skillUser.Id,
-                    WorkspaceId = currentWorkspaceProvider.WorkspaceId,
-                    IsSuperAdmin = skillUser.Roles.Contains("SuperAdmin")
-                };
-                var skillResult = await skill.ExecuteAsync(skillContext, ct);
-
-                if (!skillResult.IsSuccess)
-                {
-                    await WriteErrorEventAsync($"Skill error: {skillResult.Error}", ct);
-                    return;
-                }
-
-                // Inject skill result into history as tool call/result pair
-                var toolCallId = Guid.NewGuid().ToString();
-                history.Add(new ChatMessage(
-                    ChatRole.Assistant,
-                    Content: null,
-                    ToolCalls: [new ToolCall(toolCallId, command.SkillName, jsonArgs)]));
-                history.Add(new ChatMessage(ChatRole.Tool, skillResult.Output ?? "", toolCallId));
+                // Override the message — strip the slash prefix, keep args as user input
+                request = request with { Message = string.IsNullOrWhiteSpace(command.RawArguments)
+                    ? $"Execute the task defined by the {agent.Name} agent."
+                    : command.RawArguments };
             }
 
             // Convert image attachments to ImageContent
@@ -145,7 +127,7 @@ public class ChatController(
             await activityTracker.TrackAsync(streamUserId, currentUser.Name,
                 ActivityType.Chat, ActivityStatus.Started, sourceId, sourceName, ct: ct);
 
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, ct);
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, ct);
 
             await foreach (var evt in eventStream)
             {
@@ -235,77 +217,11 @@ public class ChatController(
         var history = conversation.Messages.Select(m => m.ToLlmMessage()).ToList();
         var isFirstMessage = conversation.Messages.Count == 0;
 
-        // Compact history if too long
-        history = await CompactHistoryIfNeededAsync(history, ct);
+        // Compact history using refreshing agent compressor
+        var llmProvider = await llmProviderFactory.GetProviderAsync(GetUserId(), ct: ct);
+        history = await contextCompressor.CompressIfNeededAsync(history, llmProvider, ct: ct);
 
         return (conversation, history, isFirstMessage);
-    }
-
-    private const int MaxTokenEstimate = 4000; // ~4k tokens for context
-    private const int RecentMessagesToKeep = 6; // Keep last 3 exchanges (6 messages)
-
-    private async Task<List<ChatMessage>> CompactHistoryIfNeededAsync(
-        List<ChatMessage> history,
-        CancellationToken ct)
-    {
-        if (history.Count <= RecentMessagesToKeep)
-            return history;
-
-        // Estimate tokens (rough: 1 token ≈ 4 chars for English, 1.5 chars for Chinese)
-        var totalChars = history.Sum(m => m.Content?.Length ?? 0);
-        var estimatedTokens = totalChars / 2; // Conservative estimate
-
-        if (estimatedTokens <= MaxTokenEstimate)
-            return history;
-
-        // Split into old messages (to summarize) and recent messages (to keep)
-        var oldMessages = history.Take(history.Count - RecentMessagesToKeep).ToList();
-        var recentMessages = history.Skip(history.Count - RecentMessagesToKeep).ToList();
-
-        // Summarize old messages
-        var summary = await SummarizeConversationAsync(oldMessages, ct);
-
-        // Return summary + recent messages
-        var compacted = new List<ChatMessage>
-        {
-            new(ChatRole.System, $"[Previous conversation summary]\n{summary}")
-        };
-        compacted.AddRange(recentMessages);
-
-        return compacted;
-    }
-
-    private async Task<string> SummarizeConversationAsync(
-        List<ChatMessage> messages,
-        CancellationToken ct)
-    {
-        const string systemPrompt = """
-            Summarize the following conversation concisely.
-            Focus on key topics discussed, decisions made, and important context.
-            Keep the summary under 500 characters.
-            Use the same language as the conversation.
-            """;
-
-        var conversationText = string.Join("\n", messages.Select(m =>
-            $"{(m.Role == ChatRole.User ? "User" : "Assistant")}: {m.Content}"));
-
-        var summaryMessages = new List<ChatMessage>
-        {
-            new(ChatRole.System, systemPrompt),
-            new(ChatRole.User, conversationText)
-        };
-
-        try
-        {
-            var llmProvider = await llmProviderFactory.GetProviderAsync(GetUserId(), ct: ct);
-            var response = await llmProvider.ChatAsync(summaryMessages, ct: ct);
-            return response.Content ?? "Previous conversation context.";
-        }
-        catch
-        {
-            // Fallback: just truncate
-            return conversationText.Length > 500 ? conversationText[..500] + "..." : conversationText;
-        }
     }
 
     private async Task<string> GenerateTitleAsync(

@@ -189,8 +189,7 @@ public class CronJobExecutor(
                     var result = await tool.ExecuteAsync(new ToolContext(mergedArgs)
                     {
                         UserId = userId,
-                        WorkspaceId = job.WorkspaceId,
-                        IsSuperAdmin = false
+                        WorkspaceId = job.WorkspaceId
                     });
                     toolResult = result.IsSuccess ? result.Output ?? "" : $"Error: {result.Error}";
                 }

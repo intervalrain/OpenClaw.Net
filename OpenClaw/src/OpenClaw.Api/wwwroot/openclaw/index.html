@@ -411,6 +411,54 @@
         </div>
     </div>
 
+    <!-- Token Usage Modal -->
+    <div id="token-usage-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content token-usage-modal-content">
+            <div class="modal-header">
+                <h3>Token Usage</h3>
+                <button class="modal-close" id="token-usage-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="usage-session-section">
+                    <h4>Current Session</h4>
+                    <div class="usage-stats">
+                        <div class="usage-stat-card">
+                            <div class="usage-stat-value" id="usage-input-tokens">0</div>
+                            <div class="usage-stat-label">Input Tokens</div>
+                        </div>
+                        <div class="usage-stat-card">
+                            <div class="usage-stat-value" id="usage-output-tokens">0</div>
+                            <div class="usage-stat-label">Output Tokens</div>
+                        </div>
+                        <div class="usage-stat-card">
+                            <div class="usage-stat-value" id="usage-total-tokens">0</div>
+                            <div class="usage-stat-label">Total Tokens</div>
+                        </div>
+                    </div>
+                    <div class="usage-detail-row">
+                        <span class="usage-detail-label">LLM Calls</span>
+                        <span class="usage-detail-value" id="usage-call-count">0</span>
+                    </div>
+                    <div class="usage-detail-row">
+                        <span class="usage-detail-label">Estimated Cost</span>
+                        <span class="usage-detail-value" id="usage-estimated-cost">$0.00</span>
+                    </div>
+                </div>
+                <div class="usage-history-section">
+                    <h4>Per-Message Breakdown</h4>
+                    <div class="usage-history-list" id="usage-history-list">
+                        <div class="usage-empty">No usage data yet. Send a message to start tracking.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="token-usage-reset">Reset Session</button>
+                <button class="btn btn-primary" id="token-usage-done">Done</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 

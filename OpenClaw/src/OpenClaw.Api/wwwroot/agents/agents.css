@@ -1,0 +1,308 @@
+/* ── Agents Page ── */
+
+:root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #1c2128;
+    --border-color: #30363d;
+    --text-color: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --purple: #bc8cff;
+}
+
+[data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #eaeef2;
+    --border-color: #d0d7de;
+    --text-color: #1f2328;
+    --text-muted: #656d76;
+    --accent: #0969da;
+    --accent-hover: #0550ae;
+    --green: #1a7f37;
+    --red: #cf222e;
+    --purple: #8250df;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.agents-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ── Sidebar ── */
+
+.agents-sidebar {
+    width: 260px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.btn-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    transition: all 0.15s;
+}
+
+.btn-icon:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.agent-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.agent-item {
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: background 0.1s;
+}
+
+.agent-item:hover { background: var(--bg-tertiary); }
+
+.agent-item.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.agent-item.active .agent-item-desc { color: rgba(255,255,255,0.7); }
+
+.agent-item-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.agent-item-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty-hint {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 20px;
+}
+
+/* ── Main ── */
+
+.agents-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    padding: 0 16px;
+}
+
+.tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.tab:hover { color: var(--text-color); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.panel {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.panel.active { display: block; }
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    gap: 12px;
+}
+
+/* ── Agent Editor ── */
+
+.agent-editor {
+    max-width: 700px;
+}
+
+.editor-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.editor-name {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-color);
+    padding: 4px 0;
+    outline: none;
+}
+
+.editor-name:focus { border-bottom-color: var(--accent); }
+
+.editor-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.editor-field {
+    margin-bottom: 16px;
+}
+
+.editor-field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.editor-field input[type="text"],
+.editor-field input[type="number"],
+.editor-field textarea {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text-color);
+    font-size: 0.85rem;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.editor-field textarea { font-family: 'SF Mono', Menlo, monospace; font-size: 0.8rem; }
+
+.editor-field input:focus,
+.editor-field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* ── Tool/SubAgent chips ── */
+
+.tool-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.chip-label {
+    cursor: pointer;
+}
+
+.chip-label input { display: none; }
+
+.chip {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    transition: all 0.15s;
+}
+
+.chip-label input:checked + .chip {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.chip:hover { border-color: var(--accent); }
+
+/* ── Buttons ── */
+
+.btn { padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; cursor: pointer; border: none; }
+.btn-sm { padding: 5px 12px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); }
+.btn-outline:hover { border-color: var(--red); color: var(--red); }
+
+/* ── DAG ── */
+
+.mermaid-container {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    overflow: auto;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 768px) {
+    .agents-layout { flex-direction: column; }
+    .agents-sidebar { width: 100%; max-height: 180px; border-right: none; border-bottom: 1px solid var(--border-color); }
+}
