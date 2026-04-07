@@ -14,14 +14,16 @@ public class UpdatesController(
     IConfigStore configStore) : ApiController
 {
     /// <summary>
-    /// Get current update status (current version, latest available, update available).
+    /// Get current update status + progress (available to all authenticated users).
     /// </summary>
     [HttpGet("status")]
-    [AllowAnonymous] // Allow all authenticated users to see version
+    [AllowAnonymous]
     public IActionResult GetStatus()
     {
         var currentVersion = UpdateCheckerService.CurrentVersion.ToString();
         var latestVersion = configStore.Get(ConfigKeys.LatestAvailableVersion);
+        var updateStatus = configStore.Get(ConfigKeys.UpdateStatus) ?? "idle";
+        var statusMessage = configStore.Get(ConfigKeys.UpdateStatusMessage);
 
         var updateAvailable = false;
         if (latestVersion is not null)
@@ -34,7 +36,9 @@ public class UpdatesController(
         {
             currentVersion,
             latestVersion,
-            updateAvailable
+            updateAvailable,
+            updateStatus,
+            statusMessage
         });
     }
 
@@ -56,6 +60,27 @@ public class UpdatesController(
             releaseUrl = result.LatestRelease?.HtmlUrl,
             publishedAt = result.LatestRelease?.PublishedAt
         });
+    }
+
+    /// <summary>
+    /// Apply the update — pull new image and restart container (SuperAdmin only).
+    /// Runs in background; poll GET /status for progress.
+    /// </summary>
+    [HttpPost("apply")]
+    public async Task<IActionResult> ApplyUpdate(CancellationToken ct)
+    {
+        var latestVersion = configStore.Get(ConfigKeys.LatestAvailableVersion);
+        if (latestVersion is null)
+            return BadRequest("No update available. Run POST /check first.");
+
+        var currentStatus = configStore.Get(ConfigKeys.UpdateStatus);
+        if (currentStatus is "pulling" or "restarting")
+            return Conflict("Update already in progress.");
+
+        // Start update in background (fire-and-forget — will survive even if this request ends)
+        _ = Task.Run(() => updateChecker.ApplyUpdateAsync(latestVersion));
+
+        return Accepted(new { message = "Update started. Poll GET /status for progress." });
     }
 
     /// <summary>

@@ -28,6 +28,9 @@ public class UpdateCheckerService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Check if we just finished an update (container was restarted)
+        await CheckPostUpdateAsync();
+
         // Wait 2 minutes after startup before first check
         await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken);
 
@@ -174,6 +177,86 @@ public class UpdateCheckerService(
         }
     }
 
+    /// <summary>
+    /// Applies the update: pulls new Docker image and restarts the container.
+    /// Progress is written to IConfigStore so all clients can poll status.
+    /// </summary>
+    public async Task ApplyUpdateAsync(string targetVersion)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var configStore = scope.ServiceProvider.GetRequiredService<IConfigStore>();
+
+        try
+        {
+            await SetStatusAsync(configStore, "pulling", $"Pulling latest image for {targetVersion}...");
+
+            // docker compose pull api
+            var pullResult = await RunDockerCommandAsync("docker compose pull api");
+            if (pullResult.ExitCode != 0)
+            {
+                await SetStatusAsync(configStore, "failed", $"Pull failed: {pullResult.Error}");
+                return;
+            }
+
+            await SetStatusAsync(configStore, "restarting", "Restarting container with new image...");
+
+            // docker compose up -d --no-deps api (recreates only the api container)
+            _ = RunDockerCommandAsync("docker compose up -d --no-deps api");
+
+            // Note: this process will be killed when the container restarts.
+            // The new container will read UPDATE_STATUS=restarting from DB.
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Update apply failed");
+            try { await SetStatusAsync(configStore, "failed", ex.Message); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Called on startup to check if we just finished an update.
+    /// </summary>
+    public async Task CheckPostUpdateAsync()
+    {
+        using var scope = scopeFactory.CreateScope();
+        var configStore = scope.ServiceProvider.GetRequiredService<IConfigStore>();
+
+        var status = configStore.Get(ConfigKeys.UpdateStatus);
+        if (status is "restarting")
+        {
+            await SetStatusAsync(configStore, "completed",
+                $"Successfully updated to {CurrentVersion}");
+            logger.LogInformation("Post-update: marked update as completed (v{Version})", CurrentVersion);
+        }
+    }
+
+    private static async Task SetStatusAsync(IConfigStore configStore, string status, string message)
+    {
+        await configStore.SetAsync(ConfigKeys.UpdateStatus, status);
+        await configStore.SetAsync(ConfigKeys.UpdateStatusMessage, message);
+    }
+
+    private static async Task<DockerResult> RunDockerCommandAsync(string command)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "/bin/sh",
+            Arguments = $"-c \"{command}\"",
+            WorkingDirectory = "/app/project",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = System.Diagnostics.Process.Start(psi)!;
+        var output = await process.StandardOutput.ReadToEndAsync();
+        var error = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        return new DockerResult(process.ExitCode, output, error);
+    }
+
     private static string TruncateReleaseNotes(string? body, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(body)) return "No release notes.";
@@ -182,3 +265,4 @@ public class UpdateCheckerService(
 }
 
 public record UpdateCheckResult(bool UpdateAvailable, string CurrentVersion, GitHubReleaseInfo? LatestRelease);
+public record DockerResult(int ExitCode, string Output, string Error);

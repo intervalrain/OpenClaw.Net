@@ -20,6 +20,8 @@ services:
       - AllowedHosts=*
     volumes:
       - ./.data/workspace:/app/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app/project:ro
     depends_on:
       postgres:
         condition: service_healthy

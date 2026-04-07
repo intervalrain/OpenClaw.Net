@@ -304,7 +304,7 @@ function initTopHeader(activePage = '') {
     initTheme();
 }
 
-// Check for updates and show badge
+// Check for updates and show badge / overlay
 async function checkForUpdateBadge() {
     try {
         const token = typeof getToken === 'function' ? getToken() : null;
@@ -314,6 +314,21 @@ async function checkForUpdateBadge() {
         });
         if (!res.ok) return;
         const data = await res.json();
+
+        // Show progress overlay if update is in progress
+        if (data.updateStatus === 'pulling' || data.updateStatus === 'restarting') {
+            showUpdateOverlay(data.updateStatus, data.statusMessage);
+            pollUpdateProgress();
+            return;
+        }
+
+        // Show "completed" briefly then dismiss
+        if (data.updateStatus === 'completed') {
+            showUpdateOverlay('completed', data.statusMessage);
+            setTimeout(() => removeUpdateOverlay(), 5000);
+        }
+
+        // Show badge if update available
         const badge = document.getElementById('navUpdateBadge');
         if (badge && data.updateAvailable) {
             badge.style.display = 'flex';
@@ -326,6 +341,58 @@ async function checkForUpdateBadge() {
             });
         }
     } catch {}
+}
+
+function showUpdateOverlay(status, message) {
+    let overlay = document.getElementById('update-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'update-overlay';
+        overlay.className = 'update-overlay';
+        document.body.appendChild(overlay);
+    }
+    const icon = status === 'completed'
+        ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+        : '<svg class="spin" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>';
+    overlay.innerHTML = `
+        <div class="update-overlay-content">
+            ${icon}
+            <h3>${status === 'completed' ? 'Update Complete' : 'Updating...'}</h3>
+            <p>${message || ''}</p>
+            ${status === 'restarting' ? '<p class="update-hint">Server is restarting. This page will reload automatically.</p>' : ''}
+        </div>
+    `;
+}
+
+function removeUpdateOverlay() {
+    document.getElementById('update-overlay')?.remove();
+}
+
+function pollUpdateProgress() {
+    const token = typeof getToken === 'function' ? getToken() : null;
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/v1/updates/status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('offline');
+            const data = await res.json();
+
+            if (data.updateStatus === 'completed') {
+                clearInterval(interval);
+                showUpdateOverlay('completed', data.statusMessage);
+                setTimeout(() => window.location.reload(), 3000);
+            } else if (data.updateStatus === 'failed') {
+                clearInterval(interval);
+                showUpdateOverlay('failed', data.statusMessage);
+            } else {
+                showUpdateOverlay(data.updateStatus, data.statusMessage);
+            }
+        } catch {
+            // Server is down (restarting) — keep polling
+            showUpdateOverlay('restarting', 'Server is restarting...');
+        }
+    }, 3000);
 }
 
 // Auto-initialize when DOM is ready
