@@ -26,6 +26,11 @@ public class SmtpEmailService(
             if (enabled is not null)
                 return string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase);
 
+            // If SMTP server is configured in DB, consider email enabled
+            var dbServer = configStore.Get($"{KeyPrefix}SmtpServer");
+            if (!string.IsNullOrEmpty(dbServer))
+                return true;
+
             return _fallback.EnableEmailNotifications
                 && !string.IsNullOrEmpty(_fallback.SmtpSettings.Server);
         }

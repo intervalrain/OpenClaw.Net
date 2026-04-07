@@ -28,22 +28,34 @@ const deleteModal = document.getElementById('deleteModal');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check if user is SuperAdmin
+    // Check if user is Admin or SuperAdmin
     const user = getCurrentUser();
-    if (!user || !user.roles || !user.roles.some(r => r.toLowerCase() === 'superadmin')) {
-        alert('Access denied. SuperAdmin role required.');
+    const isSuperAdmin = user?.roles?.some(r => r.toLowerCase() === 'superadmin');
+    const isAdmin = isSuperAdmin || user?.roles?.some(r => r.toLowerCase() === 'admin');
+    if (!isAdmin) {
+        alert('Access denied. Admin role required.');
         window.location.href = '/';
         return;
+    }
+
+    // Hide SuperAdmin-only tabs for non-SuperAdmin users
+    if (!isSuperAdmin) {
+        document.querySelectorAll('.superadmin-tab').forEach(el => el.style.display = 'none');
     }
 
     initTabs();
     initModals();
     initFilters();
     initProviderUI();
-    initAppConfigUI();
-    initEmailSettingsUI();
+    if (isSuperAdmin) {
+        initAppConfigUI();
+        initEmailSettingsUI();
+    }
     initEventDelegation();
-    await Promise.all([loadUsers(), loadGlobalProviders(), loadAppConfigs()]);
+
+    const promises = [loadUsers(), loadGlobalProviders()];
+    if (isSuperAdmin) promises.push(loadAppConfigs());
+    await Promise.all(promises);
 });
 
 // Tab switching
