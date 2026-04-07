@@ -92,6 +92,14 @@ function createTopHeader(activePage = '') {
                     <span>API</span>
                 </a>
                 <div class="nav-spacer"></div>
+                <div class="nav-update-badge" id="navUpdateBadge" style="display: none;" title="Update available">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span class="update-dot"></span>
+                </div>
                 <button class="theme-toggle" id="themeToggle" title="Toggle theme">
                     <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"/>
@@ -296,9 +304,34 @@ function initTopHeader(activePage = '') {
     initTheme();
 }
 
+// Check for updates and show badge
+async function checkForUpdateBadge() {
+    try {
+        const token = typeof getToken === 'function' ? getToken() : null;
+        if (!token) return;
+        const res = await fetch('/api/v1/updates/status', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = document.getElementById('navUpdateBadge');
+        if (badge && data.updateAvailable) {
+            badge.style.display = 'flex';
+            badge.title = `Update available: ${data.latestVersion}`;
+            badge.style.cursor = 'pointer';
+            badge.addEventListener('click', () => {
+                if (data.latestVersion) {
+                    window.open(`https://github.com/intervalrain/OpenClaw.Net/releases/tag/${data.latestVersion}`, '_blank');
+                }
+            });
+        }
+    } catch {}
+}
+
 // Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => initTopHeader());
+    document.addEventListener('DOMContentLoaded', () => { initTopHeader(); checkForUpdateBadge(); });
 } else {
     initTopHeader();
+    checkForUpdateBadge();
 }

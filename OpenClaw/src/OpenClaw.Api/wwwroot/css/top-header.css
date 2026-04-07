@@ -194,6 +194,40 @@
     margin: 4px 0;
 }
 
+/* ── Update Badge ── */
+
+.nav-update-badge {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 6px;
+    color: #3fb950;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.nav-update-badge:hover {
+    background: #2a2a3e;
+}
+
+.update-dot {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    background: #3fb950;
+    border-radius: 50%;
+    border: 2px solid #1a1a2e;
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
 /* Responsive - hide text on small screens */
 @media (max-width: 768px) {
     .top-nav .nav-link span {
