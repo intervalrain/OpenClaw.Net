@@ -814,7 +814,8 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 12px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
+    overflow-y: auto;
+    max-height: 220px;
     display: none;
     z-index: 100;
 }
@@ -825,8 +826,9 @@ body {
 
 .autocomplete-item {
     display: flex;
-    flex-direction: column;
-    padding: 10px 14px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
     cursor: pointer;
     transition: background 0.1s;
 }
@@ -837,18 +839,18 @@ body {
 }
 
 .autocomplete-command {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     color: var(--accent);
+    white-space: nowrap;
 }
 
 .autocomplete-desc {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin-top: 2px;
 }
 
 /* Status Indicator */

@@ -18,6 +18,7 @@ using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
 
 using OpenClaw.Contracts.Workspaces;
+using OpenClaw.Tools.FileSystem;
 using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
@@ -30,11 +31,13 @@ public class ChatController(
     IConversationRepository repository,
     ICurrentUserProvider currentUserProvider,
     ILlmProviderFactory llmProviderFactory,
-    ISlashCommandParser slashCommandParser,
+    IChatSyntaxParser chatSyntaxParser,
     IAgentActivityTracker activityTracker,
     ICurrentWorkspaceProvider currentWorkspaceProvider,
     IContextCompressor contextCompressor,
     IAgentDefinitionRepository agentDefinitionRepo,
+    IToolRegistry toolRegistry,
+    IToolInstanceResolver toolInstanceResolver,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -93,26 +96,90 @@ public class ChatController(
         {
             string assistantResponse = "";
 
-            if (slashCommandParser.TryParse(request.Message, out var command))
+            var syntaxResult = chatSyntaxParser.Parse(request.Message);
+            switch (syntaxResult)
             {
-                // Slash commands invoke agents (AgentDefinition from DB)
-                var agent = await agentDefinitionRepo.GetByNameAsync(command!.SkillName, ct);
-                if (agent == null)
+                case AgentInvokeResult agentInvoke:
                 {
-                    var availableAgents = (await agentDefinitionRepo.GetAllAsync(ct)).Select(a => a.Name);
-                    await WriteErrorEventAsync($"Agent '{command.SkillName}' not found. Available: {string.Join(", ", availableAgents)}", ct);
-                    return;
+                    // // mounts an agent (system prompt + tool set)
+                    var agent = await agentDefinitionRepo.GetByNameAsync(agentInvoke.AgentName, ct);
+                    if (agent == null)
+                    {
+                        var availableAgents = (await agentDefinitionRepo.GetAllAsync(ct)).Select(a => a.Name);
+                        await WriteErrorEventAsync($"Agent '{agentInvoke.AgentName}' not found. Available: {string.Join(", ", availableAgents)}", ct);
+                        return;
+                    }
+
+                    history.Insert(0, new ChatMessage(
+                        ChatRole.System,
+                        $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
+
+                    request = request with { Message = string.IsNullOrWhiteSpace(agentInvoke.RawArguments)
+                        ? $"Execute the task defined by the {agent.Name} agent."
+                        : agentInvoke.RawArguments };
+                    break;
                 }
 
-                // Mount agent: inject its system prompt into history
-                history.Insert(0, new ChatMessage(
-                    ChatRole.System,
-                    $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
+                case ToolInvokeResult toolInvoke:
+                {
+                    // / adds a tool to context and passes args to LLM
+                    var tool = toolRegistry.GetSkill(toolInvoke.ToolName);
+                    if (tool == null)
+                    {
+                        var availableTools = toolRegistry.GetAllSkills().Select(t => t.Name);
+                        await WriteErrorEventAsync($"Tool '{toolInvoke.ToolName}' not found. Available: {string.Join(", ", availableTools.Take(20))}", ct);
+                        return;
+                    }
 
-                // Override the message — strip the slash prefix, keep args as user input
-                request = request with { Message = string.IsNullOrWhiteSpace(command.RawArguments)
-                    ? $"Execute the task defined by the {agent.Name} agent."
-                    : command.RawArguments };
+                    history.Add(new ChatMessage(ChatRole.System,
+                        $"[Tool Context: {tool.Name}]\nThe user wants to use the '{tool.Name}' tool.\n" +
+                        $"Description: {tool.Description}\n" +
+                        $"You MUST call the '{tool.Name}' tool to fulfill this request."));
+
+                    request = request with { Message = string.IsNullOrWhiteSpace(toolInvoke.RawArguments)
+                        ? $"Use the {tool.Name} tool."
+                        : toolInvoke.RawArguments };
+                    break;
+                }
+
+                case PlainMessageResult plain:
+                {
+                    // Inject @file references as context
+                    var wsId = currentWorkspaceProvider.WorkspaceId;
+                    foreach (var fileRef in plain.FileReferences)
+                    {
+                        try
+                        {
+                            var resolvedPath = PathSecurity.ResolveWorkspacePath(fileRef, wsId);
+                            var error = PathSecurity.ValidateWorkspacePath(resolvedPath, wsId,
+                                currentUserProvider.GetCurrentUser().Roles.Contains(Weda.Core.Application.Security.Models.Role.SuperAdmin));
+                            if (error is not null) continue;
+                            if (!System.IO.File.Exists(resolvedPath)) continue;
+
+                            var content = await System.IO.File.ReadAllTextAsync(resolvedPath, ct);
+                            if (content.Length > 50_000) content = content[..50_000] + "\n... (truncated)";
+
+                            history.Add(new ChatMessage(ChatRole.System,
+                                $"<file path=\"{fileRef}\">\n{content}\n</file>"));
+                        }
+                        catch { /* skip unreadable files */ }
+                    }
+                    break;
+                }
+            }
+
+            // Resolve #toolInstance references from message + mounted agent prompt
+            var combinedText = string.Join("\n", history.Where(h => h.Role == ChatRole.System).Select(h => h.Content ?? ""))
+                + "\n" + request.Message;
+            var instanceResolution = await toolInstanceResolver.ResolveAsync(combinedText, GetUserId(), ct);
+            if (instanceResolution.InstanceArgs.Count > 0)
+            {
+                var instanceInfo = instanceResolution.InstanceArgs
+                    .Select(kv => $"- Tool '{kv.Key}' has pre-filled args: {kv.Value}")
+                    .ToList();
+                history.Add(new ChatMessage(ChatRole.System,
+                    $"[Tool Instances]\nThe following tools have pre-configured parameters from user settings. " +
+                    $"When calling these tools, the pre-filled values will be automatically merged:\n{string.Join("\n", instanceInfo)}"));
             }
 
             // Convert image attachments to ImageContent

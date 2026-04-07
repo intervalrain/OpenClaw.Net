@@ -9,6 +9,8 @@ using OpenClaw.Application.Agents;
 using OpenClaw.Application.Agents.ContextProviders;
 using OpenClaw.Application.Agents.Middlewares;
 using OpenClaw.Application.CronJobs;
+using OpenClaw.Application.Agents.Tools;
+using OpenClaw.Application.Email.Tools;
 using OpenClaw.Application.Llm;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Configuration;
@@ -97,6 +99,8 @@ public static class ServiceCollectionExtensions
         services.AddSkillsFromAssemblies(configuration);
         services.AddScoped<IToolSettingsService, ToolSettingsService>();
         services.AddSingleton<ISlashCommandParser, SlashCommandParser>();
+        services.AddSingleton<IChatSyntaxParser, ChatSyntaxParser>();
+        services.AddScoped<IToolInstanceResolver, ToolInstanceResolver>();
         // services.AddSingleton<IAgentTool>(ReadFileSkill.Default);
         // services.AddSingleton<IAgentTool>(WriteFileSkill.Default);
         // services.AddSingleton<IAgentTool>(ListDirectorySkill.Default);
@@ -114,6 +118,14 @@ public static class ServiceCollectionExtensions
 
         // Structured output validation tool
         services.AddSingleton<IAgentTool, StructuredOutputTool>();
+
+        // Email tool (scoped IEmailService → needs IServiceScopeFactory)
+        services.AddSingleton<IAgentTool>(sp =>
+            new SendEmailTool(sp.GetRequiredService<IServiceScopeFactory>()));
+
+        // Agent management tool (chat-driven agent creation)
+        services.AddSingleton<IAgentTool>(sp =>
+            new ManageAgentTool(sp.GetRequiredService<IServiceScopeFactory>()));
 
         // Agent hooks (event-driven extensibility, fire-and-forget)
         services.AddSingleton<AgentHookExecutor>();
