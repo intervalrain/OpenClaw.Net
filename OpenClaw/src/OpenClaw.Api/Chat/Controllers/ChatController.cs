@@ -12,6 +12,7 @@ using OpenClaw.Contracts.Chat.Responses;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Domain.AgentActivities;
+using OpenClaw.Domain.Agents.Repositories;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
@@ -30,11 +31,10 @@ public class ChatController(
     ICurrentUserProvider currentUserProvider,
     ILlmProviderFactory llmProviderFactory,
     ISlashCommandParser slashCommandParser,
-    IToolRegistry skillRegistry,
-    IToolSettingsService skillSettingsService,
     IAgentActivityTracker activityTracker,
     ICurrentWorkspaceProvider currentWorkspaceProvider,
     IContextCompressor contextCompressor,
+    IAgentDefinitionRepository agentDefinitionRepo,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -95,44 +95,24 @@ public class ChatController(
 
             if (slashCommandParser.TryParse(request.Message, out var command))
             {
-                var skill = skillRegistry.GetSkill(command!.SkillName);
-                if (skill == null)
+                // Slash commands invoke agents (AgentDefinition from DB)
+                var agent = await agentDefinitionRepo.GetByNameAsync(command!.SkillName, ct);
+                if (agent == null)
                 {
-                    var availableSkills = string.Join(", ", skillRegistry.GetAllSkills().Select(s => s.Name));
-                    await WriteErrorEventAsync($"Skill '{command.SkillName}' not found. Available skills: {availableSkills}", ct);
+                    var availableAgents = (await agentDefinitionRepo.GetAllAsync(ct)).Select(a => a.Name);
+                    await WriteErrorEventAsync($"Agent '{command.SkillName}' not found. Available: {string.Join(", ", availableAgents)}", ct);
                     return;
                 }
 
-                if (!await skillSettingsService.IsEnabledAsync(command.SkillName, ct))
-                {
-                    await WriteErrorEventAsync($"Skill '{command.SkillName}' is disabled.", ct);
-                    return;
-                }
+                // Mount agent: inject its system prompt into history
+                history.Insert(0, new ChatMessage(
+                    ChatRole.System,
+                    $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
 
-                // Execute skill first
-                var skillUser = currentUserProvider.GetCurrentUser();
-                var jsonArgs = slashCommandParser.ConvertToJson(command, skill);
-                var skillContext = new ToolContext(jsonArgs)
-                {
-                    UserId = skillUser.Id,
-                    WorkspaceId = currentWorkspaceProvider.WorkspaceId,
-                    Roles = skillUser.Roles
-                };
-                var skillResult = await skill.ExecuteAsync(skillContext, ct);
-
-                if (!skillResult.IsSuccess)
-                {
-                    await WriteErrorEventAsync($"Skill error: {skillResult.Error}", ct);
-                    return;
-                }
-
-                // Inject skill result into history as tool call/result pair
-                var toolCallId = Guid.NewGuid().ToString();
-                history.Add(new ChatMessage(
-                    ChatRole.Assistant,
-                    Content: null,
-                    ToolCalls: [new ToolCall(toolCallId, command.SkillName, jsonArgs)]));
-                history.Add(new ChatMessage(ChatRole.Tool, skillResult.Output ?? "", toolCallId));
+                // Override the message — strip the slash prefix, keep args as user input
+                request = request with { Message = string.IsNullOrWhiteSpace(command.RawArguments)
+                    ? $"Execute the task defined by the {agent.Name} agent."
+                    : command.RawArguments };
             }
 
             // Convert image attachments to ImageContent

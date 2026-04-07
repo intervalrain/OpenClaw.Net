@@ -1054,7 +1054,7 @@ async function openSettingsModal() {
     document.getElementById('language-select').value = settings.language;
 
     // Load providers, skills, channel settings, app configs, and preferences from backend
-    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences()]);
+    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences(), loadAgentList()]);
     renderModelList();
     renderSkillsList();
     renderTelegramSettings();
@@ -1713,25 +1713,31 @@ function initPreferenceManagement() {
     if (valueInput) valueInput.addEventListener('keydown', handleEnter);
 }
 
-// Slash Command Autocomplete
+// Slash Command Autocomplete — invokes Agents (not tools)
 let autocompleteIndex = -1;
-let filteredSkills = [];
+let filteredAgents = [];
+let agentList = []; // loaded from /api/v1/agents
+
+async function loadAgentList() {
+    try {
+        const res = await authFetch('/api/v1/agents');
+        if (res.ok) agentList = await res.json();
+    } catch {}
+}
 
 function handleAutocompleteInput() {
     const value = userInputEl.value;
     const cursorPos = userInputEl.selectionStart;
 
-    // Check if we're typing a slash command at the start
     if (value.startsWith('/') && cursorPos <= value.indexOf(' ') + 1 || (value.startsWith('/') && !value.includes(' '))) {
         const query = value.slice(1).split(' ')[0].toLowerCase();
 
-        // Filter enabled skills
-        filteredSkills = skills
-            .filter(s => s.isEnabled && s.name.toLowerCase().includes(query))
-            .slice(0, 6); // Max 6 suggestions
+        filteredAgents = agentList
+            .filter(a => a.name.toLowerCase().includes(query))
+            .slice(0, 6);
 
-        if (filteredSkills.length > 0) {
-            showAutocomplete(filteredSkills);
+        if (filteredAgents.length > 0) {
+            showAutocomplete(filteredAgents);
         } else {
             hideAutocomplete();
         }
@@ -1740,20 +1746,19 @@ function handleAutocompleteInput() {
     }
 }
 
-function showAutocomplete(skillList) {
+function showAutocomplete(items) {
     const dropdown = document.getElementById('autocomplete-dropdown');
     autocompleteIndex = -1;
 
-    dropdown.innerHTML = skillList.map((s, i) => `
-        <div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(s.name)}">
-            <span class="autocomplete-command">/${escapeHtml(s.name)}</span>
-            <span class="autocomplete-desc">${escapeHtml(s.description)}</span>
+    dropdown.innerHTML = items.map((a, i) => `
+        <div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(a.name)}">
+            <span class="autocomplete-command">/${escapeHtml(a.name)}</span>
+            <span class="autocomplete-desc">${escapeHtml(a.description || '')}</span>
         </div>
     `).join('');
 
     dropdown.classList.add('visible');
 
-    // Add click handlers
     dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
         item.addEventListener('click', () => {
             autocompleteIndex = parseInt(item.dataset.index);
@@ -1770,7 +1775,7 @@ function hideAutocomplete() {
     const dropdown = document.getElementById('autocomplete-dropdown');
     dropdown.classList.remove('visible');
     autocompleteIndex = -1;
-    filteredSkills = [];
+    filteredAgents = [];
 }
 
 function isAutocompleteVisible() {
@@ -1778,11 +1783,11 @@ function isAutocompleteVisible() {
 }
 
 function navigateAutocomplete(direction) {
-    if (filteredSkills.length === 0) return;
+    if (filteredAgents.length === 0) return;
 
     autocompleteIndex += direction;
-    if (autocompleteIndex < 0) autocompleteIndex = filteredSkills.length - 1;
-    if (autocompleteIndex >= filteredSkills.length) autocompleteIndex = 0;
+    if (autocompleteIndex < 0) autocompleteIndex = filteredAgents.length - 1;
+    if (autocompleteIndex >= filteredAgents.length) autocompleteIndex = 0;
 
     updateAutocompleteSelection();
 }
@@ -1795,26 +1800,24 @@ function updateAutocompleteSelection() {
 }
 
 function getSelectedAutocompleteItem() {
-    if (autocompleteIndex >= 0 && autocompleteIndex < filteredSkills.length) {
-        return filteredSkills[autocompleteIndex];
+    if (autocompleteIndex >= 0 && autocompleteIndex < filteredAgents.length) {
+        return filteredAgents[autocompleteIndex];
     }
     return null;
 }
 
 function selectAutocompleteItem() {
-    const skill = getSelectedAutocompleteItem();
-    if (!skill) return;
+    const agent = getSelectedAutocompleteItem();
+    if (!agent) return;
 
-    // Replace the current slash command with selected one
     const currentValue = userInputEl.value;
     const spaceIndex = currentValue.indexOf(' ');
     const args = spaceIndex > 0 ? currentValue.slice(spaceIndex) : ' ';
 
-    userInputEl.value = `/${skill.name}${args}`;
+    userInputEl.value = `/${agent.name}${args}`;
     userInputEl.focus();
 
-    // Move cursor after the command
-    const newCursorPos = skill.name.length + 2; // +2 for '/' and space
+    const newCursorPos = agent.name.length + 2;
     userInputEl.setSelectionRange(newCursorPos, newCursorPos);
 
     hideAutocomplete();
