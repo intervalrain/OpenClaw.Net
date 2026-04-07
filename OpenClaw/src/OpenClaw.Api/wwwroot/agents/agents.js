@@ -161,36 +161,48 @@ async function renderDag() {
     try {
         const headers = { 'Authorization': `Bearer ${getToken()}` };
         const res = await fetch('/api/v1/agents/dag', { headers });
-        if (!res.ok) return;
+        if (!res.ok) {
+            console.error('DAG API returned', res.status);
+            throw new Error(`API ${res.status}`);
+        }
         dagData = await res.json();
 
         // Build Mermaid flowchart from DAG data
         let mermaidCode = 'graph LR\n';
 
-        // Style classes
-        mermaidCode += '  classDef tool fill:#1a3a2a,stroke:#3fb950,color:#e6edf3\n';
-        mermaidCode += '  classDef skill fill:#1a2a3a,stroke:#58a6ff,color:#e6edf3\n';
-        mermaidCode += '  classDef pipeline fill:#2a1a3a,stroke:#bc8cff,color:#e6edf3\n';
-
-        // Nodes
+        // Nodes — quote all labels to handle special chars
         for (const node of dagData.nodes) {
-            const shape = node.type === 'skill' ? `([${node.label}])`
-                        : node.type === 'pipeline' ? `{{${node.label}}}`
-                        : `[${node.label}]`;
-            mermaidCode += `  ${sanitizeId(node.id)}${shape}\n`;
-            mermaidCode += `  class ${sanitizeId(node.id)} ${node.type}\n`;
+            const id = sanitizeId(node.id);
+            const label = escapeLabel(node.label);
+            if (node.type === 'skill') {
+                mermaidCode += `  ${id}(["${label}"])\n`;
+            } else if (node.type === 'pipeline') {
+                mermaidCode += `  ${id}[/"${label}"\\]\n`;
+            } else {
+                mermaidCode += `  ${id}["${label}"]\n`;
+            }
         }
 
         // Edges
         for (const edge of dagData.edges) {
-            const label = edge.label ? `|${edge.label}|` : '';
+            const label = edge.label ? `|${escapeLabel(edge.label)}|` : '';
             mermaidCode += `  ${sanitizeId(edge.from)} -->${label} ${sanitizeId(edge.to)}\n`;
         }
 
-        const container = document.getElementById('dag-chart');
-        container.textContent = mermaidCode;
+        // Style classes
+        mermaidCode += '  classDef tool fill:#1a3a2a,stroke:#3fb950,color:#e6edf3\n';
+        mermaidCode += '  classDef skill fill:#1a2a3a,stroke:#58a6ff,color:#e6edf3\n';
+        mermaidCode += '  classDef pipeline fill:#2a1a3a,stroke:#bc8cff,color:#e6edf3\n';
+        for (const node of dagData.nodes) {
+            mermaidCode += `  class ${sanitizeId(node.id)} ${node.type}\n`;
+        }
 
-        // Re-initialize mermaid
+        console.log('Mermaid code:', mermaidCode);
+
+        // Remove previous render if exists
+        const existing = document.getElementById('dag-svg');
+        if (existing) existing.remove();
+
         mermaid.initialize({
             startOnLoad: false,
             theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'default' : 'dark',
@@ -199,14 +211,18 @@ async function renderDag() {
         });
 
         const { svg } = await mermaid.render('dag-svg', mermaidCode);
-        container.innerHTML = svg;
+        document.getElementById('dag-chart').innerHTML = svg;
         dagRendered = true;
 
     } catch (err) {
         console.error('Failed to render DAG:', err);
         document.getElementById('dag-chart').innerHTML =
-            '<p style="color: var(--text-muted); text-align: center;">Failed to load DAG</p>';
+            `<p style="color: var(--text-muted); text-align: center;">Failed to load DAG: ${err.message}</p>`;
     }
+}
+
+function escapeLabel(text) {
+    return text.replace(/"/g, "'").replace(/[<>{}]/g, '');
 }
 
 function sanitizeId(id) {
