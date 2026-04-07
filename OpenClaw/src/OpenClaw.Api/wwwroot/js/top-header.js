@@ -92,6 +92,14 @@ function createTopHeader(activePage = '') {
                     <span>API</span>
                 </a>
                 <div class="nav-spacer"></div>
+                <div class="nav-update-badge" id="navUpdateBadge" style="display: none;" title="Update available">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span class="update-dot"></span>
+                </div>
                 <button class="theme-toggle" id="themeToggle" title="Toggle theme">
                     <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"/>
@@ -296,9 +304,101 @@ function initTopHeader(activePage = '') {
     initTheme();
 }
 
+// Check for updates and show badge / overlay
+async function checkForUpdateBadge() {
+    try {
+        const token = typeof getToken === 'function' ? getToken() : null;
+        if (!token) return;
+        const res = await fetch('/api/v1/updates/status', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Show progress overlay if update is in progress
+        if (data.updateStatus === 'pulling' || data.updateStatus === 'restarting') {
+            showUpdateOverlay(data.updateStatus, data.statusMessage);
+            pollUpdateProgress();
+            return;
+        }
+
+        // Show "completed" briefly then dismiss
+        if (data.updateStatus === 'completed') {
+            showUpdateOverlay('completed', data.statusMessage);
+            setTimeout(() => removeUpdateOverlay(), 5000);
+        }
+
+        // Show badge if update available
+        const badge = document.getElementById('navUpdateBadge');
+        if (badge && data.updateAvailable) {
+            badge.style.display = 'flex';
+            badge.title = `Update available: ${data.latestVersion}`;
+            badge.style.cursor = 'pointer';
+            badge.addEventListener('click', () => {
+                if (data.latestVersion) {
+                    window.open(`https://github.com/intervalrain/OpenClaw.Net/releases/tag/${data.latestVersion}`, '_blank');
+                }
+            });
+        }
+    } catch {}
+}
+
+function showUpdateOverlay(status, message) {
+    let overlay = document.getElementById('update-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'update-overlay';
+        overlay.className = 'update-overlay';
+        document.body.appendChild(overlay);
+    }
+    const icon = status === 'completed'
+        ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+        : '<svg class="spin" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>';
+    overlay.innerHTML = `
+        <div class="update-overlay-content">
+            ${icon}
+            <h3>${status === 'completed' ? 'Update Complete' : 'Updating...'}</h3>
+            <p>${message || ''}</p>
+            ${status === 'restarting' ? '<p class="update-hint">Server is restarting. This page will reload automatically.</p>' : ''}
+        </div>
+    `;
+}
+
+function removeUpdateOverlay() {
+    document.getElementById('update-overlay')?.remove();
+}
+
+function pollUpdateProgress() {
+    const token = typeof getToken === 'function' ? getToken() : null;
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/v1/updates/status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('offline');
+            const data = await res.json();
+
+            if (data.updateStatus === 'completed') {
+                clearInterval(interval);
+                showUpdateOverlay('completed', data.statusMessage);
+                setTimeout(() => window.location.reload(), 3000);
+            } else if (data.updateStatus === 'failed') {
+                clearInterval(interval);
+                showUpdateOverlay('failed', data.statusMessage);
+            } else {
+                showUpdateOverlay(data.updateStatus, data.statusMessage);
+            }
+        } catch {
+            // Server is down (restarting) — keep polling
+            showUpdateOverlay('restarting', 'Server is restarting...');
+        }
+    }, 3000);
+}
+
 // Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => initTopHeader());
+    document.addEventListener('DOMContentLoaded', () => { initTopHeader(); checkForUpdateBadge(); });
 } else {
     initTopHeader();
+    checkForUpdateBadge();
 }
