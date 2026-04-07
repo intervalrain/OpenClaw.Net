@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OpenClaw.Domain.Chat.Entities;
 using OpenClaw.Domain.Configuration.Entities;
+using OpenClaw.Domain.Agents.Entities;
 using OpenClaw.Domain.CronJobs.Entities;
 using OpenClaw.Domain.Users.Entities;
 using Weda.Core.Application.Security.Models;
@@ -53,6 +54,12 @@ public class AppDbContext : WedaDbContext
             .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
 
         modelBuilder.Entity<CronJob>()
+            .HasQueryFilter(e => IsSuperAdmin || e.CreatedByUserId == CurrentUserId);
+
+        modelBuilder.Entity<CronJobExecution>()
+            .HasQueryFilter(e => IsSuperAdmin || e.UserId == CurrentUserId);
+
+        modelBuilder.Entity<AgentDefinition>()
             .HasQueryFilter(e => IsSuperAdmin || e.CreatedByUserId == CurrentUserId);
 
         modelBuilder.Entity<ToolInstance>()

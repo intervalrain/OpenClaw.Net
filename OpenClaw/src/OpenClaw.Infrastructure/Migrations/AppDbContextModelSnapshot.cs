@@ -79,6 +79,71 @@ namespace OpenClaw.Infrastructure.Migrations
                     b.ToTable("agent_activities", (string)null);
                 });
 
+            modelBuilder.Entity("OpenClaw.Domain.Agents.Entities.AgentDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("MaxIterations")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_iterations");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("SubAgentIdsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sub_agent_ids_json");
+
+                    b.Property<string>("SystemPrompt")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("system_prompt");
+
+                    b.Property<string>("ToolsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tools_json");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_agent_definitions_user_id");
+
+                    b.HasIndex("WorkspaceId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_agent_definitions_ws_name");
+
+                    b.ToTable("agent_definitions", (string)null);
+                });
+
             modelBuilder.Entity("OpenClaw.Domain.Audit.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -442,6 +507,9 @@ namespace OpenClaw.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<int?>("MaxContextTokens")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ModelName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -500,6 +568,9 @@ namespace OpenClaw.Infrastructure.Migrations
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean")
                         .HasColumnName("is_default");
+
+                    b.Property<int?>("MaxContextTokens")
+                        .HasColumnType("integer");
 
                     b.Property<string>("ModelName")
                         .IsRequired()

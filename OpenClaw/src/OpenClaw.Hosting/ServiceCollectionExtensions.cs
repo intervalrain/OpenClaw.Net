@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 
 using OpenClaw.Application.AgentActivities;
 using OpenClaw.Application.Agents;
+using OpenClaw.Application.Agents.ContextProviders;
 using OpenClaw.Application.Agents.Middlewares;
 using OpenClaw.Application.CronJobs;
 using OpenClaw.Application.Llm;
@@ -16,7 +17,9 @@ using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
 using OpenClaw.Channels.Telegram.Extensions;
 using OpenClaw.Domain.AgentActivities.Repositories;
+using OpenClaw.Domain.Agents.Repositories;
 using OpenClaw.Domain.CronJobs.Repositories;
+using OpenClaw.Infrastructure.Agents.Persistence;
 using OpenClaw.Infrastructure.AgentActivities.Persistence;
 using OpenClaw.Infrastructure.Configuration;
 using OpenClaw.Infrastructure.Llm.Ollama;
@@ -56,6 +59,7 @@ public static class ServiceCollectionExtensions
         // Middlewares
         services.AddSingleton<LoggingMiddleware>();
         services.AddSingleton<ErrorHandlingMiddleware>();
+        services.AddSingleton<RetryMiddleware>();
         services.AddSingleton<TimeoutMiddleware>();
         services.AddSingleton<SecretRedactionMiddleware>();
 
@@ -72,10 +76,11 @@ public static class ServiceCollectionExtensions
         });
 
         // LLM Provider Factories (keyed) - for dynamic creation with custom params
-        services.AddKeyedSingleton<Func<string, string, ILlmProvider>>("ollama",
-            (_, _) => (url, model) => new OllamaLlmProvider(url, model));
-        services.AddKeyedSingleton<Func<string, string, ILlmProvider>>("openai",
-            (_, _) => (apiKey, model) => new OpenAILlmProvider(apiKey, model));
+        // maxContextTokens: DB value > hardcode lookup > conservative default
+        services.AddKeyedSingleton<Func<string, string, int?, ILlmProvider>>("ollama",
+            (_, _) => (url, model, maxCtx) => new OllamaLlmProvider(url, model, maxCtx));
+        services.AddKeyedSingleton<Func<string, string, int?, ILlmProvider>>("openai",
+            (_, _) => (apiKey, model, maxCtx) => new OpenAILlmProvider(apiKey, model, maxCtx));
 
         // Default LLM Provider (resolved from config)
         services.AddSingleton<ILlmProvider>(sp =>
@@ -99,16 +104,48 @@ public static class ServiceCollectionExtensions
         // services.AddSingleton<IAgentTool>(HttpRequestSkill.Default);
         // services.AddSingleton<IAgentTool>(WebSearchSkill.Default);
 
+        // Model context resolver: DB app-config > Ollama API / LiteLLM JSON > default
+        // Scoped because it depends on IConfigStore (scoped, uses DbContext)
+        services.AddScoped<IModelContextResolver, ModelContextResolver>();
+
+        // Feature flags (runtime, DB-backed, per-workspace overrides)
+        // Scoped because it depends on IConfigStore (scoped, uses DbContext)
+        services.AddScoped<IFeatureFlags, ConfigStoreFeatureFlags>();
+
+        // Structured output validation tool
+        services.AddSingleton<IAgentTool, StructuredOutputTool>();
+
+        // Agent hooks (event-driven extensibility, fire-and-forget)
+        services.AddSingleton<AgentHookExecutor>();
+
+        // System prompt assembly (composable context providers)
+        services.AddSingleton<IContextProvider, BaseSystemPromptProvider>(sp =>
+            new BaseSystemPromptProvider(sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value));
+        services.AddSingleton<IContextProvider, LanguageProvider>();
+        services.AddSingleton<SystemPromptAssembler>();
+
+        // Agent definitions (CRUD, DAG)
+        services.AddScoped<IAgentDefinitionRepository, AgentDefinitionRepository>();
+
+        // Context compression (refreshing agent approach)
+        services.AddSingleton<IContextCompressor, RefreshingAgentCompressor>();
+
         // pipeline (Scoped to allow dynamic provider switching per request)
         services.AddScoped<IAgentPipeline>(sp =>
         {
             var llmProviderFactory = sp.GetRequiredService<ILlmProviderFactory>();
-            var skills = sp.GetServices<IAgentTool>();
+            var baseSkills = sp.GetServices<IAgentTool>().ToList();
+
+            // Register spawn_agent tool for sub-agent support
+            var subAgentTool = new SubAgentTool(llmProviderFactory, baseSkills);
+            var skills = baseSkills.Concat<IAgentTool>([subAgentTool]);
+
             var options = sp.GetRequiredService<IOptions<AgentPipelineOptions>>().Value;
 
             var pipeline = new AgentPipelineBuilder(sp)
                 .Use<ErrorHandlingMiddleware>()
-                .Use<SecretRedactionMiddleware>()  // Redact secrets before logging
+                .Use<RetryMiddleware>()             // Retry transient LLM errors (inside error handling)
+                .Use<SecretRedactionMiddleware>()    // Redact secrets before logging
                 .Use<LoggingMiddleware>()
                 .Use<TimeoutMiddleware>()
                 .Build(llmProviderFactory, skills, options);

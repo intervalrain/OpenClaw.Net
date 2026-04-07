@@ -11,6 +11,7 @@ public class UserModelProvider : Entity<Guid>
     public string Url { get; private set; } = string.Empty;
     public string ModelName { get; private set; } = string.Empty;
     public string? EncryptedApiKey { get; private set; }
+    public int? MaxContextTokens { get; private set; }
     public bool IsDefault { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -52,7 +53,8 @@ public class UserModelProvider : Entity<Guid>
         string url,
         string modelName,
         string? encryptedApiKey,
-        bool isDefault = false)
+        bool isDefault = false,
+        int? maxContextTokens = null)
     {
         return new UserModelProvider
         {
@@ -63,6 +65,7 @@ public class UserModelProvider : Entity<Guid>
             Url = url,
             ModelName = modelName,
             EncryptedApiKey = encryptedApiKey,
+            MaxContextTokens = maxContextTokens,
             IsDefault = isDefault,
             CreatedAt = DateTime.UtcNow
         };

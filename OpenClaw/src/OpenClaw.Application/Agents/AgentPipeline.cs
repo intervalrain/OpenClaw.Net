@@ -1,8 +1,10 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using OpenClaw.Contracts.Agents;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
+using OpenClaw.Application.Agents.ContextProviders;
 using OpenClaw.Domain.Chat.Enums;
 
 namespace OpenClaw.Application.Agents;
@@ -12,7 +14,9 @@ public class AgentPipeline(
     IEnumerable<IAgentTool> skills,
     AgentPipelineOptions options,
     ISkillStore? skillStore = null,
-    IReadOnlyList<IAgentMiddleware>? middlewares = null) : IAgentPipeline
+    IReadOnlyList<IAgentMiddleware>? middlewares = null,
+    ILogger<AgentPipeline>? logger = null,
+    SystemPromptAssembler? promptAssembler = null) : IAgentPipeline
 {
     private readonly Dictionary<string, IAgentTool> _skillMap = skills.ToDictionary(s => s.Name);
     private readonly IReadOnlyList<IAgentMiddleware> _middlewares = middlewares ?? [];
@@ -24,6 +28,7 @@ public class AgentPipeline(
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
         Guid? workspaceId = null,
+        IReadOnlyList<string>? userRoles = null,
         CancellationToken ct = default)
     {
         var context = new AgentContext
@@ -36,11 +41,11 @@ public class AgentPipeline(
             Skills = _skillMap.Values.ToList(),
             Options = options,
             UserId = userId,
-            WorkspaceId = workspaceId
+            WorkspaceId = workspaceId,
+            UserRoles = userRoles ?? []
         };
 
-
-        var systemPrompt = BuildSystemPrompt(language);
+        var systemPrompt = await AssembleSystemPromptAsync(language, userInput, userId, workspaceId, userRoles, ct);
 
         if (!string.IsNullOrEmpty(systemPrompt))
         {
@@ -64,11 +69,12 @@ public class AgentPipeline(
         IReadOnlyList<ImageContent>? images = null,
         Guid? userId = null,
         Guid? workspaceId = null,
+        IReadOnlyList<string>? userRoles = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
 
-        var systemPrompt = BuildSystemPrompt(language);
+        var systemPrompt = await AssembleSystemPromptAsync(language, userInput, userId, workspaceId, userRoles, ct);
 
         if (!string.IsNullOrEmpty(systemPrompt))
         {
@@ -92,31 +98,69 @@ public class AgentPipeline(
         // Add user message with images if present
         messages.Add(new ChatMessage(ChatRole.User, processedInput, Images: images));
 
-        var toolDefinitions = _skillMap.Values
+        var allToolDefinitions = _skillMap.Values
             .Select(s => new ToolDefinition(s.Name, s.Description, s.Parameters))
             .ToList();
 
         // Add skill-specific tools that aren't already in the tool list
         foreach (var extraTool in extraTools)
         {
-            if (!toolDefinitions.Any(t => t.Name == extraTool.Name))
+            if (!allToolDefinitions.Any(t => t.Name == extraTool.Name))
             {
-                toolDefinitions.Add(extraTool);
+                allToolDefinitions.Add(extraTool);
             }
         }
+
+        // Deferred tool loading: when tool count exceeds threshold, only send tool_search
+        // to the LLM. The LLM discovers tools on demand. All tools remain dispatchable.
+        var toolDefinitions = allToolDefinitions;
+        ToolSearchTool? toolSearchTool = null;
+        if (options.DeferredToolThreshold > 0 && allToolDefinitions.Count > options.DeferredToolThreshold)
+        {
+            toolSearchTool = new ToolSearchTool(_skillMap.Values);
+            _skillMap.TryAdd(toolSearchTool.Name, toolSearchTool);
+            toolDefinitions =
+            [
+                new ToolDefinition(toolSearchTool.Name, toolSearchTool.Description, toolSearchTool.Parameters)
+            ];
+        }
+
+        // Plan mode: register enter/exit tools and track state
+        var planContext = new PlanModeContext();
+        var enterPlanTool = new EnterPlanModeTool { Context = planContext };
+        var exitPlanTool = new ExitPlanModeTool { Context = planContext };
+        _skillMap.TryAdd(enterPlanTool.Name, enterPlanTool);
+        _skillMap.TryAdd(exitPlanTool.Name, exitPlanTool);
+        if (toolDefinitions == allToolDefinitions) // not in deferred mode
+        {
+            toolDefinitions.Add(new ToolDefinition(enterPlanTool.Name, enterPlanTool.Description, enterPlanTool.Parameters));
+            toolDefinitions.Add(new ToolDefinition(exitPlanTool.Name, exitPlanTool.Description, exitPlanTool.Parameters));
+        }
+        var fullToolDefinitions = toolDefinitions.ToList(); // snapshot for restoring after plan mode
 
         var llmProvider = userId.HasValue
             ? await llmProviderFactory.GetProviderAsync(userId.Value, ct: ct)
             : await llmProviderFactory.GetProviderAsync(ct);
 
+        var totalUsage = LlmUsage.Empty;
+
         for (int i = 0; i < options.MaxIterations; i++)
         {
+            // In plan mode, filter tool definitions to read-only subset
+            var iterationTools = planContext.State == PlanModeState.Planning
+                ? toolDefinitions.Where(t => planContext.IsToolAllowed(t.Name)).ToList()
+                : (planContext.State == PlanModeState.Approved
+                    ? fullToolDefinitions  // restore all tools after plan approved
+                    : toolDefinitions);
+
             yield return new AgentStreamEvent(AgentStreamEventType.Thinking);
 
             var contentBuilder = new System.Text.StringBuilder();
             var toolCalls = new List<ToolCall>();
+            LlmUsage? iterationUsage = null;
 
-            await foreach (var chunk in llmProvider.ChatStreamAsync(messages, toolDefinitions, ct))
+            var streamLogger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AgentPipeline>.Instance;
+            await foreach (var chunk in LlmRetryHelper.StreamWithRetryAsync(llmProvider, messages, iterationTools, streamLogger, ct: ct))
             {
                 if (chunk.ContentDelta is not null)
                 {
@@ -128,6 +172,12 @@ public class AgentPipeline(
                 {
                     toolCalls.Add(chunk.ToolCall);
                 }
+
+                if (chunk.Usage is not null)
+                {
+                    iterationUsage = chunk.Usage;
+                    totalUsage += chunk.Usage;
+                }
             }
 
             var content = contentBuilder.ToString();
@@ -136,6 +186,7 @@ public class AgentPipeline(
             {
                 messages.Add(new ChatMessage(ChatRole.Assistant, content));
                 yield return new AgentStreamEvent(AgentStreamEventType.Completed, content);
+                yield return new AgentStreamEvent(AgentStreamEventType.UsageReport, Usage: totalUsage);
                 yield break;
             }
 
@@ -143,16 +194,70 @@ public class AgentPipeline(
 
             foreach (var toolCall in toolCalls)
             {
+                // Block disallowed tools in plan mode
+                if (!planContext.IsToolAllowed(toolCall.Name))
+                {
+                    var blocked = $"Tool '{toolCall.Name}' is not available in plan mode. Use read-only tools only.";
+                    messages.Add(new ChatMessage(ChatRole.Tool, blocked, toolCall.Id));
+                    yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, blocked, toolCall.Name);
+                    continue;
+                }
+
+                // Permission check
+                if (_skillMap.TryGetValue(toolCall.Name, out var permTool))
+                {
+                    var permContext = new ToolContext(toolCall.Arguments)
+                    {
+                        UserId = userId, WorkspaceId = workspaceId, Roles = userRoles ?? []
+                    };
+                    if (!ToolPermissionChecker.HasPermission(permTool, permContext))
+                    {
+                        var denied = ToolPermissionChecker.GetDenialMessage(permTool);
+                        messages.Add(new ChatMessage(ChatRole.Tool, denied, toolCall.Id));
+                        yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, denied, toolCall.Name);
+                        continue;
+                    }
+                }
+
                 yield return new AgentStreamEvent(AgentStreamEventType.ToolExecuting, ToolName: toolCall.Name);
 
-                var result = await ExecuteToolCallAsync(toolCall, userId, workspaceId, ct);
-                messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
-
-                yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, result, toolCall.Name);
+                // Stream progress if tool supports it, otherwise blocking execution
+                if (_skillMap.TryGetValue(toolCall.Name, out var tool) && tool is IStreamingAgentTool streamingTool)
+                {
+                    var toolContext = new ToolContext(toolCall.Arguments)
+                    {
+                        UserId = userId, WorkspaceId = workspaceId, Roles = userRoles ?? []
+                    };
+                    string resultText = "";
+                    await foreach (var progress in streamingTool.ExecuteStreamAsync(toolContext, ct))
+                    {
+                        switch (progress.Type)
+                        {
+                            case ToolProgressType.InProgress:
+                                yield return new AgentStreamEvent(AgentStreamEventType.ToolProgress, progress.Message, toolCall.Name);
+                                break;
+                            case ToolProgressType.Completed:
+                                resultText = progress.Result?.Output ?? "";
+                                break;
+                            case ToolProgressType.Failed:
+                                resultText = $"Error: {progress.Result?.Error ?? progress.Message}";
+                                break;
+                        }
+                    }
+                    messages.Add(new ChatMessage(ChatRole.Tool, resultText, toolCall.Id));
+                    yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, resultText, toolCall.Name);
+                }
+                else
+                {
+                    var result = await ExecuteToolCallAsync(toolCall, userId, workspaceId, userRoles, ct);
+                    messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
+                    yield return new AgentStreamEvent(AgentStreamEventType.ToolCompleted, result, toolCall.Name);
+                }
             }
         }
 
         yield return new AgentStreamEvent(AgentStreamEventType.Error, "Max iteration reached");
+        yield return new AgentStreamEvent(AgentStreamEventType.UsageReport, Usage: totalUsage);
     }
 
     /// <summary>
@@ -212,14 +317,26 @@ public class AgentPipeline(
         return (userInput, skillPrompt, extraTools);
     }
 
-    private string BuildSystemPrompt(string? language)
+    private async Task<string> AssembleSystemPromptAsync(
+        string? language, string? userInput, Guid? userId, Guid? workspaceId,
+        IReadOnlyList<string>? userRoles, CancellationToken ct)
     {
-        var parts = new List<string>();
-
-        if (options.SystemPrompt is not null)
+        if (promptAssembler is not null)
         {
-            parts.Add(options.SystemPrompt);
+            return await promptAssembler.AssembleAsync(new ContextProviderRequest
+            {
+                Language = language,
+                UserInput = userInput,
+                UserId = userId,
+                WorkspaceId = workspaceId,
+                UserRoles = userRoles
+            }, ct);
         }
+
+        // Fallback: inline assembly (for SubAgentTool which doesn't have DI)
+        var parts = new List<string>();
+        if (options.SystemPrompt is not null)
+            parts.Add(options.SystemPrompt);
 
         if (!string.IsNullOrEmpty(language) && language != "auto")
         {
@@ -231,11 +348,8 @@ public class AgentPipeline(
                 "kr" => "Always response in Korean.",
                 _ => null
             };
-
             if (langInstruction != null)
-            {
                 parts.Add(langInstruction);
-            }
         }
 
         return string.Join("\n\n", parts);
@@ -279,7 +393,7 @@ public class AgentPipeline(
 
             foreach (var toolCall in response.ToolCalls!)
             {
-                var result = await ExecuteToolCallAsync(toolCall, context.UserId, context.WorkspaceId, ct);
+                var result = await ExecuteToolCallAsync(toolCall, context.UserId, context.WorkspaceId, context.UserRoles, ct);
                 context.Messages.Add(new ChatMessage(ChatRole.Tool, result, toolCall.Id));
             }
         }
@@ -287,7 +401,7 @@ public class AgentPipeline(
         return "Max iteration reached";
     }
 
-    private async Task<string> ExecuteToolCallAsync(ToolCall toolCall, Guid? userId, Guid? workspaceId, CancellationToken ct)
+    private async Task<string> ExecuteToolCallAsync(ToolCall toolCall, Guid? userId, Guid? workspaceId, IReadOnlyList<string>? userRoles, CancellationToken ct)
     {
         if (!_skillMap.TryGetValue(toolCall.Name, out var skill))
         {
@@ -298,7 +412,7 @@ public class AgentPipeline(
         {
             UserId = userId,
             WorkspaceId = workspaceId,
-            IsSuperAdmin = false
+            Roles = userRoles ?? []
         };
         var result = await skill.ExecuteAsync(skillContext, ct);
         return result.IsSuccess ? result.Output ?? string.Empty : $"Error: {result.Error}";

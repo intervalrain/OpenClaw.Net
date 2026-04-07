@@ -1,3 +1,4 @@
+using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 
 namespace OpenClaw.Contracts.Agents;
@@ -6,11 +7,13 @@ public enum AgentStreamEventType
 {
     Thinking,
     ToolExecuting,
+    ToolProgress,
     ToolCompleted,
     ContentDelta,
     Completed,
     Error,
-    ApprovalRequired
+    ApprovalRequired,
+    UsageReport
 }
 
 public record AgentStreamEvent(
@@ -18,4 +21,5 @@ public record AgentStreamEvent(
     string? Content = null,
     string? ToolName = null,
     PipelineApprovalRequest? ApprovalRequest = null,
-    string? ExecutionId = null);
+    string? ExecutionId = null,
+    LlmUsage? Usage = null);

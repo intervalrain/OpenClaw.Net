@@ -17,8 +17,20 @@ public class ToolContext(string? arguments)
     public Guid? WorkspaceId { get; init; }
 
     /// <summary>
-    /// Whether the executing user has SuperAdmin privileges.
-    /// SuperAdmin can access all user workspaces.
+    /// The executing user's roles (from CurrentUser.Roles).
+    /// Used by ToolPermissionChecker for RBAC decisions.
     /// </summary>
-    public bool IsSuperAdmin { get; init; }
+    public IReadOnlyList<string> Roles { get; init; } = [];
+
+    /// <summary>
+    /// Whether the executing user has SuperAdmin privileges.
+    /// Derived from Roles containing "SuperAdmin".
+    /// </summary>
+    public bool IsSuperAdmin => Roles.Any(r => r.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Whether the executing user is an admin of the current workspace.
+    /// Derived from Roles containing "Admin" or "SuperAdmin".
+    /// </summary>
+    public bool IsWorkspaceAdmin => IsSuperAdmin || Roles.Any(r => r.Equals("Admin", StringComparison.OrdinalIgnoreCase));
 }

@@ -13,13 +13,17 @@ namespace OpenClaw.Infrastructure.Llm.Ollama;
 public class OllamaLlmProvider : ILlmProvider
 {
     public string Name => $"ollama:{_model}";
+    public int MaxContextTokens { get; }
+
     private readonly OllamaApiClient _client;
     private readonly string _model;
 
-    public OllamaLlmProvider(string url, string model)
+    public OllamaLlmProvider(string url, string model, int? maxContextTokens = null)
     {
         _client = new OllamaApiClient(url);
         _model = model;
+        // Temporary default until resolved by IModelContextResolver
+        MaxContextTokens = maxContextTokens ?? 4_096;
     }
 
     public OllamaLlmProvider(IConfigStore config)
@@ -54,6 +58,8 @@ public class OllamaLlmProvider : ILlmProvider
             }
         }
 
+        // OllamaSharp ChatDoneResponseStream has usage but ChatResponseStream does not;
+        // non-streaming aggregation doesn't expose it, so usage is null here.
         return ToChatResponse(sb.ToString(), toolCalls);
     }
 
@@ -98,6 +104,8 @@ public class OllamaLlmProvider : ILlmProvider
                     }
                 }
 
+                // ChatResponseStream doesn't expose token counts; ChatDoneResponseStream does
+                // but the streaming API only yields ChatResponseStream.
                 yield return new ChatResponseChunk(IsComplete: true);
             }
         }
@@ -144,7 +152,7 @@ public class OllamaLlmProvider : ILlmProvider
         };
     }
 
-    private static LlmChatResponse ToChatResponse(string content, List<Message.ToolCall>? toolCalls)
+    private static LlmChatResponse ToChatResponse(string content, List<Message.ToolCall>? toolCalls, LlmUsage? usage = null)
     {
         var mappedToolCalls = toolCalls?
             .Select(tc => new ToolCall(
@@ -155,6 +163,7 @@ public class OllamaLlmProvider : ILlmProvider
 
         return new LlmChatResponse(
             string.IsNullOrEmpty(content) ? null : content,
-            mappedToolCalls);
+            mappedToolCalls,
+            usage);
     }
 }

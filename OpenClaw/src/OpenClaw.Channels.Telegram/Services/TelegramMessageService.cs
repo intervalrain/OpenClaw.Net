@@ -181,8 +181,7 @@ public class TelegramMessageService(
             var args = parser.ConvertToJson(command, skill);
             var context = new ToolContext(args)
             {
-                UserId = null, // Telegram messages don't yet have user binding
-                IsSuperAdmin = false
+                UserId = null // Telegram messages don't yet have user binding
             };
             var result = await skill.ExecuteAsync(context, cancellationToken);
 

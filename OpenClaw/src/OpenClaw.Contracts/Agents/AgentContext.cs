@@ -12,6 +12,18 @@ public class AgentContext
     public required AgentPipelineOptions Options { get; init; }
     public Guid? UserId { get; init; }
     public Guid? WorkspaceId { get; init; }
+    public IReadOnlyList<string> UserRoles { get; init; } = [];
     public List<ChatMessage> Messages { get; } = [];
     public Dictionary<string, object> Items { get; } = [];
+
+    /// <summary>
+    /// Accumulated token usage across all LLM calls in this execution.
+    /// </summary>
+    public LlmUsage TotalUsage { get; private set; } = LlmUsage.Empty;
+
+    public void AccumulateUsage(LlmUsage? usage)
+    {
+        if (usage is not null)
+            TotalUsage += usage;
+    }
 }

@@ -11,6 +11,7 @@ public class LlmProviderFactory(
     IModelProviderRepository repository,
     IUserModelProviderRepository userRepository,
     IEncryptionService encryption,
+    IModelContextResolver contextResolver,
     IServiceProvider sp) : ILlmProviderFactory
 {
     public async Task<ILlmProvider> GetProviderAsync(CancellationToken ct = default)
@@ -19,7 +20,7 @@ public class LlmProviderFactory(
 
         return provider is null
             ? sp.GetRequiredKeyedService<ILlmProvider>("ollama")
-            : CreateFromGlobalProvider(provider);
+            : await CreateFromGlobalProviderAsync(provider, ct);
     }
 
     public async Task<ILlmProvider> GetProviderAsync(Guid userId, string? providerName = null, CancellationToken ct = default)
@@ -48,30 +49,35 @@ public class LlmProviderFactory(
         {
             var global = await repository.GetByIdAsync(userProvider.GlobalModelProviderId.Value, ct);
             if (global is not null)
-                return CreateFromGlobalProvider(global);
+                return await CreateFromGlobalProviderAsync(global, ct);
         }
 
         // Custom user provider with own credentials
-        return CreateFromProviderConfig(
+        return await CreateFromProviderConfigAsync(
             userProvider.Type,
             userProvider.Name,
             userProvider.Url,
             userProvider.ModelName,
-            userProvider.EncryptedApiKey);
+            userProvider.EncryptedApiKey,
+            userProvider.MaxContextTokens,
+            ct);
     }
 
-    private ILlmProvider CreateFromGlobalProvider(ModelProvider provider)
+    private async Task<ILlmProvider> CreateFromGlobalProviderAsync(ModelProvider provider, CancellationToken ct)
     {
-        return CreateFromProviderConfig(
+        return await CreateFromProviderConfigAsync(
             provider.Type,
             provider.Name,
             provider.Url,
             provider.ModelName,
-            provider.EncryptedApiKey);
+            provider.EncryptedApiKey,
+            provider.MaxContextTokens,
+            ct);
     }
 
-    private ILlmProvider CreateFromProviderConfig(
-        string type, string name, string url, string modelName, string? encryptedApiKey)
+    private async Task<ILlmProvider> CreateFromProviderConfigAsync(
+        string type, string name, string url, string modelName, string? encryptedApiKey,
+        int? maxContextTokens = null, CancellationToken ct = default)
     {
         string? apiKey = null;
         if (!string.IsNullOrEmpty(encryptedApiKey))
@@ -86,20 +92,25 @@ public class LlmProviderFactory(
             }
         }
 
+        // Resolve context window: DB app-config > Ollama API / LiteLLM JSON > default
+        // This auto-persists to DB so subsequent calls are free.
+        var contextTokens = maxContextTokens
+            ?? await contextResolver.ResolveAsync(type, modelName, url, ct);
+
         return type.ToLowerInvariant() switch
         {
-            "ollama" => CreateProvider("ollama", url, modelName),
+            "ollama" => CreateProvider("ollama", url, modelName, contextTokens),
             "openai" or "anthropic" or "custom" when apiKey is not null
-                => CreateProvider("openai", apiKey, modelName),
+                => CreateProvider("openai", apiKey, modelName, contextTokens),
             "openai" or "anthropic" or "custom"
                 => throw new InvalidOperationException($"API key is required for provider '{name}' but decryption failed or key is missing."),
             _ => throw new NotSupportedException($"Provider type '{type}' is not supported.")
         };
     }
 
-    private ILlmProvider CreateProvider(string type, string urlOrApiKey, string model)
+    private ILlmProvider CreateProvider(string type, string urlOrApiKey, string model, int? maxContextTokens = null)
     {
-        var factory = sp.GetRequiredKeyedService<Func<string, string, ILlmProvider>>(type);
-        return factory(urlOrApiKey, model);
+        var factory = sp.GetRequiredKeyedService<Func<string, string, int?, ILlmProvider>>(type);
+        return factory(urlOrApiKey, model, maxContextTokens);
     }
 }
