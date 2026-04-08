@@ -3,7 +3,7 @@ namespace OpenClaw.Contracts.Agents;
 public class AgentPipelineOptions
 {
     public string? SystemPrompt { get; set; }
-    public int MaxIterations { get; set; } = 10;
+    public int MaxIterations { get; set; } = 25;
 
     /// <summary>
     /// When total tool count exceeds this threshold, only core tools + tool_search
