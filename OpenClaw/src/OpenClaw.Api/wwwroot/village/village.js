@@ -232,7 +232,7 @@ function addAgent(userId, name, character) {
 
     const label = gameScene.add.text(px, py + 20, name.split(' ')[0], {
         font: '11px monospace', fill: '#ffffff',
-        shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 2, fill: true }
+        stroke: '#000000', strokeThickness: 3
     }).setOrigin(0.5).setDepth(6);
 
     const bubble = gameScene.add.text(px - 6, py - 74, '💤', {
@@ -561,20 +561,21 @@ function showCharacterPicker() {
 
     document.querySelector('.village-toolbar').appendChild(picker);
 
-    // Draw character previews on canvases
-    const atlasImg = gameScene.textures.get('atlas').getSourceImage();
-    const atlasJson = gameScene.textures.get('atlas').frames;
-    picker.querySelectorAll('canvas[data-char]').forEach(canvas => {
-        const char = canvas.dataset.char;
-        const frameKey = `${char}-front`;
-        const frame = atlasJson[frameKey];
-        if (frame) {
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(atlasImg, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
-                0, 0, canvas.width, canvas.height);
-        }
-    });
+    // Draw character previews on canvases using Phaser texture frames
+    try {
+        const texture = gameScene.textures.get('atlas');
+        const sourceImg = texture.getSourceImage();
+        picker.querySelectorAll('canvas[data-char]').forEach(canvas => {
+            const char = canvas.dataset.char;
+            const frame = texture.get(`${char}-front`);
+            if (frame && sourceImg) {
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(sourceImg, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
+                    0, 0, canvas.width, canvas.height);
+            }
+        });
+    } catch (e) { console.error('Character preview error:', e); }
 
     picker.querySelectorAll('.picker-item').forEach(item => {
         item.addEventListener('click', async () => {
