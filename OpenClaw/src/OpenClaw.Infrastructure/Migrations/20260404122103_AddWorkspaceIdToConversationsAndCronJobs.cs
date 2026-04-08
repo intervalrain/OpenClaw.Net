@@ -26,18 +26,30 @@ namespace OpenClaw.Infrastructure.Migrations
                 defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
 
             // Backfill: set WorkspaceId to the user's personal workspace
+            // Use DO block to safely handle case where tables/columns may not exist yet
             migrationBuilder.Sql("""
-                UPDATE "Conversations" c
-                SET "WorkspaceId" = w.id
-                FROM workspaces w
-                WHERE w.owner_user_id = c."UserId" AND w.is_personal = true
+                DO $$
+                BEGIN
+                    UPDATE "Conversations" AS c
+                    SET "WorkspaceId" = w."Id"
+                    FROM "workspaces" AS w
+                    WHERE w."owner_user_id" = c."UserId" AND w."is_personal" = true;
+                EXCEPTION WHEN undefined_column OR undefined_table THEN
+                    -- Skip backfill if columns/tables don't exist (fresh DB)
+                    NULL;
+                END $$;
                 """);
 
             migrationBuilder.Sql("""
-                UPDATE cron_jobs j
-                SET "WorkspaceId" = w.id
-                FROM workspaces w
-                WHERE w.owner_user_id = j.created_by_user_id AND w.is_personal = true
+                DO $$
+                BEGIN
+                    UPDATE "cron_jobs" AS j
+                    SET "WorkspaceId" = w."Id"
+                    FROM "workspaces" AS w
+                    WHERE w."owner_user_id" = j."created_by_user_id" AND w."is_personal" = true;
+                EXCEPTION WHEN undefined_column OR undefined_table THEN
+                    NULL;
+                END $$;
                 """);
         }
 

@@ -21,7 +21,7 @@ public class AppConfigController(IConfigStore configStore) : ApiController
         return Ok(configs);
     }
 
-    [HttpGet("{key}")]
+    [HttpGet("{**key}")]
     public IActionResult Get(string key)
     {
         var value = configStore.Get(key);
@@ -31,7 +31,7 @@ public class AppConfigController(IConfigStore configStore) : ApiController
         return Ok(new { key, value });
     }
 
-    [HttpPut("{key}")]
+    [HttpPut("{**key}")]
     public async Task<IActionResult> Set(
         string key,
         [FromBody] SetConfigRequest request,
@@ -41,7 +41,7 @@ public class AppConfigController(IConfigStore configStore) : ApiController
         return Ok(new { key, success = true });
     }
 
-    [HttpDelete("{key}")]
+    [HttpDelete("{**key}")]
     public async Task<IActionResult> Delete(string key, CancellationToken ct)
     {
         var deleted = await configStore.DeleteAsync(key, ct);

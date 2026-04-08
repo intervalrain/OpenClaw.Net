@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBtn.addEventListener('click', sendMessage);
     themeToggle.addEventListener('click', toggleChatTheme);
 
-    userInputEl.addEventListener('keydown', (e) => {
+    userInputEl.addEventListener('keydown', async (e) => {
         // Handle autocomplete navigation
         if (isAutocompleteVisible()) {
             if (e.key === 'ArrowDown') {
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (e.key === 'Tab' || e.key === 'Enter') {
                 if (getSelectedAutocompleteItem()) {
                     e.preventDefault();
-                    selectAutocompleteItem();
+                    await selectAutocompleteItem();
                     return;
                 }
             } else if (e.key === 'Escape') {
@@ -167,6 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isAuthenticated()) {
             loadConversations();
             loadSkills();
+            loadAgentList();
+            loadToolList();
             updateUserProfile();
         }
     });
@@ -580,16 +582,26 @@ async function sendMessage() {
 
     try {
         const settings = getSettings();
+        // Collect tool/agent tags
+        const toolTags = contextTags.filter(t => t.type === 'tool').map(t => t.name);
+        const agentTags = contextTags.filter(t => t.type === 'agent').map(t => t.name);
+
         const res = await authFetch('/api/v1/chat/stream', {
             method: 'POST',
             body: JSON.stringify({
                 message: message || 'What is in this image?',
                 conversationId: currentConversationId,
                 language: settings.language,
-                images: images
+                images: images,
+                tools: toolTags.length > 0 ? toolTags : undefined,
+                agents: agentTags.length > 0 ? agentTags : undefined
             }),
             signal: currentAbortController.signal
         });
+
+        // Clear tags after sending
+        contextTags = [];
+        renderContextTags();
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -1054,7 +1066,7 @@ async function openSettingsModal() {
     document.getElementById('language-select').value = settings.language;
 
     // Load providers, skills, channel settings, app configs, and preferences from backend
-    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences(), loadAgentList()]);
+    await Promise.all([loadModelProviders(), loadSkills(), loadTelegramSettings(), loadAppConfigs(), loadUserPreferences(), loadAgentList(), loadToolList()]);
     renderModelList();
     renderSkillsList();
     renderTelegramSettings();
@@ -1713,10 +1725,50 @@ function initPreferenceManagement() {
     if (valueInput) valueInput.addEventListener('keydown', handleEnter);
 }
 
-// Slash Command Autocomplete — invokes Agents (not tools)
+// ── Enhanced Chat Syntax Autocomplete ──
+// /  → tools (add as tag)
+// // → agents (add as tag)
+// @  → workspace files (inline)
 let autocompleteIndex = -1;
-let filteredAgents = [];
-let agentList = []; // loaded from /api/v1/agents
+let filteredItems = [];
+let autocompleteMode = null; // 'agent' | 'file' | 'tool'
+let agentList = [];
+let toolList = [];
+
+// Context tags state
+let contextTags = []; // { type: 'tool'|'agent', name: string }
+
+function addContextTag(type, name) {
+    if (contextTags.some(t => t.type === type && t.name === name)) return;
+    contextTags.push({ type, name });
+    renderContextTags();
+}
+
+function removeContextTag(index) {
+    contextTags.splice(index, 1);
+    renderContextTags();
+}
+
+function renderContextTags() {
+    const container = document.getElementById('context-tags');
+    if (contextTags.length === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+    container.style.display = 'flex';
+    container.innerHTML = contextTags.map((tag, i) => {
+        const prefix = tag.type === 'agent' ? '//' : '/';
+        const cls = tag.type === 'agent' ? 'tag-agent' : 'tag-tool';
+        return `<span class="context-tag ${cls}" data-index="${i}">${prefix}${escapeHtml(tag.name)}<span class="tag-remove" data-index="${i}">&times;</span></span>`;
+    }).join('');
+    container.querySelectorAll('.tag-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeContextTag(parseInt(btn.dataset.index));
+        });
+    });
+}
 
 async function loadAgentList() {
     try {
@@ -1725,44 +1777,99 @@ async function loadAgentList() {
     } catch {}
 }
 
+async function loadToolList() {
+    try {
+        const res = await authFetch('/api/v1/agents/tools');
+        if (res.ok) toolList = await res.json();
+    } catch {}
+}
+
 function handleAutocompleteInput() {
     const value = userInputEl.value;
     const cursorPos = userInputEl.selectionStart;
 
-    if (value.startsWith('/') && cursorPos <= value.indexOf(' ') + 1 || (value.startsWith('/') && !value.includes(' '))) {
-        const query = value.slice(1).split(' ')[0].toLowerCase();
-
-        filteredAgents = agentList
-            .filter(a => a.name.toLowerCase().includes(query))
-            .slice(0, 6);
-
-        if (filteredAgents.length > 0) {
-            showAutocomplete(filteredAgents);
-        } else {
-            hideAutocomplete();
+    // Detect // agent invoke (must check before /)
+    if (value.startsWith('//')) {
+        const inCommandArea = !value.includes(' ') || cursorPos <= value.indexOf(' ') + 1;
+        if (inCommandArea) {
+            const query = value.slice(2).split(' ')[0].toLowerCase();
+            filteredItems = agentList
+                .filter(a => a.name.toLowerCase().includes(query))
+                ;
+            autocompleteMode = 'agent';
+            if (filteredItems.length > 0) { showAutocomplete(filteredItems); return; }
         }
-    } else {
-        hideAutocomplete();
     }
+    // Detect / tool invoke
+    else if (value.startsWith('/')) {
+        const inCommandArea = !value.includes(' ') || cursorPos <= value.indexOf(' ') + 1;
+        if (inCommandArea) {
+            const query = value.slice(1).split(' ')[0].toLowerCase();
+            filteredItems = toolList
+                .filter(t => (t.name || t).toLowerCase().includes(query))
+                ;
+            autocompleteMode = 'tool';
+            if (filteredItems.length > 0) { showAutocomplete(filteredItems); return; }
+        }
+    }
+
+    // Detect @ file reference (at cursor position)
+    const beforeCursor = value.slice(0, cursorPos);
+    const atMatch = beforeCursor.match(/@([\w./\-]*)$/);
+    if (atMatch) {
+        const query = atMatch[1].toLowerCase();
+        autocompleteMode = 'file';
+        loadFileAutocomplete(query);
+        return;
+    }
+
+    hideAutocomplete();
+}
+
+let fileAutocompleteDebounce = null;
+function loadFileAutocomplete(query) {
+    clearTimeout(fileAutocompleteDebounce);
+    fileAutocompleteDebounce = setTimeout(() => loadFileAutocompleteNow(query), 200);
+}
+
+async function loadFileAutocompleteNow(query) {
+    try {
+        const dir = query.includes('/') ? query.slice(0, query.lastIndexOf('/')) : '';
+        const res = await authFetch(`/api/v1/workspace-file/list?path=${encodeURIComponent(dir)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const prefix = query.includes('/') ? query.slice(query.lastIndexOf('/') + 1) : query;
+        filteredItems = (data.entries || [])
+            .filter(e => e.name.toLowerCase().includes(prefix.toLowerCase()))
+            .map(e => ({ name: dir ? `${dir}/${e.name}` : e.name, description: e.isDirectory ? 'folder' : `${(e.size / 1024).toFixed(1)} KB`, isDirectory: e.isDirectory }));
+        if (filteredItems.length > 0) showAutocomplete(filteredItems);
+        else hideAutocomplete();
+    } catch { hideAutocomplete(); }
 }
 
 function showAutocomplete(items) {
     const dropdown = document.getElementById('autocomplete-dropdown');
     autocompleteIndex = -1;
 
-    dropdown.innerHTML = items.map((a, i) => `
-        <div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(a.name)}">
-            <span class="autocomplete-command">/${escapeHtml(a.name)}</span>
-            <span class="autocomplete-desc">${escapeHtml(a.description || '')}</span>
-        </div>
-    `).join('');
+    const prefixMap = { agent: '//', file: '@', tool: '/' };
+    const prefix = prefixMap[autocompleteMode] || '';
+
+    dropdown.innerHTML = items.map((a, i) => {
+        const name = typeof a === 'string' ? a : a.name;
+        const desc = typeof a === 'string' ? '' : (a.description || '');
+        return `
+        <div class="autocomplete-item" data-index="${i}" data-name="${escapeHtml(name)}">
+            <span class="autocomplete-command">${prefix}${escapeHtml(name)}</span>
+            ${desc ? `<span class="autocomplete-desc">${escapeHtml(desc)}</span>` : ''}
+        </div>`;
+    }).join('');
 
     dropdown.classList.add('visible');
 
     dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', async () => {
             autocompleteIndex = parseInt(item.dataset.index);
-            selectAutocompleteItem();
+            await selectAutocompleteItem();
         });
         item.addEventListener('mouseenter', () => {
             autocompleteIndex = parseInt(item.dataset.index);
@@ -1775,7 +1882,8 @@ function hideAutocomplete() {
     const dropdown = document.getElementById('autocomplete-dropdown');
     dropdown.classList.remove('visible');
     autocompleteIndex = -1;
-    filteredAgents = [];
+    filteredItems = [];
+    autocompleteMode = null;
 }
 
 function isAutocompleteVisible() {
@@ -1783,11 +1891,11 @@ function isAutocompleteVisible() {
 }
 
 function navigateAutocomplete(direction) {
-    if (filteredAgents.length === 0) return;
+    if (filteredItems.length === 0) return;
 
     autocompleteIndex += direction;
-    if (autocompleteIndex < 0) autocompleteIndex = filteredAgents.length - 1;
-    if (autocompleteIndex >= filteredAgents.length) autocompleteIndex = 0;
+    if (autocompleteIndex < 0) autocompleteIndex = filteredItems.length - 1;
+    if (autocompleteIndex >= filteredItems.length) autocompleteIndex = 0;
 
     updateAutocompleteSelection();
 }
@@ -1796,30 +1904,68 @@ function updateAutocompleteSelection() {
     const dropdown = document.getElementById('autocomplete-dropdown');
     dropdown.querySelectorAll('.autocomplete-item').forEach((item, i) => {
         item.classList.toggle('selected', i === autocompleteIndex);
+        if (i === autocompleteIndex) item.scrollIntoView({ block: 'nearest' });
     });
 }
 
 function getSelectedAutocompleteItem() {
-    if (autocompleteIndex >= 0 && autocompleteIndex < filteredAgents.length) {
-        return filteredAgents[autocompleteIndex];
+    if (autocompleteIndex >= 0 && autocompleteIndex < filteredItems.length) {
+        return filteredItems[autocompleteIndex];
     }
     return null;
 }
 
-function selectAutocompleteItem() {
-    const agent = getSelectedAutocompleteItem();
-    if (!agent) return;
+async function selectAutocompleteItem() {
+    const item = getSelectedAutocompleteItem();
+    if (!item) return;
 
-    const currentValue = userInputEl.value;
-    const spaceIndex = currentValue.indexOf(' ');
-    const args = spaceIndex > 0 ? currentValue.slice(spaceIndex) : ' ';
+    const name = typeof item === 'string' ? item : item.name;
+    const value = userInputEl.value;
+    const cursorPos = userInputEl.selectionStart;
 
-    userInputEl.value = `/${agent.name}${args}`;
+    if (autocompleteMode === 'agent') {
+        // Add as tag, clear the //command from input
+        addContextTag('agent', name);
+        const spaceIndex = value.indexOf(' ');
+        userInputEl.value = spaceIndex > 0 ? value.slice(spaceIndex + 1) : '';
+    } else if (autocompleteMode === 'tool') {
+        // Add as tag, clear the /command from input
+        addContextTag('tool', name);
+        const spaceIndex = value.indexOf(' ');
+        userInputEl.value = spaceIndex > 0 ? value.slice(spaceIndex + 1) : '';
+    } else if (autocompleteMode === 'file') {
+        const beforeCursor = value.slice(0, cursorPos);
+        const atIndex = beforeCursor.lastIndexOf('@');
+        const suffix = item.isDirectory ? '/' : ' ';
+        userInputEl.value = value.slice(0, atIndex) + '@' + name + suffix + value.slice(cursorPos);
+        const newCursorPos = atIndex + 1 + name.length + suffix.length;
+        userInputEl.setSelectionRange(newCursorPos, newCursorPos);
+        userInputEl.focus();
+
+        if (item.isDirectory) {
+            // Show loading state immediately
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            dropdown.innerHTML = '<div class="autocomplete-item"><span class="autocomplete-command">Loading...</span></div>';
+            dropdown.classList.add('visible');
+            autocompleteMode = 'file';
+            // Fetch next level
+            const dirQuery = name.endsWith('/') ? name : name + '/';
+            try {
+                const dir = dirQuery.slice(0, dirQuery.lastIndexOf('/'));
+                const res = await authFetch(`/api/v1/workspace-file/list?path=${encodeURIComponent(dir)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    filteredItems = (data.entries || [])
+                        .map(e => ({ name: dir ? `${dir}/${e.name}` : e.name, description: e.isDirectory ? 'folder' : `${(e.size / 1024).toFixed(1)} KB`, isDirectory: e.isDirectory }));
+                    if (filteredItems.length > 0) { showAutocomplete(filteredItems); }
+                    else { dropdown.innerHTML = '<div class="autocomplete-item"><span class="autocomplete-desc">Empty directory</span></div>'; }
+                }
+            } catch { hideAutocomplete(); }
+            return;
+        }
+    }
+
     userInputEl.focus();
-
-    const newCursorPos = agent.name.length + 2;
-    userInputEl.setSelectionRange(newCursorPos, newCursorPos);
-
     hideAutocomplete();
 }
 

@@ -17,8 +17,18 @@ public class ManageCronJobTool(IServiceScopeFactory scopeFactory) : AgentToolBas
 {
     public override string Name => "manage_cronjob";
     public override string Description =>
-        "Manage scheduled cron jobs. Actions: create (new job), list (show all), update (modify), delete (remove), execute (run now). " +
-        "For create/update, provide schedule with frequency (Daily/Weekly/Monthly), timeOfDay (HH:mm), timezone, and optionally daysOfWeek.";
+        "Manage scheduled cron jobs. Actions: create, list, update, delete, execute.\n" +
+        "Example create call:\n" +
+        "{\n" +
+        "  \"action\": \"create\",\n" +
+        "  \"name\": \"daily-report\",\n" +
+        "  \"content\": \"Query ADO tasks and send summary email\",\n" +
+        "  \"schedule\": { \"frequency\": \"Daily\", \"timeOfDay\": \"09:00\", \"timezone\": \"Asia/Taipei\", \"isEnabled\": true },\n" +
+        "  \"skills\": [\"ADO\"],\n" +
+        "  \"wakeMode\": \"Scheduled\"\n" +
+        "}\n" +
+        "Weekly example schedule: { \"frequency\": \"Weekly\", \"timeOfDay\": \"17:00\", \"timezone\": \"Asia/Taipei\", \"daysOfWeek\": [\"Friday\"] }\n" +
+        "For list: { \"action\": \"list\" }. For delete/execute: { \"action\": \"delete\", \"jobId\": \"<guid>\" }";
 
     public override async Task<ToolResult> ExecuteAsync(ManageCronJobArgs args, ToolContext context, CancellationToken ct)
     {

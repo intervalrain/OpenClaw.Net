@@ -15,6 +15,7 @@ using OpenClaw.Hosting;
 using OpenClaw.Hosting.Observability;
 using OpenClaw.Api.Security;
 using OpenClaw.Application.CronJobs;
+using OpenClaw.Application.Updates;
 using OpenClaw.Api.Audit;
 using Weda.Core.Infrastructure.Messaging.Nats.Locking;
 
@@ -53,6 +54,8 @@ var builder = WebApplication.CreateBuilder(args);
         // Background services
         .AddHostedService<CronJobSchedulerService>()
         .AddHostedService<AuditLogCleanupService>()
+        .AddSingleton<UpdateCheckerService>()
+        .AddHostedService(sp => sp.GetRequiredService<UpdateCheckerService>())
         .AddWedaCore<IAssemblyMarker, IContractsMarker, IApplicationMarker>(
             builder.Configuration,
             services => services.AddMediator(options =>

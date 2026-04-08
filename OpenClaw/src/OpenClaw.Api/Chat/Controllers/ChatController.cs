@@ -18,6 +18,7 @@ using OpenClaw.Domain.Chat.Enums;
 using OpenClaw.Domain.Chat.Repositories;
 
 using OpenClaw.Contracts.Workspaces;
+using OpenClaw.Tools.FileSystem;
 using Weda.Core.Application.Interfaces;
 using Weda.Core.Application.Security;
 using Weda.Core.Presentation;
@@ -30,11 +31,13 @@ public class ChatController(
     IConversationRepository repository,
     ICurrentUserProvider currentUserProvider,
     ILlmProviderFactory llmProviderFactory,
-    ISlashCommandParser slashCommandParser,
+    IChatSyntaxParser chatSyntaxParser,
     IAgentActivityTracker activityTracker,
     ICurrentWorkspaceProvider currentWorkspaceProvider,
     IContextCompressor contextCompressor,
     IAgentDefinitionRepository agentDefinitionRepo,
+    IToolRegistry toolRegistry,
+    IToolInstanceResolver toolInstanceResolver,
     IUnitOfWork uow) : ApiController
 {
     private Guid GetUserId() => currentUserProvider.GetCurrentUser().Id;
@@ -92,27 +95,107 @@ public class ChatController(
         try
         {
             string assistantResponse = "";
+            var priorityTools = new List<string>();
 
-            if (slashCommandParser.TryParse(request.Message, out var command))
+            // Process tool/agent tags (selected via UI tags)
+            if (request.Tools is { Count: > 0 })
             {
-                // Slash commands invoke agents (AgentDefinition from DB)
-                var agent = await agentDefinitionRepo.GetByNameAsync(command!.SkillName, ct);
-                if (agent == null)
+                foreach (var toolName in request.Tools)
                 {
-                    var availableAgents = (await agentDefinitionRepo.GetAllAsync(ct)).Select(a => a.Name);
-                    await WriteErrorEventAsync($"Agent '{command.SkillName}' not found. Available: {string.Join(", ", availableAgents)}", ct);
-                    return;
+                    var tool = toolRegistry.GetSkill(toolName);
+                    if (tool is null) continue;
+                    priorityTools.Add(tool.Name);
+                    history.Add(new ChatMessage(ChatRole.System,
+                        $"[Tool: {tool.Name}]\n{tool.Description}\n" +
+                        $"Parameters: {System.Text.Json.JsonSerializer.Serialize(tool.Parameters)}\n" +
+                        $"You have this tool available. Call it when appropriate."));
+                }
+            }
+
+            if (request.Agents is { Count: > 0 })
+            {
+                foreach (var agentName in request.Agents)
+                {
+                    var agent = await agentDefinitionRepo.GetByNameAsync(agentName, ct);
+                    if (agent is null) continue;
+                    history.Insert(0, new ChatMessage(
+                        ChatRole.System,
+                        $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
+                }
+            }
+
+            // Process message syntax (/ tool, // agent, @file)
+            var syntaxResult = chatSyntaxParser.Parse(request.Message);
+            switch (syntaxResult)
+            {
+                case AgentInvokeResult agentInvoke:
+                {
+                    var agent = await agentDefinitionRepo.GetByNameAsync(agentInvoke.AgentName, ct);
+                    if (agent == null)
+                    {
+                        var availableAgents = (await agentDefinitionRepo.GetAllAsync(ct)).Select(a => a.Name);
+                        await WriteErrorEventAsync($"Agent '{agentInvoke.AgentName}' not found. Available: {string.Join(", ", availableAgents)}", ct);
+                        return;
+                    }
+
+                    history.Insert(0, new ChatMessage(
+                        ChatRole.System,
+                        $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
+
+                    request = request with { Message = string.IsNullOrWhiteSpace(agentInvoke.RawArguments)
+                        ? $"Execute the task defined by the {agent.Name} agent."
+                        : agentInvoke.RawArguments };
+                    break;
                 }
 
-                // Mount agent: inject its system prompt into history
-                history.Insert(0, new ChatMessage(
-                    ChatRole.System,
-                    $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
+                case ToolInvokeResult toolInvoke:
+                {
+                    var tool = toolRegistry.GetSkill(toolInvoke.ToolName);
+                    if (tool == null)
+                    {
+                        var availableTools = toolRegistry.GetAllSkills().Select(t => t.Name);
+                        await WriteErrorEventAsync($"Tool '{toolInvoke.ToolName}' not found. Available: {string.Join(", ", availableTools.Take(20))}", ct);
+                        return;
+                    }
 
-                // Override the message — strip the slash prefix, keep args as user input
-                request = request with { Message = string.IsNullOrWhiteSpace(command.RawArguments)
-                    ? $"Execute the task defined by the {agent.Name} agent."
-                    : command.RawArguments };
+                    if (!priorityTools.Contains(tool.Name))
+                        priorityTools.Add(tool.Name);
+
+                    history.Add(new ChatMessage(ChatRole.System,
+                        $"[Tool Context: {tool.Name}]\nThe user wants to use the '{tool.Name}' tool.\n" +
+                        $"Description: {tool.Description}\n" +
+                        $"Parameters: {System.Text.Json.JsonSerializer.Serialize(tool.Parameters)}\n" +
+                        $"You MUST call the '{tool.Name}' tool to fulfill this request. " +
+                        $"Do it in a SINGLE tool call — do not read files or do other steps first."));
+
+                    var toolArgs = toolInvoke.RawArguments;
+                    await InjectFileReferencesAsync(toolArgs, history, ct);
+
+                    request = request with { Message = string.IsNullOrWhiteSpace(toolArgs)
+                        ? $"Use the {tool.Name} tool."
+                        : toolArgs };
+                    break;
+                }
+
+                case PlainMessageResult plain:
+                {
+                    await InjectFileReferencesAsync(plain.Message, history, ct);
+                    break;
+                }
+            }
+
+            // Resolve #toolInstance references from message + mounted agent prompt
+            var combinedText = string.Join("\n", history.Where(h => h.Role == ChatRole.System).Select(h => h.Content ?? ""))
+                + "\n" + request.Message;
+            var instanceResolution = await toolInstanceResolver.ResolveAsync(combinedText, GetUserId(), ct);
+            if (instanceResolution.InstanceArgs.Count > 0)
+            {
+                var instanceInfo = instanceResolution.InstanceArgs
+                    .Select(kv => $"- Tool '{kv.Key}' has pre-filled args: {kv.Value}")
+                    .ToList();
+                history.Add(new ChatMessage(ChatRole.System,
+                    $"[Tool Instances]\nThe following tools have pre-configured parameters from user settings. " +
+                    $"When calling these tools, the pre-filled values will be automatically merged:\n{string.Join("\n", instanceInfo)}"));
             }
 
             // Convert image attachments to ImageContent
@@ -127,7 +210,7 @@ public class ChatController(
             await activityTracker.TrackAsync(streamUserId, currentUser.Name,
                 ActivityType.Chat, ActivityStatus.Started, sourceId, sourceName, ct: ct);
 
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, ct);
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, priorityTools.Count > 0 ? priorityTools : null, ct);
 
             await foreach (var evt in eventStream)
             {
@@ -191,6 +274,40 @@ public class ChatController(
             await activityTracker.TrackAsync(GetUserId(), errorUser.Name,
                 ActivityType.Chat, ActivityStatus.Failed, request.ConversationId?.ToString(), detail: ex.Message);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Extracts @file references from text and injects file contents into history.
+    /// </summary>
+    private async Task InjectFileReferencesAsync(string text, List<ChatMessage> history, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var fileRefs = System.Text.RegularExpressions.Regex.Matches(text, @"@([\w./\-]+\.\w+)")
+            .Select(m => m.Groups[1].Value)
+            .Distinct();
+
+        var wsId = currentWorkspaceProvider.WorkspaceId;
+        var isSuperAdmin = currentUserProvider.GetCurrentUser().Roles
+            .Contains(Weda.Core.Application.Security.Models.Role.SuperAdmin);
+
+        foreach (var fileRef in fileRefs)
+        {
+            try
+            {
+                var resolvedPath = PathSecurity.ResolveWorkspacePath(fileRef, wsId);
+                var error = PathSecurity.ValidateWorkspacePath(resolvedPath, wsId, isSuperAdmin);
+                if (error is not null) continue;
+                if (!System.IO.File.Exists(resolvedPath)) continue;
+
+                var content = await System.IO.File.ReadAllTextAsync(resolvedPath, ct);
+                if (content.Length > 50_000) content = content[..50_000] + "\n... (truncated)";
+
+                history.Add(new ChatMessage(ChatRole.System,
+                    $"<file path=\"{fileRef}\">\n{content}\n</file>"));
+            }
+            catch { /* skip unreadable files */ }
         }
     }
 

@@ -55,13 +55,15 @@ RUN dotnet publish "OpenClaw.Api.csproj" --no-restore -c Release -o /app/publish
 # Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
-# Install GitHub CLI and Python3 (for skill scripts)
-RUN apt-get update && apt-get install -y curl python3 \
+# Install GitHub CLI, Docker CLI, and Python3 (for skill scripts)
+RUN apt-get update && apt-get install -y curl python3 gpg \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
     && apt-get update \
-    && apt-get install -y gh \
+    && apt-get install -y gh docker-ce-cli docker-compose-plugin \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
