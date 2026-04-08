@@ -157,6 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Logout button
     document.getElementById('logout-btn').addEventListener('click', logout);
 
+    // Edit display name
+    document.getElementById('edit-name-btn').addEventListener('click', editDisplayName);
+
     // Image upload handling
     initImageUpload();
 
@@ -187,6 +190,37 @@ function updateUserProfile() {
     }
     if (nameEl && user.name) {
         nameEl.textContent = user.name;
+    }
+}
+
+async function editDisplayName() {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const newName = prompt('Enter new display name:', user.name);
+    if (!newName || newName.trim() === '' || newName.trim() === user.name) return;
+
+    try {
+        const res = await authFetch(`/api/v1/user-management/${user.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName.trim() })
+        });
+
+        if (res.ok) {
+            const updated = await res.json();
+            // Update stored token user info
+            const stored = JSON.parse(localStorage.getItem('user') || '{}');
+            stored.name = updated.name;
+            localStorage.setItem('user', JSON.stringify(stored));
+            updateUserProfile();
+            document.querySelector('.profile-section').classList.remove('open');
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert(err.title || err.message || 'Failed to update name');
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
     }
 }
 
