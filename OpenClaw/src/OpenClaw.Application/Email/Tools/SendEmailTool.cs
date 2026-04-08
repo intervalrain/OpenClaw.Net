@@ -9,8 +9,8 @@ public class SendEmailTool(IServiceScopeFactory scopeFactory) : AgentToolBase<Se
 {
     public override string Name => "send_email";
     public override string Description =>
-        "Send an email. Requires SMTP to be configured by an admin. " +
-        "Use this to deliver reports, notifications, or summaries to users.";
+        "Send an email via SMTP. Example: { \"to\": \"user@example.com\", \"subject\": \"Daily Report\", \"body\": \"<h1>Report</h1><p>Content here</p>\" }. " +
+        "Body supports HTML.";
 
     public override async Task<ToolResult> ExecuteAsync(SendEmailArgs args, ToolContext context, CancellationToken ct)
     {

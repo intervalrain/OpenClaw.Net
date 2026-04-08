@@ -16,9 +16,18 @@ public class ManageAgentTool(IServiceScopeFactory scopeFactory) : AgentToolBase<
 {
     public override string Name => "manage_agent";
     public override string Description =>
-        "Manage agent definitions. Actions: create (new agent), list (show all), update (modify), delete (remove). " +
-        "Agents have a name, description, system prompt, list of tool names, and optional sub-agent references. " +
-        "Sub-agents are referenced by name and form a DAG (no circular dependencies).";
+        "Manage agent definitions. Actions: create, list, update, delete.\n" +
+        "Example create call:\n" +
+        "{\n" +
+        "  \"action\": \"create\",\n" +
+        "  \"name\": \"weekly-report\",\n" +
+        "  \"description\": \"Generate weekly progress report\",\n" +
+        "  \"systemPrompt\": \"You are a report generator. Steps: 1) git log 2) query ADO 3) write report 4) email\",\n" +
+        "  \"tools\": [\"git\", \"azure_devops\", \"read_file\", \"write_file\", \"send_email\"],\n" +
+        "  \"maxIterations\": 15\n" +
+        "}\n" +
+        "For list: { \"action\": \"list\" }. For delete: { \"action\": \"delete\", \"name\": \"agent-name\" }\n" +
+        "Sub-agents referenced by name (not ID): { \"subAgentNames\": [\"sub-agent-1\"] }";
 
     public override async Task<ToolResult> ExecuteAsync(ManageAgentArgs args, ToolContext context, CancellationToken ct)
     {
