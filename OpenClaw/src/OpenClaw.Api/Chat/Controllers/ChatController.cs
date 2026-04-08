@@ -95,6 +95,7 @@ public class ChatController(
         try
         {
             string assistantResponse = "";
+            List<string>? priorityTools = null;
 
             var syntaxResult = chatSyntaxParser.Parse(request.Message);
             switch (syntaxResult)
@@ -131,9 +132,12 @@ public class ChatController(
                         return;
                     }
 
+                    priorityTools = [tool.Name];
+
                     history.Add(new ChatMessage(ChatRole.System,
                         $"[Tool Context: {tool.Name}]\nThe user wants to use the '{tool.Name}' tool.\n" +
                         $"Description: {tool.Description}\n" +
+                        $"Parameters: {System.Text.Json.JsonSerializer.Serialize(tool.Parameters)}\n" +
                         $"You MUST call the '{tool.Name}' tool to fulfill this request. " +
                         $"Do it in a SINGLE tool call — do not read files or do other steps first."));
 
@@ -181,7 +185,7 @@ public class ChatController(
             await activityTracker.TrackAsync(streamUserId, currentUser.Name,
                 ActivityType.Chat, ActivityStatus.Started, sourceId, sourceName, ct: ct);
 
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, ct);
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, priorityTools, ct);
 
             await foreach (var evt in eventStream)
             {

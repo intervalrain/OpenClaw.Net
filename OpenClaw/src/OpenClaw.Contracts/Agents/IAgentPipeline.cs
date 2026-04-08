@@ -23,5 +23,6 @@ public interface IAgentPipeline
         Guid? userId = null,
         Guid? workspaceId = null,
         IReadOnlyList<string>? userRoles = null,
+        IReadOnlyList<string>? priorityToolNames = null,
         CancellationToken ct = default);
 }

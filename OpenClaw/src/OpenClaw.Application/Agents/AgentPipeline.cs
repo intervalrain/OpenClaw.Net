@@ -70,6 +70,7 @@ public class AgentPipeline(
         Guid? userId = null,
         Guid? workspaceId = null,
         IReadOnlyList<string>? userRoles = null,
+        IReadOnlyList<string>? priorityToolNames = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var messages = new List<ChatMessage>();
@@ -112,17 +113,24 @@ public class AgentPipeline(
         }
 
         // Deferred tool loading: when tool count exceeds threshold, only send tool_search
-        // to the LLM. The LLM discovers tools on demand. All tools remain dispatchable.
+        // + priority tools to the LLM. The LLM discovers other tools on demand. All tools remain dispatchable.
         var toolDefinitions = allToolDefinitions;
         ToolSearchTool? toolSearchTool = null;
         if (options.DeferredToolThreshold > 0 && allToolDefinitions.Count > options.DeferredToolThreshold)
         {
             toolSearchTool = new ToolSearchTool(_skillMap.Values);
             _skillMap.TryAdd(toolSearchTool.Name, toolSearchTool);
-            toolDefinitions =
-            [
-                new ToolDefinition(toolSearchTool.Name, toolSearchTool.Description, toolSearchTool.Parameters)
-            ];
+            toolDefinitions = new List<ToolDefinition>
+            {
+                new(toolSearchTool.Name, toolSearchTool.Description, toolSearchTool.Parameters)
+            };
+
+            // Always include priority tools (e.g. from /tool invoke)
+            if (priorityToolNames is { Count: > 0 })
+            {
+                var prioritySet = new HashSet<string>(priorityToolNames, StringComparer.OrdinalIgnoreCase);
+                toolDefinitions.AddRange(allToolDefinitions.Where(t => prioritySet.Contains(t.Name)));
+            }
         }
 
         // Plan mode: register enter/exit tools and track state
