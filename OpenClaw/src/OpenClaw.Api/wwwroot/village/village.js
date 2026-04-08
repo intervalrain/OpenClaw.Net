@@ -73,9 +73,12 @@ let villageData = null; // { width, height, collision[][], sectors{} }
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', async () => {
-    initTopHeader('office');
+    initTopHeader('village');
     document.getElementById('detailClose').addEventListener('click', closeDetailPanel);
-    document.getElementById('change-character-btn').addEventListener('click', showCharacterPicker);
+    document.getElementById('change-character-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        showCharacterPicker();
+    });
 
     // Load village data first (collision grid + room positions)
     try {
@@ -541,10 +544,14 @@ function esc(t) { if(!t)return''; const d=document.createElement('div'); d.textC
 
 // ===== Character Picker =====
 const CHAR_COLORS = { misa: '#e74c3c', alex: '#e67e22', bob: '#27ae60', carol: '#2980b9', dave: '#8e44ad', eve: '#e84393' };
+let pickerVisible = false;
 
 function showCharacterPicker() {
     const existing = document.getElementById('character-picker');
-    if (existing) { existing.remove(); return; }
+    if (existing) { existing.remove(); pickerVisible = false; return; }
+
+    pickerVisible = true;
+    const container = document.querySelector('.village-container');
 
     const picker = document.createElement('div');
     picker.id = 'character-picker';
@@ -559,10 +566,11 @@ function showCharacterPicker() {
     }).join('');
 
     picker.innerHTML = `<div class="picker-title">Choose Character</div><div class="picker-grid">${items}</div>`;
-    document.querySelector('.village-toolbar').appendChild(picker);
+    container.appendChild(picker);
 
     // Use event delegation on picker
     picker.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const item = e.target.closest('.picker-item');
         if (!item) return;
 
@@ -587,16 +595,6 @@ function showCharacterPicker() {
         }
 
         picker.remove();
+        pickerVisible = false;
     });
-
-    // Close on click outside (deferred)
-    setTimeout(() => {
-        const handler = (e) => {
-            if (!picker.contains(e.target) && e.target.id !== 'change-character-btn') {
-                picker.remove();
-                document.removeEventListener('click', handler);
-            }
-        };
-        document.addEventListener('click', handler);
-    }, 50);
 }
