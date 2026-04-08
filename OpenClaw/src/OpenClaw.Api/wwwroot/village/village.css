@@ -89,9 +89,9 @@
 /* Character picker */
 .btn-character {
     padding: 4px 12px; border-radius: 6px; font-size: 12px;
-    background: var(--accent); color: #fff; border: none; cursor: pointer;
+    background: #6366f1; color: #fff; border: none; cursor: pointer;
 }
-.btn-character:hover { opacity: 0.85; }
+.btn-character:hover { background: #4f46e5; }
 
 .character-picker {
     position: absolute; top: 50px; right: 12px;

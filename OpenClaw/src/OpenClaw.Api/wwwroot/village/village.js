@@ -558,11 +558,8 @@ function showCharacterPicker() {
     picker.className = 'character-picker';
 
     const items = CHARACTERS.map(c => {
-        const color = CHAR_COLORS[c] || '#888';
         const sel = c === myCharacter ? ' selected' : '';
-        return `<div class="picker-item${sel}" data-char="${c}">` +
-            `<div class="picker-dot" style="background:${color}"></div>` +
-            `<span>${c}</span></div>`;
+        return `<div class="picker-item${sel}" data-char="${c}"><span>${c}</span></div>`;
     }).join('');
 
     picker.innerHTML = `<div class="picker-title">Choose Character</div><div class="picker-grid">${items}</div>`;
