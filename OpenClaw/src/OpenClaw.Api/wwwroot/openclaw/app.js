@@ -582,16 +582,26 @@ async function sendMessage() {
 
     try {
         const settings = getSettings();
+        // Collect tool/agent tags
+        const toolTags = contextTags.filter(t => t.type === 'tool').map(t => t.name);
+        const agentTags = contextTags.filter(t => t.type === 'agent').map(t => t.name);
+
         const res = await authFetch('/api/v1/chat/stream', {
             method: 'POST',
             body: JSON.stringify({
                 message: message || 'What is in this image?',
                 conversationId: currentConversationId,
                 language: settings.language,
-                images: images
+                images: images,
+                tools: toolTags.length > 0 ? toolTags : undefined,
+                agents: agentTags.length > 0 ? agentTags : undefined
             }),
             signal: currentAbortController.signal
         });
+
+        // Clear tags after sending
+        contextTags = [];
+        renderContextTags();
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -1716,14 +1726,49 @@ function initPreferenceManagement() {
 }
 
 // ── Enhanced Chat Syntax Autocomplete ──
-// /  or //  → agents
-// @        → workspace files
-// $        → tools
+// /  → tools (add as tag)
+// // → agents (add as tag)
+// @  → workspace files (inline)
 let autocompleteIndex = -1;
 let filteredItems = [];
 let autocompleteMode = null; // 'agent' | 'file' | 'tool'
 let agentList = [];
 let toolList = [];
+
+// Context tags state
+let contextTags = []; // { type: 'tool'|'agent', name: string }
+
+function addContextTag(type, name) {
+    if (contextTags.some(t => t.type === type && t.name === name)) return;
+    contextTags.push({ type, name });
+    renderContextTags();
+}
+
+function removeContextTag(index) {
+    contextTags.splice(index, 1);
+    renderContextTags();
+}
+
+function renderContextTags() {
+    const container = document.getElementById('context-tags');
+    if (contextTags.length === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+    container.style.display = 'flex';
+    container.innerHTML = contextTags.map((tag, i) => {
+        const prefix = tag.type === 'agent' ? '//' : '/';
+        const cls = tag.type === 'agent' ? 'tag-agent' : 'tag-tool';
+        return `<span class="context-tag ${cls}" data-index="${i}">${prefix}${escapeHtml(tag.name)}<span class="tag-remove" data-index="${i}">&times;</span></span>`;
+    }).join('');
+    container.querySelectorAll('.tag-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeContextTag(parseInt(btn.dataset.index));
+        });
+    });
+}
 
 async function loadAgentList() {
     try {
@@ -1879,17 +1924,15 @@ async function selectAutocompleteItem() {
     const cursorPos = userInputEl.selectionStart;
 
     if (autocompleteMode === 'agent') {
+        // Add as tag, clear the //command from input
+        addContextTag('agent', name);
         const spaceIndex = value.indexOf(' ');
-        const args = spaceIndex > 0 ? value.slice(spaceIndex) : ' ';
-        userInputEl.value = `//${name}${args}`;
-        const newCursorPos = 2 + name.length + 1;
-        userInputEl.setSelectionRange(newCursorPos, newCursorPos);
+        userInputEl.value = spaceIndex > 0 ? value.slice(spaceIndex + 1) : '';
     } else if (autocompleteMode === 'tool') {
+        // Add as tag, clear the /command from input
+        addContextTag('tool', name);
         const spaceIndex = value.indexOf(' ');
-        const args = spaceIndex > 0 ? value.slice(spaceIndex) : ' ';
-        userInputEl.value = `/${name}${args}`;
-        const newCursorPos = 1 + name.length + 1;
-        userInputEl.setSelectionRange(newCursorPos, newCursorPos);
+        userInputEl.value = spaceIndex > 0 ? value.slice(spaceIndex + 1) : '';
     } else if (autocompleteMode === 'file') {
         const beforeCursor = value.slice(0, cursorPos);
         const atIndex = beforeCursor.lastIndexOf('@');

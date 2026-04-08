@@ -95,14 +95,41 @@ public class ChatController(
         try
         {
             string assistantResponse = "";
-            List<string>? priorityTools = null;
+            var priorityTools = new List<string>();
 
+            // Process tool/agent tags (selected via UI tags)
+            if (request.Tools is { Count: > 0 })
+            {
+                foreach (var toolName in request.Tools)
+                {
+                    var tool = toolRegistry.GetSkill(toolName);
+                    if (tool is null) continue;
+                    priorityTools.Add(tool.Name);
+                    history.Add(new ChatMessage(ChatRole.System,
+                        $"[Tool: {tool.Name}]\n{tool.Description}\n" +
+                        $"Parameters: {System.Text.Json.JsonSerializer.Serialize(tool.Parameters)}\n" +
+                        $"You have this tool available. Call it when appropriate."));
+                }
+            }
+
+            if (request.Agents is { Count: > 0 })
+            {
+                foreach (var agentName in request.Agents)
+                {
+                    var agent = await agentDefinitionRepo.GetByNameAsync(agentName, ct);
+                    if (agent is null) continue;
+                    history.Insert(0, new ChatMessage(
+                        ChatRole.System,
+                        $"[Mounted Agent: {agent.Name}]\n\n{agent.SystemPrompt}"));
+                }
+            }
+
+            // Process message syntax (/ tool, // agent, @file)
             var syntaxResult = chatSyntaxParser.Parse(request.Message);
             switch (syntaxResult)
             {
                 case AgentInvokeResult agentInvoke:
                 {
-                    // // mounts an agent (system prompt + tool set)
                     var agent = await agentDefinitionRepo.GetByNameAsync(agentInvoke.AgentName, ct);
                     if (agent == null)
                     {
@@ -123,7 +150,6 @@ public class ChatController(
 
                 case ToolInvokeResult toolInvoke:
                 {
-                    // / adds a tool to context and passes args to LLM
                     var tool = toolRegistry.GetSkill(toolInvoke.ToolName);
                     if (tool == null)
                     {
@@ -132,7 +158,8 @@ public class ChatController(
                         return;
                     }
 
-                    priorityTools = [tool.Name];
+                    if (!priorityTools.Contains(tool.Name))
+                        priorityTools.Add(tool.Name);
 
                     history.Add(new ChatMessage(ChatRole.System,
                         $"[Tool Context: {tool.Name}]\nThe user wants to use the '{tool.Name}' tool.\n" +
@@ -142,8 +169,6 @@ public class ChatController(
                         $"Do it in a SINGLE tool call — do not read files or do other steps first."));
 
                     var toolArgs = toolInvoke.RawArguments;
-
-                    // Resolve @file references in args
                     await InjectFileReferencesAsync(toolArgs, history, ct);
 
                     request = request with { Message = string.IsNullOrWhiteSpace(toolArgs)
@@ -185,7 +210,7 @@ public class ChatController(
             await activityTracker.TrackAsync(streamUserId, currentUser.Name,
                 ActivityType.Chat, ActivityStatus.Started, sourceId, sourceName, ct: ct);
 
-            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, priorityTools, ct);
+            var eventStream = pipeline.ExecuteStreamAsync(request.Message, history, request.Language, images, streamUserId, currentWorkspaceProvider.WorkspaceId, currentUser.Roles, priorityTools.Count > 0 ? priorityTools : null, ct);
 
             await foreach (var evt in eventStream)
             {

@@ -804,6 +804,46 @@ body {
 }
 
 /* Autocomplete Dropdown */
+/* Context tags above input */
+.context-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 12px;
+}
+
+.context-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: default;
+}
+
+.tag-tool {
+    background: var(--accent);
+    color: #fff;
+}
+
+.tag-agent {
+    background: #8b5cf6;
+    color: #fff;
+}
+
+.tag-remove {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 0.9rem;
+    margin-left: 2px;
+}
+
+.tag-remove:hover {
+    opacity: 1;
+}
+
 .autocomplete-dropdown {
     position: absolute;
     bottom: 100%;

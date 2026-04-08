@@ -11,4 +11,6 @@ public record ChatRequest(
     string Message,
     Guid? ConversationId = null,
     string? Language = null,
-    IReadOnlyList<ChatImageAttachment>? Images = null);
+    IReadOnlyList<ChatImageAttachment>? Images = null,
+    IReadOnlyList<string>? Tools = null,
+    IReadOnlyList<string>? Agents = null);
