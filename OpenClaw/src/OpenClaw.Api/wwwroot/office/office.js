@@ -13,6 +13,8 @@ const ACTIVITY_ZONES = {
     toolexecution: ['The Willows Market and Pharmacy', 'Harvey Oak Supply Store'],
 };
 const IDLE_ZONES = ['Johnson Park', 'Hobbs Cafe', 'The Rose and Crown Pub', 'Dorm for Oak Hill College'];
+const CHARACTERS = ['misa', 'alex', 'bob', 'carol', 'dave', 'eve'];
+let myCharacter = 'misa'; // loaded from user preference
 
 // ===== State =====
 let agents = {};
@@ -25,6 +27,7 @@ let villageData = null; // { width, height, collision[][], sectors{} }
 document.addEventListener('DOMContentLoaded', async () => {
     initTopHeader('office');
     document.getElementById('detailClose').addEventListener('click', closeDetailPanel);
+    document.getElementById('change-character-btn').addEventListener('click', showCharacterPicker);
 
     // Load village data first (collision grid + room positions)
     try {
@@ -95,13 +98,15 @@ function create() {
     if (fg1) fg1.setDepth(10);
     if (fg2) fg2.setDepth(10);
 
-    // Animations
+    // Animations for all characters
     const anims = this.anims;
-    ['left','right','front','back'].forEach(dir => {
-        anims.create({
-            key: `misa-${dir}-walk`,
-            frames: anims.generateFrameNames('atlas', { prefix: `misa-${dir}-walk.`, start: 0, end: 3, zeroPad: 3 }),
-            frameRate: 6, repeat: -1
+    CHARACTERS.forEach(char => {
+        ['left','right','front','back'].forEach(dir => {
+            anims.create({
+                key: `${char}-${dir}-walk`,
+                frames: anims.generateFrameNames('atlas', { prefix: `${char}-${dir}-walk.`, start: 0, end: 3, zeroPad: 3 }),
+                frameRate: 6, repeat: -1
+            });
         });
     });
 
@@ -127,13 +132,31 @@ function update() {
 
 // ===== Data Loading =====
 async function loadUsersAndStart() {
+    // Load character preferences for all users
+    const charPrefs = {};
+    try {
+        const meRes = await authFetch('/api/v1/users/me');
+        if (meRes.ok) {
+            const me = await meRes.json();
+            // Load my character preference
+            const prefRes = await authFetch('/api/v1/user-config/village_character');
+            if (prefRes.ok) {
+                const pref = await prefRes.json();
+                if (pref.value && CHARACTERS.includes(pref.value)) {
+                    myCharacter = pref.value;
+                    charPrefs[me.id] = pref.value;
+                }
+            }
+        }
+    } catch {}
+
     try {
         const res = await authFetch(`${API_BASE}/users`);
         if (res.status === 403) {
             const meRes = await authFetch('/api/v1/users/me');
-            if (meRes.ok) { const me = await meRes.json(); addAgent(me.id, me.name || me.email); }
+            if (meRes.ok) { const me = await meRes.json(); addAgent(me.id, me.name || me.email, charPrefs[me.id]); }
         } else if (res.ok) {
-            (await res.json()).filter(u => u.status === 'Active').forEach(u => addAgent(u.id, u.name || u.email));
+            (await res.json()).filter(u => u.status === 'Active').forEach(u => addAgent(u.id, u.name || u.email, charPrefs[u.id]));
         }
     } catch (e) { console.error('loadUsers error:', e); }
 
@@ -147,15 +170,16 @@ async function loadUsersAndStart() {
 }
 
 // ===== Agent Management =====
-function addAgent(userId, name) {
+function addAgent(userId, name, character) {
     if (agents[userId] || !gameScene || !villageData) return;
 
+    const char = character || CHARACTERS[Object.keys(agents).length % CHARACTERS.length];
     const index = Object.keys(agents).length;
     const zoneName = IDLE_ZONES[index % IDLE_ZONES.length];
     const pos = getRandomWalkableTile(zoneName);
     const px = pos[0] * TILE, py = pos[1] * TILE;
 
-    const sprite = gameScene.physics.add.sprite(px, py, 'atlas', 'misa-front')
+    const sprite = gameScene.physics.add.sprite(px, py, 'atlas', `${char}-front`)
         .setSize(30, 40).setOffset(0, 32).setDepth(5);
 
     const label = gameScene.add.text(px, py + 20, name.split(' ')[0], {
@@ -172,7 +196,7 @@ function addAgent(userId, name) {
     sprite.on('pointerdown', () => selectAgent(userId));
 
     agents[userId] = {
-        name, initials: getInitials(name), sprite, label, bubble,
+        name, character: char, initials: getInitials(name), sprite, label, bubble,
         currentZone: zoneName, status: 'idle', detail: '', history: [],
         walkTimer: null, walkQueue: []
     };
@@ -258,7 +282,7 @@ function moveAgentToSector(userId, sectorName) {
     function step() {
         if (stepIdx >= agent.walkQueue.length) {
             agent.sprite.anims.stop();
-            agent.sprite.setTexture('atlas', 'misa-front');
+            agent.sprite.setTexture('atlas', `${agent.character}-front`);
             agent.walkTimer = null;
             agent.walkQueue = [];
             return;
@@ -273,7 +297,7 @@ function moveAgentToSector(userId, sectorName) {
         if (Math.abs(dx) >= Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
         else dir = dy > 0 ? 'front' : 'back';
 
-        agent.sprite.anims.play(`misa-${dir}-walk`, true);
+        agent.sprite.anims.play(`${agent.character}-${dir}-walk`, true);
 
         gameScene.tweens.add({
             targets: agent.sprite,
@@ -456,3 +480,76 @@ function getInitials(n) { return n.split(' ').map(w => w[0]).join('').substring(
 function fmtTime(d) { return (d instanceof Date ? d : new Date(d)).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
 function updateAgentCount() { document.getElementById('agentCount').textContent = `${Object.keys(agents).length} agents`; }
 function esc(t) { if(!t)return''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+// ===== Character Picker =====
+function showCharacterPicker() {
+    // Remove existing picker if any
+    const existing = document.getElementById('character-picker');
+    if (existing) { existing.remove(); return; }
+
+    const picker = document.createElement('div');
+    picker.id = 'character-picker';
+    picker.className = 'character-picker';
+    picker.innerHTML = `
+        <div class="picker-title">Choose Character</div>
+        <div class="picker-grid">
+            ${CHARACTERS.map(c => `
+                <div class="picker-item ${c === myCharacter ? 'selected' : ''}" data-char="${c}">
+                    <canvas width="30" height="43" data-char="${c}"></canvas>
+                    <span>${c}</span>
+                </div>
+            `).join('')}
+        </div>`;
+
+    document.querySelector('.village-toolbar').appendChild(picker);
+
+    // Draw character previews on canvases
+    const atlasImg = gameScene.textures.get('atlas').getSourceImage();
+    const atlasJson = gameScene.textures.get('atlas').frames;
+    picker.querySelectorAll('canvas[data-char]').forEach(canvas => {
+        const char = canvas.dataset.char;
+        const frameKey = `${char}-front`;
+        const frame = atlasJson[frameKey];
+        if (frame) {
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(atlasImg, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
+                0, 0, canvas.width, canvas.height);
+        }
+    });
+
+    picker.querySelectorAll('.picker-item').forEach(item => {
+        item.addEventListener('click', async () => {
+            const char = item.dataset.char;
+            myCharacter = char;
+
+            // Save preference
+            try {
+                await authFetch('/api/v1/user-config/village_character', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: char, isSecret: false })
+                });
+            } catch {}
+
+            // Update my sprite
+            const user = getCurrentUser();
+            if (user && agents[user.id]) {
+                agents[user.id].character = char;
+                agents[user.id].sprite.setTexture('atlas', `${char}-front`);
+            }
+
+            picker.remove();
+        });
+    });
+
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', function handler(e) {
+            if (!picker.contains(e.target) && e.target.id !== 'change-character-btn') {
+                picker.remove();
+                document.removeEventListener('click', handler);
+            }
+        });
+    }, 0);
+}
