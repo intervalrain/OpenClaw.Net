@@ -255,12 +255,15 @@ function getRandomWalkableTile(sectorName) {
     if (!villageData) return [70, 50];
     const center = villageData.sectors[sectorName];
     if (!center) return [70, 50];
-    // Find a walkable tile near the center
-    for (let r = 0; r < 5; r++) {
-        const x = center[0] + Math.floor((Math.random() - 0.5) * (r * 2 + 1));
-        const y = center[1] + Math.floor((Math.random() - 0.5) * (r * 2 + 1));
-        if (isWalkable(x, y)) return [x, y];
+    // Find a random walkable tile within the sector area (radius up to 8)
+    const candidates = [];
+    for (let dy = -8; dy <= 8; dy++) {
+        for (let dx = -8; dx <= 8; dx++) {
+            const x = center[0] + dx, y = center[1] + dy;
+            if (isWalkable(x, y)) candidates.push([x, y]);
+        }
     }
+    if (candidates.length > 0) return candidates[Math.floor(Math.random() * candidates.length)];
     return center;
 }
 
