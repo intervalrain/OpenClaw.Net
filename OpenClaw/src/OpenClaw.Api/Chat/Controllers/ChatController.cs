@@ -134,36 +134,23 @@ public class ChatController(
                     history.Add(new ChatMessage(ChatRole.System,
                         $"[Tool Context: {tool.Name}]\nThe user wants to use the '{tool.Name}' tool.\n" +
                         $"Description: {tool.Description}\n" +
-                        $"You MUST call the '{tool.Name}' tool to fulfill this request."));
+                        $"You MUST call the '{tool.Name}' tool to fulfill this request. " +
+                        $"Do it in a SINGLE tool call — do not read files or do other steps first."));
 
-                    request = request with { Message = string.IsNullOrWhiteSpace(toolInvoke.RawArguments)
+                    var toolArgs = toolInvoke.RawArguments;
+
+                    // Resolve @file references in args
+                    await InjectFileReferencesAsync(toolArgs, history, ct);
+
+                    request = request with { Message = string.IsNullOrWhiteSpace(toolArgs)
                         ? $"Use the {tool.Name} tool."
-                        : toolInvoke.RawArguments };
+                        : toolArgs };
                     break;
                 }
 
                 case PlainMessageResult plain:
                 {
-                    // Inject @file references as context
-                    var wsId = currentWorkspaceProvider.WorkspaceId;
-                    foreach (var fileRef in plain.FileReferences)
-                    {
-                        try
-                        {
-                            var resolvedPath = PathSecurity.ResolveWorkspacePath(fileRef, wsId);
-                            var error = PathSecurity.ValidateWorkspacePath(resolvedPath, wsId,
-                                currentUserProvider.GetCurrentUser().Roles.Contains(Weda.Core.Application.Security.Models.Role.SuperAdmin));
-                            if (error is not null) continue;
-                            if (!System.IO.File.Exists(resolvedPath)) continue;
-
-                            var content = await System.IO.File.ReadAllTextAsync(resolvedPath, ct);
-                            if (content.Length > 50_000) content = content[..50_000] + "\n... (truncated)";
-
-                            history.Add(new ChatMessage(ChatRole.System,
-                                $"<file path=\"{fileRef}\">\n{content}\n</file>"));
-                        }
-                        catch { /* skip unreadable files */ }
-                    }
+                    await InjectFileReferencesAsync(plain.Message, history, ct);
                     break;
                 }
             }
@@ -258,6 +245,40 @@ public class ChatController(
             await activityTracker.TrackAsync(GetUserId(), errorUser.Name,
                 ActivityType.Chat, ActivityStatus.Failed, request.ConversationId?.ToString(), detail: ex.Message);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Extracts @file references from text and injects file contents into history.
+    /// </summary>
+    private async Task InjectFileReferencesAsync(string text, List<ChatMessage> history, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var fileRefs = System.Text.RegularExpressions.Regex.Matches(text, @"@([\w./\-]+\.\w+)")
+            .Select(m => m.Groups[1].Value)
+            .Distinct();
+
+        var wsId = currentWorkspaceProvider.WorkspaceId;
+        var isSuperAdmin = currentUserProvider.GetCurrentUser().Roles
+            .Contains(Weda.Core.Application.Security.Models.Role.SuperAdmin);
+
+        foreach (var fileRef in fileRefs)
+        {
+            try
+            {
+                var resolvedPath = PathSecurity.ResolveWorkspacePath(fileRef, wsId);
+                var error = PathSecurity.ValidateWorkspacePath(resolvedPath, wsId, isSuperAdmin);
+                if (error is not null) continue;
+                if (!System.IO.File.Exists(resolvedPath)) continue;
+
+                var content = await System.IO.File.ReadAllTextAsync(resolvedPath, ct);
+                if (content.Length > 50_000) content = content[..50_000] + "\n... (truncated)";
+
+                history.Add(new ChatMessage(ChatRole.System,
+                    $"<file path=\"{fileRef}\">\n{content}\n</file>"));
+            }
+            catch { /* skip unreadable files */ }
         }
     }
 
