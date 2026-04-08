@@ -201,7 +201,7 @@ async function editDisplayName() {
     if (!newName || newName.trim() === '' || newName.trim() === user.name) return;
 
     try {
-        const res = await authFetch(`/api/v1/user-management/${user.id}`, {
+        const res = await authFetch(`/api/v1/users/${user.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newName.trim() })
