@@ -209,11 +209,15 @@ async function editDisplayName() {
 
         if (res.ok) {
             const updated = await res.json();
-            // Update stored token user info
+            // Update stored user info
             const stored = JSON.parse(localStorage.getItem('user') || '{}');
             stored.name = updated.name;
             localStorage.setItem('user', JSON.stringify(stored));
+            // Update all UI elements showing the name
             updateUserProfile();
+            // Update top-header user name
+            const topHeaderName = document.querySelector('.user-name');
+            if (topHeaderName) topHeaderName.textContent = updated.name;
             document.querySelector('.profile-section').classList.remove('open');
         } else {
             const err = await res.json().catch(() => ({}));
