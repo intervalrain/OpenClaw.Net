@@ -108,5 +108,5 @@
 }
 .picker-item:hover { border-color: var(--accent); }
 .picker-item.selected { border-color: var(--accent); background: var(--bg-tertiary); }
-.picker-item canvas { image-rendering: pixelated; width: 30px; height: 43px; }
+.picker-dot { width: 24px; height: 24px; border-radius: 50%; }
 .picker-item span { font-size: 11px; color: var(--text-color); text-transform: capitalize; }

@@ -540,75 +540,63 @@ function updateAgentCount() { document.getElementById('agentCount').textContent 
 function esc(t) { if(!t)return''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
 
 // ===== Character Picker =====
+const CHAR_COLORS = { misa: '#e74c3c', alex: '#e67e22', bob: '#27ae60', carol: '#2980b9', dave: '#8e44ad', eve: '#e84393' };
+
 function showCharacterPicker() {
-    // Remove existing picker if any
     const existing = document.getElementById('character-picker');
     if (existing) { existing.remove(); return; }
 
     const picker = document.createElement('div');
     picker.id = 'character-picker';
     picker.className = 'character-picker';
-    picker.innerHTML = `
-        <div class="picker-title">Choose Character</div>
-        <div class="picker-grid">
-            ${CHARACTERS.map(c => `
-                <div class="picker-item ${c === myCharacter ? 'selected' : ''}" data-char="${c}">
-                    <canvas width="30" height="43" data-char="${c}"></canvas>
-                    <span>${c}</span>
-                </div>
-            `).join('')}
-        </div>`;
 
+    const items = CHARACTERS.map(c => {
+        const color = CHAR_COLORS[c] || '#888';
+        const sel = c === myCharacter ? ' selected' : '';
+        return `<div class="picker-item${sel}" data-char="${c}">` +
+            `<div class="picker-dot" style="background:${color}"></div>` +
+            `<span>${c}</span></div>`;
+    }).join('');
+
+    picker.innerHTML = `<div class="picker-title">Choose Character</div><div class="picker-grid">${items}</div>`;
     document.querySelector('.village-toolbar').appendChild(picker);
 
-    // Draw character previews on canvases using Phaser texture frames
-    try {
-        const texture = gameScene.textures.get('atlas');
-        const sourceImg = texture.getSourceImage();
-        picker.querySelectorAll('canvas[data-char]').forEach(canvas => {
-            const char = canvas.dataset.char;
-            const frame = texture.get(`${char}-front`);
-            if (frame && sourceImg) {
-                const ctx = canvas.getContext('2d');
-                ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(sourceImg, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight,
-                    0, 0, canvas.width, canvas.height);
-            }
-        });
-    } catch (e) { console.error('Character preview error:', e); }
+    // Use event delegation on picker
+    picker.addEventListener('click', async (e) => {
+        const item = e.target.closest('.picker-item');
+        if (!item) return;
 
-    picker.querySelectorAll('.picker-item').forEach(item => {
-        item.addEventListener('click', async () => {
-            const char = item.dataset.char;
-            myCharacter = char;
+        const char = item.dataset.char;
+        if (!char) return;
+        myCharacter = char;
 
-            // Save preference
-            try {
-                await authFetch('/api/v1/user-config/village_character', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ value: char, isSecret: false })
-                });
-            } catch {}
+        // Save preference
+        try {
+            await authFetch('/api/v1/user-config/village_character', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: char, isSecret: false })
+            });
+        } catch (err) { console.error('Save character error:', err); }
 
-            // Update my sprite
-            const user = getCurrentUser();
-            if (user && agents[user.id]) {
-                agents[user.id].character = char;
-                agents[user.id].sprite.setTexture('atlas', `${char}-front`);
-            }
+        // Update sprite
+        const user = getCurrentUser();
+        if (user && agents[user.id]) {
+            agents[user.id].character = char;
+            agents[user.id].sprite.setTexture('atlas', `${char}-front`);
+        }
 
-            picker.remove();
-        });
+        picker.remove();
     });
 
-    // Close on click outside
+    // Close on click outside (deferred)
     setTimeout(() => {
-        document.addEventListener('click', function handler(e) {
+        const handler = (e) => {
             if (!picker.contains(e.target) && e.target.id !== 'change-character-btn') {
                 picker.remove();
                 document.removeEventListener('click', handler);
             }
-        });
-    }, 0);
+        };
+        document.addEventListener('click', handler);
+    }, 50);
 }
