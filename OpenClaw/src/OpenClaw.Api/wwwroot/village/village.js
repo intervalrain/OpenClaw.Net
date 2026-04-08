@@ -6,6 +6,33 @@ const API_BASE = '/api/v1/agent-activity';
 const TILE = 32;
 const ASSET_PATH = '/village/assets';
 
+// Sector display names (friendly labels)
+const ZONE_LABELS = {
+    'Hobbs Cafe':                          'Cafe',
+    'The Rose and Crown Pub':              'Pub',
+    'Oak Hill College':                    'College',
+    'Dorm for Oak Hill College':           'Library',
+    'Harvey Oak Supply Store':             'Workshop',
+    'The Willows Market and Pharmacy':     'Market',
+    'Johnson Park':                        'Park',
+    "Arthur Burton's apartment":           'Post Office',
+    "artist's co-living space":            'Studio',
+    "Isabella Rodriguez's apartment":      'Home',
+    "Ryan Park's apartment":              'Office',
+    "Carlos Gomez's apartment":           'Lounge',
+    "Giorgio Rossi's apartment":          'Lab',
+    "Adam Smith's house":                 'Archives',
+    "Lin family's house":                 'Garden',
+    "Moore family's house":               'Cabin',
+    "Moreno family's house":              'Quarters',
+    "Tamara Taylor and Carmen Ortiz's house": 'Commons',
+    "Yuriko Yamamoto's house":            'Retreat',
+};
+
+function getZoneLabel(sectorName) {
+    return ZONE_LABELS[sectorName] || sectorName;
+}
+
 // Activity type → sector name mapping
 const ACTIVITY_ZONES = {
     chat:          ['Hobbs Cafe', 'The Rose and Crown Pub'],
@@ -15,25 +42,25 @@ const ACTIVITY_ZONES = {
 
 // Tool name → specific sector (more granular than activity type)
 const TOOL_ZONES = {
-    git:             'Oak Hill College',
+    git:             'Oak Hill College',         // College — coding/study
     github:          'Oak Hill College',
     azure_devops:    'Oak Hill College',
-    execute_command: 'Harvey Oak Supply Store',
-    read_file:       'Dorm for Oak Hill College',
+    execute_command: 'Harvey Oak Supply Store',   // Workshop — building/running
+    read_file:       'Dorm for Oak Hill College', // Library — reading
     write_file:      'Dorm for Oak Hill College',
     list_directory:  'Dorm for Oak Hill College',
-    web_search:      'The Willows Market and Pharmacy',
-    http_request:    'The Willows Market and Pharmacy',
-    send_email:      "Arthur Burton's apartment",
-    manage_cronjob:  'Harvey Oak Supply Store',
-    manage_agent:    "artist's co-living space",
-    preference:      "Isabella Rodriguez's apartment",
-    image_gen:       "artist's co-living space",
-    pdf:             'Dorm for Oak Hill College',
-    notion:          "Ryan Park's apartment",
+    web_search:      'Oak Hill College',          // College — research
+    http_request:    'The Willows Market and Pharmacy', // Market — fetching data
+    send_email:      "Arthur Burton's apartment", // Post Office — sending mail
+    manage_cronjob:  'Harvey Oak Supply Store',   // Workshop — scheduling
+    manage_agent:    "artist's co-living space",  // Studio — creating agents
+    preference:      "Isabella Rodriguez's apartment", // Home — personal settings
+    image_gen:       "artist's co-living space",  // Studio — creative work
+    pdf:             'Dorm for Oak Hill College',  // Library — documents
+    notion:          "Ryan Park's apartment",     // Office — note-taking
 };
 
-const IDLE_ZONES = ['Johnson Park', 'Hobbs Cafe', 'The Rose and Crown Pub', 'Dorm for Oak Hill College'];
+const IDLE_ZONES = ['Johnson Park', 'Hobbs Cafe', 'The Rose and Crown Pub'];
 const CHARACTERS = ['misa', 'alex', 'bob', 'carol', 'dave', 'eve'];
 let myCharacter = 'misa'; // loaded from user preference
 
@@ -492,7 +519,7 @@ function updateDetailPanel(userId) {
     if (!a) return;
     document.getElementById('detailAvatar').textContent = a.initials;
     document.getElementById('detailName').textContent = a.name;
-    document.getElementById('detailStatus').textContent = `${a.status} — ${a.currentZone}`;
+    document.getElementById('detailStatus').textContent = `${a.status} — ${getZoneLabel(a.currentZone)}`;
     document.getElementById('detailActivity').textContent = a.detail || 'Idle';
     document.getElementById('detailHistory').innerHTML = a.history.length === 0
         ? '<div style="font-size:12px;color:var(--text-muted)">No activity</div>'
