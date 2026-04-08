@@ -543,7 +543,8 @@ function updateAgentCount() { document.getElementById('agentCount').textContent 
 function esc(t) { if(!t)return''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
 
 // ===== Character Picker =====
-const CHAR_COLORS = { misa: '#e74c3c', alex: '#e67e22', bob: '#27ae60', carol: '#2980b9', dave: '#8e44ad', eve: '#e84393' };
+const CHAR_LABELS = { misa: 'Yellow', alex: 'Green', bob: 'Cyan', carol: 'Purple', dave: 'Red', eve: 'Brown' };
+const CHAR_COLORS = { misa: '#f0c040', alex: '#27ae60', bob: '#00bcd4', carol: '#8e44ad', dave: '#e74c3c', eve: '#8b6914' };
 let pickerVisible = false;
 
 function showCharacterPicker() {
@@ -559,10 +560,14 @@ function showCharacterPicker() {
 
     const items = CHARACTERS.map(c => {
         const sel = c === myCharacter ? ' selected' : '';
-        return `<div class="picker-item${sel}" data-char="${c}"><span>${c}</span></div>`;
+        const color = CHAR_COLORS[c] || '#888';
+        const label = CHAR_LABELS[c] || c;
+        return `<div class="picker-item${sel}" data-char="${c}">` +
+            `<div class="picker-dot" style="background:${color}"></div>` +
+            `<span>${label}</span></div>`;
     }).join('');
 
-    picker.innerHTML = `<div class="picker-title">Choose Character</div><div class="picker-grid">${items}</div>`;
+    picker.innerHTML = `<div class="picker-title">Choose Color</div><div class="picker-grid">${items}</div>`;
     container.appendChild(picker);
 
     // Use event delegation on picker
