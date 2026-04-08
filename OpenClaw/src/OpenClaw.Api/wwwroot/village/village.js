@@ -4,7 +4,7 @@
 
 const API_BASE = '/api/v1/agent-activity';
 const TILE = 32;
-const ASSET_PATH = '/office/assets';
+const ASSET_PATH = '/village/assets';
 
 // Activity type → sector name mapping
 const ACTIVITY_ZONES = {
@@ -12,6 +12,27 @@ const ACTIVITY_ZONES = {
     cronjob:       ['Oak Hill College', 'Harvey Oak Supply Store'],
     toolexecution: ['The Willows Market and Pharmacy', 'Harvey Oak Supply Store'],
 };
+
+// Tool name → specific sector (more granular than activity type)
+const TOOL_ZONES = {
+    git:             'Oak Hill College',
+    github:          'Oak Hill College',
+    azure_devops:    'Oak Hill College',
+    execute_command: 'Harvey Oak Supply Store',
+    read_file:       'Dorm for Oak Hill College',
+    write_file:      'Dorm for Oak Hill College',
+    list_directory:  'Dorm for Oak Hill College',
+    web_search:      'The Willows Market and Pharmacy',
+    http_request:    'The Willows Market and Pharmacy',
+    send_email:      "Arthur Burton's apartment",
+    manage_cronjob:  'Harvey Oak Supply Store',
+    manage_agent:    "artist's co-living space",
+    preference:      "Isabella Rodriguez's apartment",
+    image_gen:       "artist's co-living space",
+    pdf:             'Dorm for Oak Hill College',
+    notion:          "Ryan Park's apartment",
+};
+
 const IDLE_ZONES = ['Johnson Park', 'Hobbs Cafe', 'The Rose and Crown Pub', 'Dorm for Oak Hill College'];
 const CHARACTERS = ['misa', 'alex', 'bob', 'carol', 'dave', 'eve'];
 let myCharacter = 'misa'; // loaded from user preference
@@ -225,20 +246,27 @@ function updateAgentState(activity) {
 
     const statusRaw = (activity.status || '').toLowerCase();
     const typeRaw = (activity.type || '').toLowerCase();
+    // For ToolExecution events, the tool name is in the detail field
+    const toolName = (typeRaw === 'toolexecution' ? (activity.detail || '') : '').toLowerCase();
     const detail = activity.detail || activity.sourceName || '';
 
-    // Choose target sector
-    let targetSectors = IDLE_ZONES;
-    if (ACTIVITY_ZONES[typeRaw]) targetSectors = ACTIVITY_ZONES[typeRaw];
-
-    const targetZone = targetSectors[Object.keys(agents).indexOf(userId) % targetSectors.length] || IDLE_ZONES[0];
+    // Choose target sector: tool-specific > activity-type > idle
+    let targetZone;
+    if (toolName && TOOL_ZONES[toolName]) {
+        targetZone = TOOL_ZONES[toolName];
+    } else if (ACTIVITY_ZONES[typeRaw]) {
+        const sectors = ACTIVITY_ZONES[typeRaw];
+        targetZone = sectors[Object.keys(agents).indexOf(userId) % sectors.length];
+    } else {
+        targetZone = IDLE_ZONES[Object.keys(agents).indexOf(userId) % IDLE_ZONES.length];
+    }
 
     if (statusRaw === 'completed' || statusRaw === 'failed') {
         moveAgentToSector(userId, targetZone);
         setTimeout(() => {
             const idleZone = IDLE_ZONES[Math.floor(Math.random() * IDLE_ZONES.length)];
             moveAgentToSector(userId, idleZone);
-        }, 6000);
+        }, 8000);
     } else {
         moveAgentToSector(userId, targetZone);
     }

@@ -13,7 +13,7 @@ function createTopHeader(activePage = '') {
         else if (path.includes('/workspace')) activePage = 'workspace';
         else if (path.includes('/cronjobs')) activePage = 'cronjobs';
         else if (path.includes('/agents')) activePage = 'agents';
-        else if (path.includes('/office')) activePage = 'village';
+        else if (path.includes('/village')) activePage = 'village';
         else if (path.includes('/wiki')) activePage = 'wiki';
         else if (path.includes('/wedally')) activePage = 'wedally';
     }
@@ -48,7 +48,7 @@ function createTopHeader(activePage = '') {
                     </svg>
                     <span>Agents</span>
                 </a>
-                <a href="/office/index.html" class="nav-link ${activePage === 'village' ? 'active' : ''}">
+                <a href="/village/index.html" class="nav-link ${activePage === 'village' ? 'active' : ''}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="7" width="20" height="14" rx="2"/>
                         <path d="M16 7V5a4 4 0 0 0-8 0v2"/>
