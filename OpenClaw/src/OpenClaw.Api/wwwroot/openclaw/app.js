@@ -25,14 +25,30 @@ const tokenUsage = {
     history: [] // { message, inputTokens, outputTokens, timestamp }
 };
 
-// Configure marked.js
+// Configure mermaid
+if (typeof mermaid !== 'undefined') {
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+}
+
+// Configure marked.js with custom renderer for mermaid
+const renderer = new marked.Renderer();
+const originalCode = renderer.code;
+renderer.code = function({ text, lang }) {
+    if (lang === 'mermaid') {
+        const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+        return `<div class="mermaid" id="${id}">${text}</div>`;
+    }
+    // Default code rendering with hljs
+    if (lang && hljs.getLanguage(lang)) {
+        const highlighted = hljs.highlight(text, { language: lang }).value;
+        return `<pre><code class="hljs language-${lang}">${highlighted}</code></pre>`;
+    }
+    const highlighted = hljs.highlightAuto(text).value;
+    return `<pre><code class="hljs">${highlighted}</code></pre>`;
+};
+
 marked.setOptions({
-    highlight: function(code, lang) {
-        if (lang && hljs.getLanguage(lang)) {
-            return hljs.highlight(code, { language: lang }).value;
-        }
-        return hljs.highlightAuto(code).value;
-    },
+    renderer,
     breaks: true,
     gfm: true
 });
@@ -413,6 +429,7 @@ function addMessage(content, role) {
         messageEl.querySelectorAll('pre code').forEach(block => {
             hljs.highlightElement(block);
         });
+        renderMermaidDiagrams();
     } else {
         messageEl.textContent = content;
     }
@@ -491,6 +508,7 @@ function updateStreamingMessage(messageEl, content) {
     messageEl.querySelectorAll('pre code').forEach(block => {
         hljs.highlightElement(block);
     });
+    renderMermaidDiagrams();
 
     // Only auto-scroll if user was already near the bottom
     if (wasNearBottom) {
@@ -537,9 +555,31 @@ function renderMarkdown(content) {
 
     // Render markdown and sanitize with DOMPurify to prevent XSS
     const html = marked.parse(content);
-    return typeof DOMPurify !== 'undefined'
-        ? DOMPurify.sanitize(html, { ADD_TAGS: ['katex-display'], ADD_ATTR: ['class', 'style'] })
+    const sanitized = typeof DOMPurify !== 'undefined'
+        ? DOMPurify.sanitize(html, {
+            ADD_TAGS: ['katex-display'],
+            ADD_ATTR: ['class', 'style', 'id'],
+            CUSTOM_ELEMENT_HANDLING: {
+                tagNameCheck: /^div$/,
+                attributeNameCheck: /^(class|id)$/,
+                allowCustomizedBuiltInElements: true
+            }
+        })
         : html;
+    return sanitized;
+}
+
+// Run mermaid on all pending diagrams in the messages container
+function renderMermaidDiagrams() {
+    if (typeof mermaid === 'undefined') return;
+    try {
+        const pending = document.querySelectorAll('.mermaid:not([data-processed])');
+        if (pending.length > 0) {
+            mermaid.run({ nodes: pending });
+        }
+    } catch (e) {
+        console.warn('Mermaid render error:', e);
+    }
 }
 
 // Input history navigation - get user messages from current conversation
