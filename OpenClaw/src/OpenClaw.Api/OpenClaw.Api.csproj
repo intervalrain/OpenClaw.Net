@@ -43,6 +43,7 @@
     <ProjectReference Include="..\OpenClaw.Infrastructure\OpenClaw.Infrastructure.csproj" />
     <ProjectReference Include="..\Weda.Protocol\Weda.Protocol.csproj" />
     <ProjectReference Include="..\OpenClaw.Hosting\OpenClaw.Hosting.csproj" />
+    <ProjectReference Include="..\OpenClaw.Channels.Teams\OpenClaw.Channels.Teams.csproj" />
   </ItemGroup>
 
 </Project>

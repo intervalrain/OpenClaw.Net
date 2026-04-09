@@ -63,6 +63,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Tmux", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Tools.Notion", "src\tools\OpenClaw.Tools.Notion\OpenClaw.Tools.Notion.csproj", "{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenClaw.Channels.Teams", "src\OpenClaw.Channels.Teams\OpenClaw.Channels.Teams.csproj", "{A0111884-AD67-4228-9BD3-1474D065CC3D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -397,6 +399,18 @@ Global
 		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x64.Build.0 = Release|Any CPU
 		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x86.ActiveCfg = Release|Any CPU
 		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63}.Release|x86.Build.0 = Release|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Debug|x64.Build.0 = Debug|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Debug|x86.Build.0 = Debug|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Release|x64.ActiveCfg = Release|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Release|x64.Build.0 = Release|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Release|x86.ActiveCfg = Release|Any CPU
+		{A0111884-AD67-4228-9BD3-1474D065CC3D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -429,5 +443,6 @@ Global
 		{D37E083D-F698-43EB-8630-F8248CCC5A96} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{6175CA82-8DFC-4061-8FC3-6768242AAB21} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
 		{8423C7B2-4CD8-49CD-9271-88D5C4EAAD63} = {B4179A26-5D7C-6D52-AD07-0B3AC1AE5D4D}
+		{A0111884-AD67-4228-9BD3-1474D065CC3D} = {E6C0A80B-5ADC-4138-A79D-C9C128EA163B}
 	EndGlobalSection
 EndGlobal

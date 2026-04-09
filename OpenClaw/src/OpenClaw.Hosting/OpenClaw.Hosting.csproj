@@ -39,6 +39,7 @@
     <ProjectReference Include="..\tools\OpenClaw.Tools.Tmux\OpenClaw.Tools.Tmux.csproj" />
     <ProjectReference Include="..\tools\OpenClaw.Tools.Preference\OpenClaw.Tools.Preference.csproj" />
     <ProjectReference Include="..\tools\OpenClaw.Tools.Notion\OpenClaw.Tools.Notion.csproj" />
+    <ProjectReference Include="..\OpenClaw.Channels.Teams\OpenClaw.Channels.Teams.csproj" />
   </ItemGroup>
 
 </Project>

@@ -17,6 +17,7 @@ using OpenClaw.Contracts.Configuration;
 using OpenClaw.Contracts.Llm;
 using OpenClaw.Contracts.Skills;
 using OpenClaw.Application.Skills;
+using OpenClaw.Channels.Teams.Extensions;
 using OpenClaw.Channels.Telegram.Extensions;
 using OpenClaw.Domain.AgentActivities.Repositories;
 using OpenClaw.Domain.Agents.Repositories;
@@ -167,6 +168,7 @@ public static class ServiceCollectionExtensions
 
         // Channels
         services.AddTelegramChannel(configuration);
+        services.AddTeamsChannel(configuration);
 
         // Agent Activities
         services.AddScoped<IAgentActivityRepository, AgentActivityRepository>();

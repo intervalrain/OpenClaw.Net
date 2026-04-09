@@ -52,6 +52,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.2" />
     <PackageVersion Include="Shouldly" Version="4.2.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="Microsoft.Bot.Builder.Integration.AspNet.Core" Version="4.23.0" />
     <PackageVersion Include="Telegram.Bot" Version="22.9.5.2" />
     <PackageVersion Include="throw" Version="1.4.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
